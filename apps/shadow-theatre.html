@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SHADOW THEATRE | 빛으로 만드는 그림자 극장</title>
+  <!-- Three.js 단일 안정 CDN (전역 THREE 사용) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #070b16;
+      --bg-panel: rgba(12, 19, 36, 0.84);
+      --border-gold: rgba(255, 209, 102, 0.28);
+      --gold-bright: #ffd166;
+      --gold-warm: #ffb703;
+      --text-main: #f4f6fb;
+      --text-muted: #9aa8c7;
+      --accent-blue: #3a86ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: radial-gradient(circle at 35% 35%, #131f3e 0%, #090e1d 60%, #050811 100%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    }
+    #stage-wrap {
+      position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: hidden;
+    }
+    canvas {
+      display: block; width: 100%; height: 100%; outline: none;
+    }
+    .top-bar {
+      position: fixed; top: 14px; left: 16px; right: 16px;
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 10px; pointer-events: none; z-index: 20;
+    }
+    .brand-box {
+      pointer-events: auto;
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-gold);
+      border-radius: 14px;
+      padding: 10px 16px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    }
+    .brand-title {
+      font-size: 1.05rem; font-weight: 800; letter-spacing: 0.02em;
+      color: var(--gold-bright); display: flex; align-items: center; gap: 8px;
+    }
+    .brand-sub {
+      font-size: 0.76rem; color: var(--text-muted); margin-top: 3px; line-height: 1.35;
+    }
+    .formula-card {
+      pointer-events: auto;
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-gold);
+      border-radius: 14px;
+      padding: 9px 15px;
+      display: flex; flex-direction: column; gap: 4px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+      max-width: 520px;
+    }
+    .formula-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+      font-size: 0.82rem; color: var(--text-main);
+    }
+    .badge-mag {
+      background: rgba(255, 183, 3, 0.18);
+      border: 1px solid var(--gold-warm);
+      color: var(--gold-bright);
+      padding: 2px 9px; border-radius: 999px; font-weight: 700; font-size: 0.82rem;
+    }
+    .disclaimer {
+      font-size: 0.71rem; color: var(--text-muted); line-height: 1.3;
+    }
+    .control-deck {
+      position: fixed;
+      left: 50%; transform: translateX(-50%);
+      bottom: 84px; /* Gemini 하단 입력창 80px 안전공간 확보 */
+      width: min(1120px, calc(100vw - 24px));
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-gold);
+      border-radius: 16px;
+      padding: 11px 16px;
+      z-index: 20;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.6);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 10px 14px;
+      align-items: center;
+    }
+    .ctrl-group {
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .ctrl-label {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.76rem; font-weight: 600; color: #dbe4ff;
+    }
+    .ctrl-val {
+      color: var(--gold-bright); font-variant-numeric: tabular-nums; font-weight: 700;
+    }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 6px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15); outline: none; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--gold-bright);
+      border: 2px solid #1a233a;
+      box-shadow: 0 0 8px rgba(255, 209, 102, 0.8);
+    }
+    .btn-row {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    }
+    .btn {
+      flex: 1; min-width: 52px;
+      padding: 7px 9px;
+      font-size: 0.76rem; font-weight: 700;
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9px;
+      cursor: pointer; transition: all 0.15s ease;
+      text-align: center;
+    }
+    .btn:hover { background: rgba(255, 209, 102, 0.18); border-color: var(--gold-bright); }
+    .btn.active {
+      background: linear-gradient(135deg, #ffb703, #fb8500);
+      color: #090d16; border-color: #ffd166;
+      box-shadow: 0 0 12px rgba(255, 183, 3, 0.45);
+    }
+    #fallback-banner {
+      display: none;
+      position: fixed; top: 88px; left: 16px;
+      background: rgba(255, 183, 3, 0.16);
+      border: 1px solid var(--gold-warm);
+      color: var(--gold-bright);
+      padding: 6px 12px; border-radius: 8px;
+      font-size: 0.75rem; z-index: 25;
+    }
+    @media (max-width: 768px) {
+      .top-bar { top: 8px; left: 10px; right: 10px; gap: 6px; }
+      .brand-box, .formula-card { padding: 8px 11px; width: 100%; max-width: none; }
+      .control-deck {
+        bottom: 82px; padding: 9px 12px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="stage-wrap">
+    <canvas id="theatre-canvas" aria-label="빛으로 만드는 그림자 극장 3D 무대"></canvas>
+  </div>
+
+  <div id="fallback-banner">
+    WebGL 3D 가속을 사용할 수 없어 동일 3D 투영 기하를 계산하는 2D 극장 캔버스로 실행 중입니다.
+  </div>
+
+  <header class="top-bar">
+    <div class="brand-box">
+      <div class="brand-title">
+        <span>✨ SHADOW THEATRE</span>
+        <span style="font-weight:400; opacity:0.85;">| 빛으로 만드는 그림자 극장</span>
+      </div>
+      <div class="brand-sub">
+        점광원에서 뻗어 나온 빛의 직진과 기하학적 닮음으로 만들어지는 실시간 입체 투영 무대 (드래그: 시점 회전 · 방향키: 광원 이동)
+      </div>
+    </div>
+
+    <div class="formula-card">
+      <div class="formula-row">
+        <span>평행 평면 확대율 <strong>M = D<sub>s</sub> / D<sub>o</sub></strong> (광원~스크린 거리 / 광원~물체 거리)</span>
+        <span class="badge-mag" id="mag-readout">M = 2.00× (12.0m / 6.0m)</span>
+      </div>
+      <div class="disclaimer">
+        ※ 스크린과 나란한 물체 단면 기준 비례식입니다. 이상적 점광원·불투명 기하 입체의 학습 도식이며 실제 광원의 반그림자·회절은 정밀 재현하지 않습니다.
+      </div>
+    </div>
+  </header>
+
+  <section class="control-deck" aria-label="그림자 극장 조작부">
+    <!-- 1. 물체 선택 -->
+    <div class="ctrl-group">
+      <div class="ctrl-label"><span>① 기하 입체 선택</span><span class="ctrl-val" id="shape-label">정육면체</span></div>
+      <div class="btn-row" role="group" aria-label="물체 종류">
+        <button type="button" class="btn" data-shape="sphere">구</button>
+        <button type="button" class="btn active" data-shape="cube">정육면체</button>
+        <button type="button" class="btn" data-shape="prism">삼각 기둥</button>
+      </div>
+    </div>
+
+    <!-- 2. 광원 위치 (좌우 X / 높이 Y) -->
+    <div class="ctrl-group">
+      <label class="ctrl-label" for="slider-lx">
+        <span>② 광원 좌우 위치 (X<sub>L</sub>)</span>
+        <span class="ctrl-val" id="val-lx">0.0 m</span>
+      </label>
+      <input type="range" id="slider-lx" min="-2.2" max="2.2" step="0.05" value="0.0" />
+      <label class="ctrl-label" for="slider-ly" style="margin-top:2px;">
+        <span>광원 높이 (Y<sub>L</sub>)</span>
+        <span class="ctrl-val" id="val-ly">0.4 m</span>
+      </label>
+      <input type="range" id="slider-ly" min="-1.6" max="2.0" step="0.05" value="0.4" />
+    </div>
+
+    <!-- 3. 물체의 광원~스크린 사이 거리 -->
+    <div class="ctrl-group">
+      <label class="ctrl-label" for="slider-dist">
+        <span>③ 광원~물체 거리 (D<sub>o</sub>)</span>
+        <span class="ctrl-val" id="val-dist">6.0 m</span>
+      </label>
+      <input type="range" id="slider-dist" min="3.8" max="9.2" step="0.05" value="6.0" />
+      <div class="disclaimer" id="dist-sub">광원(0m) ↔ 물체(6.0m) ↔ 스크린(12.0m)</div>
+    </div>
+
+    <!-- 4. 물체 회전 (가로 Y / 세로 기울기 X) -->
+    <div class="ctrl-group">
+      <label class="ctrl-label" for="slider-roty">
+        <span>④ 물체 회전 (Y축)</span>
+        <span class="ctrl-val" id="val-roty">35°</span>
+      </label>
+      <input type="range" id="slider-roty" min="0" max="360" step="1" value="35" />
+      <label class="ctrl-label" for="slider-rotx" style="margin-top:2px;">
+        <span>물체 기울기 (X축)</span>
+        <span class="ctrl-val" id="val-rotx">25°</span>
+      </label>
+      <input type="range" id="slider-rotx" min="-80" max="80" step="1" value="25" />
+    </div>
+
+    <!-- 5 & 6. 광선 표시 전환 및 초기화·홈 시점 -->
+    <div class="ctrl-group">
+      <div class="ctrl-label"><span>⑤ 광선 표시 &amp; ⑥ 시점</span><span class="ctrl-val" id="ray-status">켜짐</span></div>
+      <div class="btn-row">
+        <button type="button" class="btn active" id="btn-rays">광선 표시 ON</button>
+        <button type="button" class="btn" id="btn-reset">초기화 · 홈</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // 무대 기하 상수 (광원 z = -6.0m, 스크린 z = +6.0m -> 총 거리 Ds = 12.0m)
+      const Z_LIGHT = -6.0;
+      const Z_SCREEN = 6.0;
+      const TOTAL_DIST = Z_SCREEN - Z_LIGHT; // 12.0m
+      const SCREEN_W = 11.2;
+      const SCREEN_H = 7.4;
+
+      const DEFAULTS = {
+        shape: 'cube',
+        lightX: 0.0,
+        lightY: 0.4,
+        objDist: 6.0, // 광원으로부터의 거리 Do (범위 3.8 ~ 9.2m로 충돌 및 0 분모 원천 차단)
+        rotY: 35,
+        rotX: 25,
+        showRays: true,
+        camAzimuth: -0.64,
+        camElevation: 0.34,
+        camDistance: 15.6
+      };
+
+      const state = Object.assign({}, DEFAULTS);
+      let renderMode = 'webgl';
+      let lastProjection = {
+        hull2D: [],
+        hull3DWorld: [],
+        projectedAllCount: 0,
+        shadowArea: 0,
+        magnification: 2.0,
+        checksum: 0
+      };
+
+      function createLocalVertices(shapeType) {
+        const verts = [];
+        if (shapeType === 'cube') {
+          const s = 0.92;
+          for (let dx of [-s, s]) {
+            for (let dy of [-s, s]) {
+              for (let dz of [-s, s]) {
+                verts.push({ x: dx, y: dy, z: dz });
+              }
+            }
+          }
+        } else if (shapeType === 'prism') {
+          // 삼각 기둥: 밑면이 정삼각형이고 높이가 있는 기둥
+          const r = 1.12;
+          const h = 1.05;
+          for (let y of [-h, h]) {
+            for (let k = 0; k < 3; k++) {
+              const ang = (k * 2 * Math.PI) / 3 - Math.PI / 2;
+              verts.push({ x: r * Math.cos(ang), y: y, z: r * Math.sin(ang) });
+            }
+          }
+        } else {
+          // 구 (Sphere): 정밀 투영 윤곽 계산을 위한 다면체 정점 샘플링
+          const radius = 1.02;
+          const latSteps = 14;
+          const lonSteps = 24;
+          verts.push({ x: 0, y: radius, z: 0 });
+          verts.push({ x: 0, y: -radius, z: 0 });
+          for (let i = 1; i < latSteps; i++) {
+            const phi = (i * Math.PI) / latSteps;
+            const sinP = Math.sin(phi);
+            const cosP = Math.cos(phi);
+            for (let j = 0; j < lonSteps; j++) {
+              const theta = (j * 2 * Math.PI) / lonSteps;
+              verts.push({
+                x: radius * sinP * Math.cos(theta),
+                y: radius * cosP,
+                z: radius * sinP * Math.sin(theta)
+              });
+            }
+          }
+        }
+        return verts;
+      }
+
+      function rotateVertex(v, rotXDeg, rotYDeg) {
+        const rx = (rotXDeg * Math.PI) / 180;
+        const ry = (rotYDeg * Math.PI) / 180;
+        // X축 회전 후 Y축 회전 (Three.js Euler 'YXZ'와 동일 순서로 맞춤)
+        const cosX = Math.cos(rx), sinX = Math.sin(rx);
+        const y1 = v.y * cosX - v.z * sinX;
+        const z1 = v.y * sinX + v.z * cosX;
+        const x1 = v.x;
+
+        const cosY = Math.cos(ry), sinY = Math.sin(ry);
+        const x2 = x1 * cosY + z1 * sinY;
+        const z2 = -x1 * sinY + z1 * cosY;
+        return { x: x2, y: y1, z: z2 };
+      }
+
+      // Monotone Chain 2D 볼록 껍질(Convex Hull) 알고리즘 - 투영 그림자 외곽선 및 접선 광선 추출
+      function computeConvexHull(pts) {
+        if (pts.length <= 2) return pts.slice();
+        const sorted = pts.slice().sort((a, b) => (a.x !== b.x ? a.x - b.x : a.y - b.y));
+        const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+        const lower = [];
+        for (const p of sorted) {
+          while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 1e-7) {
+            lower.pop();
+          }
+          lower.push(p);
+        }
+        const upper = [];
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const p = sorted[i];
+          while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 1e-7) {
+            upper.pop();
+          }
+          upper.push(p);
+        }
+        upper.pop();
+        lower.pop();
+        return lower.concat(upper);
+      }
+
+      function computePolygonArea(hull) {
+        let area = 0;
+        for (let i = 0; i < hull.length; i++) {
+          const j = (i + 1) % hull.length;
+          area += hull[i].x * hull[j].y - hull[j].x * hull[i].y;
+        }
+        return Math.abs(area) * 0.5;
+      }
+
+      function computeShadowProjection() {
+        const safeDo = Math.max(3.8, Math.min(9.2, state.objDist));
+        const objZ = Z_LIGHT + safeDo;
+        const lx = state.lightX;
+        const ly = state.lightY;
+        const lz = Z_LIGHT;
+
+        const localVerts = createLocalVertices(state.shape);
+        const projectedPts = [];
+
+        for (let i = 0; i < localVerts.length; i++) {
+          const r = rotateVertex(localVerts[i], state.rotX, state.rotY);
+          const wx = r.x;
+          const wy = r.y;
+          const wz = objZ + r.z;
+
+          // 분모 0 방지 안전 클램프 (항상 wz > lz + 1.5 이상 유지됨)
+          const denom = Math.max(0.5, wz - lz);
+          const t = (Z_SCREEN - lz) / denom;
+          const sx = lx + t * (wx - lx);
+          const sy = ly + t * (wy - ly);
+
+          projectedPts.push({
+            x: sx,
+            y: sy,
+            wx: wx,
+            wy: wy,
+            wz: wz
+          });
+        }
+
+        const hull = computeConvexHull(projectedPts);
+        const area = computePolygonArea(hull);
+        const mag = TOTAL_DIST / safeDo;
+
+        // 결정론적 체크섬 계산 (실제 투영 좌표 기반)
+        let sum = 0;
+        for (let i = 0; i < hull.length; i++) {
+          sum += Math.round((hull[i].x * 137 + hull[i].y * 251) * 1000);
+        }
+
+        lastProjection = {
+          hull2D: hull.map(p => ({ x: Number(p.x.toFixed(4)), y: Number(p.y.toFixed(4)) })),
+          hull3DWorld: hull.map(p => ({ x: p.wx, y: p.wy, z: p.wz, sx: p.x, sy: p.y })),
+          projectedAllCount: projectedPts.length,
+          shadowArea: Number(area.toFixed(4)),
+          magnification: Number(mag.toFixed(4)),
+          checksum: sum
+        };
+        return lastProjection;
+      }
+
+      const canvas = document.getElementById('theatre-canvas');
+      let renderer = null, scene = null, camera = null;
+      let lightGroup = null, objectGroup = null, objectMesh = null, objectWire = null;
+      let shadowMesh = null, shadowOutline = null, rayLines = null, rayConeMesh = null;
+      let screenGlowMesh = null;
+      let ctx2D = null;
+
+      function initStage() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('THREE not loaded');
+          renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        } catch (err) {
+          renderMode = 'canvas2d';
+          document.getElementById('fallback-banner').style.display = 'block';
+          ctx2D = canvas.getContext('2d');
+          resizeStage();
+          return;
+        }
+
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x070b16, 0.018);
+
+        camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+
+        // 극장 기본 조명
+        const ambient = new THREE.AmbientLight(0x8da8ff, 0.55);
+        scene.add(ambient);
+        const dirLight = new THREE.DirectionalLight(0xffe6a3, 0.75);
+        dirLight.position.set(-8, 9, -6);
+        scene.add(dirLight);
+
+        // 극장 무대 바닥 & 그리드
+        const floorGeo = new THREE.PlaneGeometry(24, 20);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0d1528, roughness: 0.85, metalness: 0.1 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -3.7;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(20, 20, 0x33497a, 0x1a2747);
+        grid.position.y = -3.69;
+        scene.add(grid);
+
+        // 광원~스크린 중심 레일 표시선
+        const railGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, -3.66, Z_LIGHT),
+          new THREE.Vector3(0, -3.66, Z_SCREEN)
+        ]);
+        const railLine = new THREE.Line(railGeo, new THREE.LineBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.5 }));
+        scene.add(railLine);
+
+        // 밝은 영사 스크린 (z = Z_SCREEN)
+        const frameGeo = new THREE.BoxGeometry(SCREEN_W + 0.5, SCREEN_H + 0.5, 0.25);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e2c4c, roughness: 0.5 });
+        const screenFrame = new THREE.Mesh(frameGeo, frameMat);
+        screenFrame.position.set(0, 0, Z_SCREEN + 0.14);
+        scene.add(screenFrame);
+
+        const screenGeo = new THREE.PlaneGeometry(SCREEN_W, SCREEN_H);
+        const screenMat = new THREE.MeshBasicMaterial({ color: 0xf7f4ea, side: THREE.DoubleSide });
+        const screenMesh = new THREE.Mesh(screenGeo, screenMeshMatWithGlow());
+        screenMesh.position.set(0, 0, Z_SCREEN);
+        scene.add(screenMesh);
+
+        // 스크린 위 광원 조도 중심 후광
+        const glowGeo = new THREE.CircleGeometry(4.2, 40);
+        const glowMat = new THREE.MeshBasicMaterial({
+          color: 0xfff8d6,
+          transparent: true,
+          opacity: 0.45,
+          side: THREE.DoubleSide
+        });
+        screenGlowMesh = new THREE.Mesh(glowGeo, glowMat);
+        screenGlowMesh.position.set(0, 0, Z_SCREEN - 0.008);
+        scene.add(screenGlowMesh);
+
+        // 점광원 어셈블리
+        lightGroup = new THREE.Group();
+        const bulbGeo = new THREE.SphereGeometry(0.24, 24, 24);
+        const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffea85 });
+        const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+        lightGroup.add(bulb);
+
+        const haloGeo = new THREE.SphereGeometry(0.46, 20, 20);
+        const haloMat = new THREE.MeshBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.32 });
+        lightGroup.add(new THREE.Mesh(haloGeo, haloMat));
+
+        const standGeo = new THREE.CylinderGeometry(0.05, 0.08, 6.0, 12);
+        const standMat = new THREE.MeshStandardMaterial({ color: 0x415a77, metalness: 0.5, roughness: 0.4 });
+        const stand = new THREE.Mesh(standGeo, standMat);
+        stand.position.y = -3.0;
+        lightGroup.add(stand);
+        scene.add(lightGroup);
+
+        // 3D 물체 그룹 및 받침대
+        objectGroup = new THREE.Group();
+        const objStand = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.04, 0.07, 5.0, 12),
+          new THREE.MeshStandardMaterial({ color: 0x3b4d71, transparent: true, opacity: 0.65 })
+        );
+        objStand.position.y = -2.5;
+        objectGroup.add(objStand);
+        scene.add(objectGroup);
+
+        // 스크린 투영 그림자 메쉬 및 외곽선
+        shadowMesh = new THREE.Mesh(
+          new THREE.BufferGeometry(),
+          new THREE.MeshBasicMaterial({ color: 0x0b1120, side: THREE.DoubleSide })
+        );
+        shadowMesh.position.z = Z_SCREEN - 0.02;
+        scene.add(shadowMesh);
+
+        shadowOutline = new THREE.LineLoop(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.75 })
+        );
+        shadowOutline.position.z = Z_SCREEN - 0.025;
+        scene.add(shadowOutline);
+
+        // 금빛 투영 광선 (외곽 접선) 및 반투명 빛 기둥
+        rayLines = new THREE.LineSegments(
+          new THREE.BufferGeometry(),
+          new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.68 })
+        );
+        scene.add(rayLines);
+
+        rayConeMesh = new THREE.Mesh(
+          new THREE.BufferGeometry(),
+          new THREE.MeshBasicMaterial({
+            color: 0xffd166,
+            transparent: true,
+            opacity: 0.09,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        scene.add(rayConeMesh);
+
+        rebuild3DObjectMesh();
+        updateCameraPosition();
+      }
+
+      function screenMeshMatWithGlow() {
+        return new THREE.MeshBasicMaterial({ color: 0xede8d8, side: THREE.DoubleSide });
+      }
+
+      function rebuild3DObjectMesh() {
+        if (renderMode !== 'webgl' || !objectGroup) return;
+        if (objectMesh) {
+          objectGroup.remove(objectMesh);
+          objectMesh.geometry.dispose();
+        }
+        if (objectWire) {
+          objectGroup.remove(objectWire);
+          objectWire.geometry.dispose();
+        }
+
+        let geo;
+        if (state.shape === 'cube') {
+          geo = new THREE.BoxGeometry(1.84, 1.84, 1.84);
+        } else if (state.shape === 'prism') {
+          geo = new THREE.CylinderGeometry(1.12, 1.12, 2.1, 3, 1);
+          geo.rotateY(Math.PI); // createLocalVertices 정점 위상과 일치화
+        } else {
+          geo = new THREE.SphereGeometry(1.02, 24, 14);
+        }
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0x3a86ff,
+          emissive: 0x10254c,
+          roughness: 0.32,
+          metalness: 0.18,
+          flatShading: state.shape !== 'sphere'
+        });
+        objectMesh = new THREE.Mesh(geo, mat);
+        objectGroup.add(objectMesh);
+
+        const wireGeo = new THREE.EdgesGeometry(geo, 12);
+        const wireMat = new THREE.LineBasicMaterial({ color: 0xa8dadc, transparent: true, opacity: 0.65 });
+        objectWire = new THREE.LineSegments(wireGeo, wireMat);
+        objectGroup.add(objectWire);
+      }
+
+      function syncSceneAndProjection() {
+        const proj = computeShadowProjection();
+        const objZ = Z_LIGHT + state.objDist;
+
+        // 상단 수식 및 슬라이더 텍스트 갱신
+        document.getElementById('val-lx').textContent = state.lightX.toFixed(2) + ' m';
+        document.getElementById('val-ly').textContent = state.lightY.toFixed(2) + ' m';
+        document.getElementById('val-dist').textContent = state.objDist.toFixed(2) + ' m';
+        document.getElementById('val-roty').textContent = Math.round(state.rotY) + '°';
+        document.getElementById('val-rotx').textContent = Math.round(state.rotX) + '°';
+        document.getElementById('dist-sub').textContent =
+          `광원(0m) ↔ 물체(${state.objDist.toFixed(1)}m) ↔ 스크린(${TOTAL_DIST.toFixed(1)}m)`;
+        document.getElementById('mag-readout').textContent =
+          `M = ${proj.magnification.toFixed(2)}× (${TOTAL_DIST.toFixed(1)}m / ${state.objDist.toFixed(1)}m)`;
+
+        const shapeNames = { sphere: '구', cube: '정육면체', prism: '삼각 기둥' };
+        document.getElementById('shape-label').textContent = shapeNames[state.shape];
+
+        if (renderMode === 'canvas2d') {
+          draw2DFallback(proj);
+          return;
+        }
+
+        // 1. 점광원 및 3D 물체 위치/회전 반영
+        lightGroup.position.set(state.lightX, state.lightY, Z_LIGHT);
+        objectGroup.position.set(0, 0, objZ);
+        if (objectMesh && objectWire) {
+          const rx = (state.rotX * Math.PI) / 180;
+          const ry = (state.rotY * Math.PI) / 180;
+          objectMesh.rotation.order = 'YXZ';
+          objectMesh.rotation.set(rx, ry, 0);
+          objectWire.rotation.order = 'YXZ';
+          objectWire.rotation.set(rx, ry, 0);
+        }
+
+        screenGlowMesh.position.set(
+          Math.max(-3.0, Math.min(3.0, state.lightX * 0.6)),
+          Math.max(-2.0, Math.min(2.0, state.lightY * 0.6)),
+          Z_SCREEN - 0.008
+        );
+
+        // 2. 스크린 위 실제 기하 투영 다각형(Shadow Polygon) 생성 (스크린 경계 클리핑 적용)
+        const hull = proj.hull3DWorld;
+        if (hull.length >= 3) {
+          const hw = SCREEN_W * 0.5 - 0.06;
+          const hh = SCREEN_H * 0.5 - 0.06;
+          const shape2D = new THREE.Shape();
+          for (let i = 0; i < hull.length; i++) {
+            const cx = Math.max(-hw, Math.min(hw, hull[i].sx));
+            const cy = Math.max(-hh, Math.min(hh, hull[i].sy));
+            if (i === 0) shape2D.moveTo(cx, cy);
+            else shape2D.lineTo(cx, cy);
+          }
+          shape2D.closePath();
+
+          shadowMesh.geometry.dispose();
+          shadowMesh.geometry = new THREE.ShapeGeometry(shape2D);
+
+          const outlinePts = hull.map(p => new THREE.Vector3(
+            Math.max(-hw, Math.min(hw, p.sx)),
+            Math.max(-hh, Math.min(hh, p.sy)),
+            0
+          ));
+          shadowOutline.geometry.dispose();
+          shadowOutline.geometry = new THREE.BufferGeometry().setFromPoints(outlinePts);
+        }
+
+        // 3. 광원에서 물체 윤곽을 지나 스크린 그림자 경계에 닿는 금빛 광선 업데이트
+        rayLines.visible = state.showRays;
+        rayConeMesh.visible = state.showRays;
+
+        if (state.showRays && hull.length >= 3) {
+          const linePositions = [];
+          const conePositions = [];
+          const L = new THREE.Vector3(state.lightX, state.lightY, Z_LIGHT);
+          // 구의 경우 광선이 너무 빽빽하지 않도록 최대 16개 균등 샘플링, 다면체는 모든 꼭짓점 표시
+          const step = hull.length > 16 ? Math.ceil(hull.length / 16) : 1;
+
+          for (let i = 0; i < hull.length; i += step) {
+            const p = hull[i];
+            // 광원 -> 스크린 투영점 직선 (물체 외곽 꼭짓점 통과)
+            linePositions.push(L.x, L.y, L.z, p.sx, p.sy, Z_SCREEN - 0.02);
+          }
+
+          for (let i = 0; i < hull.length; i++) {
+            const p1 = hull[i];
+            const p2 = hull[(i + 1) % hull.length];
+            conePositions.push(
+              L.x, L.y, L.z,
+              p1.sx, p1.sy, Z_SCREEN - 0.02,
+              p2.sx, p2.sy, Z_SCREEN - 0.02
+            );
+          }
+
+          rayLines.geometry.dispose();
+          const lineGeo = new THREE.BufferGeometry();
+          lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+          rayLines.geometry = lineGeo;
+
+          rayConeMesh.geometry.dispose();
+          const coneGeo = new THREE.BufferGeometry();
+          coneGeo.setAttribute('position', new THREE.Float32BufferAttribute(conePositions, 3));
+          rayConeMesh.geometry = coneGeo;
+        }
+      }
+
+      function updateCameraPosition() {
+        if (renderMode !== 'webgl' || !camera) return;
+        const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        // 화면이 좁은 모바일/세로 비율에서도 전체 무대와 스크린이 한눈에 들어오도록 거리 자동 보정
+        const responsiveScale = aspect < 1.15 ? 1.32 / Math.max(0.55, aspect * 0.95) : 1.0;
+        const dist = state.camDistance * responsiveScale;
+
+        const target = new THREE.Vector3(0.4, -0.35, 0.4);
+        const cx = target.x + dist * Math.cos(state.camElevation) * Math.sin(state.camAzimuth);
+        const cy = target.y + dist * Math.sin(state.camElevation);
+        const cz = target.z - dist * Math.cos(state.camElevation) * Math.cos(state.camAzimuth);
+
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(target);
+      }
+
+      // WebGL 실패 시 동일 3D 투영 기하를 등각(Isometric) 시점으로 그리는 2D 대안 렌더러
+      function draw2DFallback(proj) {
+        if (!ctx2D) return;
+        const w = canvas.width, h = canvas.height;
+        ctx2D.clearRect(0, 0, w, h);
+
+        const projectIso = (x, y, z) => {
+          const scale = Math.min(w, h) * 0.048;
+          const sx = w * 0.48 + (z * 0.92 - x * 0.55) * scale;
+          const sy = h * 0.46 + (-y + z * 0.22 + x * 0.25) * scale;
+          return { x: sx, y: sy };
+        };
+
+        // 스크린 평면 그리기
+        const sw = SCREEN_W * 0.5, sh = SCREEN_H * 0.5;
+        const sCorners = [
+          projectIso(-sw, sh, Z_SCREEN),
+          projectIso(sw, sh, Z_SCREEN),
+          projectIso(sw, -sh, Z_SCREEN),
+          projectIso(-sw, -sh, Z_SCREEN)
+        ];
+        ctx2D.fillStyle = '#f3efe2';
+        ctx2D.beginPath();
+        sCorners.forEach((p, idx) => (idx === 0 ? ctx2D.moveTo(p.x, p.y) : ctx2D.lineTo(p.x, p.y)));
+        ctx2D.closePath();
+        ctx2D.fill();
+
+        // 투영 그림자 다각형
+        const hull = proj.hull3DWorld;
+        if (hull.length >= 3) {
+          ctx2D.fillStyle = '#0b1120';
+          ctx2D.beginPath();
+          hull.forEach((p, idx) => {
+            const pt = projectIso(p.sx, p.sy, Z_SCREEN);
+            if (idx === 0) ctx2D.moveTo(pt.x, pt.y);
+            else ctx2D.lineTo(pt.x, pt.y);
+          });
+          ctx2D.closePath();
+          ctx2D.fill();
+        }
+
+        // 광선 및 광원
+        const lPt = projectIso(state.lightX, state.lightY, Z_LIGHT);
+        if (state.showRays) {
+          ctx2D.strokeStyle = 'rgba(255, 209, 102, 0.5)';
+          ctx2D.lineWidth = 1.2;
+          hull.forEach(p => {
+            const sPt = projectIso(p.sx, p.sy, Z_SCREEN);
+            ctx2D.beginPath();
+            ctx2D.moveTo(lPt.x, lPt.y);
+            ctx2D.lineTo(sPt.x, sPt.y);
+            ctx2D.stroke();
+          });
+        }
+
+        // 물체 투영 외곽선
+        ctx2D.fillStyle = '#3a86ff';
+        ctx2D.beginPath();
+        hull.forEach((p, idx) => {
+          const oPt = projectIso(p.x, p.y, p.z);
+          if (idx === 0) ctx2D.moveTo(oPt.x, oPt.y);
+          else ctx2D.lineTo(oPt.x, oPt.y);
+        });
+        ctx2D.closePath();
+        ctx2D.fill();
+
+        // 점광원
+        ctx2D.fillStyle = '#ffd166';
+        ctx2D.beginPath();
+        ctx2D.arc(lPt.x, lPt.y, 10, 0, Math.PI * 2);
+        ctx2D.fill();
+      }
+
+      function bindEvents() {
+        // 물체 선택 버튼
+        document.querySelectorAll('[data-shape]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            state.shape = btn.getAttribute('data-shape');
+            document.querySelectorAll('[data-shape]').forEach(b => b.classList.toggle('active', b === btn));
+            rebuild3DObjectMesh();
+            syncSceneAndProjection();
+          });
+        });
+
+        // 슬라이더 이벤트 연결
+        const bindSlider = (id, key) => {
+          const el = document.getElementById(id);
+          el.addEventListener('input', () => {
+            state[key] = parseFloat(el.value);
+            syncSceneAndProjection();
+          });
+        };
+        bindSlider('slider-lx', 'lightX');
+        bindSlider('slider-ly', 'lightY');
+        bindSlider('slider-dist', 'objDist');
+        bindSlider('slider-roty', 'rotY');
+        bindSlider('slider-rotx', 'rotX');
+
+        // 광선 토글 버튼
+        const btnRays = document.getElementById('btn-rays');
+        btnRays.addEventListener('click', () => {
+          state.showRays = !state.showRays;
+          btnRays.classList.toggle('active', state.showRays);
+          btnRays.textContent = state.showRays ? '광선 표시 ON' : '광선 표시 OFF';
+          document.getElementById('ray-status').textContent = state.showRays ? '켜짐' : '꺼짐';
+          syncSceneAndProjection();
+        });
+
+        // 초기화 · 홈 시점 버튼
+        document.getElementById('btn-reset').addEventListener('click', () => {
+          Object.assign(state, DEFAULTS);
+          document.getElementById('slider-lx').value = state.lightX;
+          document.getElementById('slider-ly').value = state.lightY;
+          document.getElementById('slider-dist').value = state.objDist;
+          document.getElementById('slider-roty').value = state.rotY;
+          document.getElementById('slider-rotx').value = state.rotX;
+          document.querySelectorAll('[data-shape]').forEach(b =>
+            b.classList.toggle('active', b.getAttribute('data-shape') === state.shape)
+          );
+          btnRays.classList.add('active');
+          btnRays.textContent = '광선 표시 ON';
+          document.getElementById('ray-status').textContent = '켜짐';
+          rebuild3DObjectMesh();
+          updateCameraPosition();
+          syncSceneAndProjection();
+        });
+
+        // 마우스/터치 시점 회전
+        let dragging = false, prevX = 0, prevY = 0;
+        canvas.addEventListener('pointerdown', e => {
+          dragging = true; prevX = e.clientX; prevY = e.clientY;
+        });
+        window.addEventListener('pointermove', e => {
+          if (!dragging) return;
+          const dx = e.clientX - prevX;
+          const dy = e.clientY - prevY;
+          prevX = e.clientX; prevY = e.clientY;
+          state.camAzimuth = Math.max(-1.35, Math.min(0.45, state.camAzimuth + dx * 0.0055));
+          state.camElevation = Math.max(-0.15, Math.min(1.1, state.camElevation + dy * 0.0055));
+          updateCameraPosition();
+        });
+        window.addEventListener('pointerup', () => { dragging = false; });
+
+        // 키보드 조작 (방향키: 광원 이동, R: 회전)
+        window.addEventListener('keydown', e => {
+          if (e.key === 'ArrowLeft') state.lightX = Math.max(-2.2, state.lightX - 0.1);
+          else if (e.key === 'ArrowRight') state.lightX = Math.min(2.2, state.lightX + 0.1);
+          else if (e.key === 'ArrowUp') state.lightY = Math.min(2.0, state.lightY + 0.1);
+          else if (e.key === 'ArrowDown') state.lightY = Math.max(-1.6, state.lightY - 0.1);
+          else return;
+          document.getElementById('slider-lx').value = state.lightX;
+          document.getElementById('slider-ly').value = state.lightY;
+          syncSceneAndProjection();
+        });
+
+        window.addEventListener('resize', resizeStage);
+      }
+
+      function resizeStage() {
+        const w = window.innerWidth, h = window.innerHeight;
+        if (renderMode === 'webgl' && renderer && camera) {
+          camera.aspect = w / Math.max(1, h);
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+          updateCameraPosition();
+        } else {
+          canvas.width = w;
+          canvas.height = h;
+          draw2DFallback(lastProjection);
+        }
+      }
+
+      // 읽기 전용 실제 투영 정점 샘플 및 파라미터 반환 함수
+      window.appDiagnostics = function () {
+        const proj = computeShadowProjection();
+        return Object.freeze({
+          appTitle: 'SHADOW THEATRE | 빛으로 만드는 그림자 극장',
+          renderMode: renderMode,
+          parameters: Object.freeze({
+            shape: state.shape,
+            lightPosition: { x: state.lightX, y: state.lightY, z: Z_LIGHT },
+            objectDistanceFromLight: state.objDist,
+            screenDistanceFromLight: TOTAL_DIST,
+            objectRotationDeg: { x: state.rotX, y: state.rotY },
+            showRays: state.showRays
+          }),
+          projectionMetrics: Object.freeze({
+            parallelPlaneMagnification: proj.magnification,
+            projectedVertexCount: proj.projectedAllCount,
+            shadowHullVertexCount: proj.hull2D.length,
+            shadowPolygonAreaM2: proj.shadowArea,
+            projectedHullSample: Object.freeze(proj.hull2D.slice(0, 8)),
+            geometryChecksum: proj.checksum
+          })
+        });
+      };
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (renderMode === 'webgl' && renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+      }
+
+      window.onload = function () {
+        initStage();
+        bindEvents();
+        resizeStage();
+        syncSceneAndProjection();
+        animate();
+      };
+    })();
+  </script>
+</body>
+</html>

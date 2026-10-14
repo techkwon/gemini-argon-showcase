@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CONTOUR PLANET | 등고선으로 만드는 작은 행성</title>
+  <style>
+    :root {
+      --bg-deep: #050914;
+      --bg-panel: rgba(10, 18, 36, 0.84);
+      --border-glow: rgba(94, 234, 212, 0.26);
+      --text-main: #f1f5f9;
+      --text-sub: #94a3b8;
+      --accent-cyan: #2dd4bf;
+      --accent-amber: #fbbf24;
+      --accent-blue: #38bdf8;
+      --bottom-safe-space: 190px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 38%, #0f2042 0%, #071024 52%, #030712 100%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .app-shell {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - var(--bottom-safe-space));
+      height: calc(100dvh - var(--bottom-safe-space));
+      max-height: calc(100dvh - var(--bottom-safe-space));
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 2;
+    }
+    #stage-wrap {
+      position: fixed;
+      inset: 0 0 var(--bottom-safe-space) 0;
+      z-index: 1;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #webgl-canvas, #fallback-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #fallback-canvas { display: none; }
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px 12px;
+      padding: 10px 14px 0;
+      pointer-events: auto;
+    }
+    .brand-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-glow);
+      border-radius: 12px;
+      padding: 8px 12px;
+      max-width: 520px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    .brand-title {
+      font-size: 0.96rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(45, 212, 191, 0.16);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(45, 212, 191, 0.35);
+    }
+    .brand-notice {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      margin-top: 3px;
+      line-height: 1.35;
+    }
+    .hud-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .legend-card, .profile-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 12px;
+      padding: 7px 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .legend-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .legend-bar {
+      width: 175px;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #0ea5e9 0%, #34d399 24%, #a3e635 50%, #fbbf24 76%, #f8fafc 100%);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.66rem;
+      color: var(--text-sub);
+      margin-top: 3px;
+    }
+    .legend-tip {
+      font-size: 0.68rem;
+      color: #a7f3d0;
+      margin-top: 4px;
+    }
+    #profile-canvas {
+      width: 190px;
+      height: 54px;
+      display: block;
+      border-radius: 6px;
+      background: rgba(3, 7, 18, 0.65);
+    }
+    .bottom-dock {
+      padding: 0 12px 10px;
+      margin-bottom: 4px;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .control-bar {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glow);
+      border-radius: 14px;
+      padding: 8px 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(140px, 1fr)) auto;
+      gap: 8px 12px;
+      align-items: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .ctrl-group label {
+      font-size: 0.73rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ctrl-val {
+      color: var(--accent-cyan);
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      border: 2px solid #0f172a;
+      box-shadow: 0 0 8px rgba(45, 212, 191, 0.8);
+    }
+    .btn-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .seg-group {
+      display: inline-flex;
+      background: rgba(15, 23, 42, 0.85);
+      padding: 2px;
+      border-radius: 9px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+    }
+    button {
+      font-family: inherit;
+      font-size: 0.73rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      background: transparent;
+      border: none;
+      padding: 6px 9px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+    button:hover { color: #ffffff; background: rgba(255, 255, 255, 0.08); }
+    button.active {
+      background: linear-gradient(135deg, #0d9488, #0284c7);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(14, 165, 233, 0.4);
+    }
+    .action-btn {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      padding: 6px 10px;
+      border-radius: 8px;
+    }
+    .action-btn.view-active {
+      border-color: var(--accent-amber);
+      color: var(--accent-amber);
+      background: rgba(251, 191, 36, 0.14);
+    }
+    #fallback-banner {
+      display: none;
+      font-size: 0.72rem;
+      color: #fde68a;
+      background: rgba(120, 53, 15, 0.75);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      padding: 4px 10px;
+      border-radius: 8px;
+      align-self: flex-start;
+    }
+    @media (max-width: 900px) {
+      .control-bar { grid-template-columns: repeat(3, 1fr); }
+      .btn-cluster { grid-column: 1 / -1; justify-content: space-between; }
+    }
+    @media (max-width: 600px) {
+      .top-bar { padding: 6px 8px 0; }
+      .brand-card { padding: 6px 9px; }
+      .profile-card { display: none; }
+      .control-bar { grid-template-columns: 1fr 1fr; padding: 7px 9px; gap: 6px 8px; }
+      .ctrl-group:nth-child(3) { grid-column: 1 / -1; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="stage-wrap">
+    <canvas id="webgl-canvas" aria-label="등고선 행성 3D 지형 캔버스"></canvas>
+    <canvas id="fallback-canvas" aria-label="등고선 행성 2D 대체 지도 캔버스"></canvas>
+  </div>
+
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="brand-card">
+        <div class="brand-title">
+          <span>CONTOUR PLANET | 등고선으로 만드는 작은 행성</span>
+          <span class="brand-badge" id="stat-badge">등고선 0개 · 침수 0%</span>
+        </div>
+        <p class="brand-notice">
+          ※ 지도 투영·지형은 등고선 원리 학습용 수학 도식이며 실측 지구 자료가 아닙니다.
+          <strong>경사가 가파른 곳일수록 같은 높이 차이를 짧은 수평 거리에서 오르므로 등고선 간격이 촘촘해집니다.</strong>
+        </p>
+        <div id="fallback-banner">WebGL 가속을 사용할 수 없어 동일 정점 데이터의 2D 등고선 투영 모드로 작동 중입니다.</div>
+      </div>
+
+      <div class="hud-right">
+        <div class="legend-card">
+          <div class="legend-title">
+            <span>고도 범례 및 등고선 색상</span>
+            <span id="peak-readout">최고 0m</span>
+          </div>
+          <div class="legend-bar"></div>
+          <div class="legend-labels">
+            <span>해수면</span>
+            <span>저지대(초록)</span>
+            <span>중산간(황토)</span>
+            <span>고산(설봉)</span>
+          </div>
+          <div class="legend-tip" id="slope-tip">● 굵은 형광선: 주곡선(5칸마다) / 청록선: 현재 해안선</div>
+        </div>
+
+        <div class="profile-card">
+          <div class="legend-title">
+            <span>중심 동서 단면도 (y = 0m 기준)</span>
+            <span id="mode-readout">3D 입체</span>
+          </div>
+          <canvas id="profile-canvas" width="190" height="54"></canvas>
+        </div>
+      </div>
+    </header>
+
+    <section class="bottom-dock" aria-label="지형 및 등고선 핵심 조작부">
+      <div class="control-bar">
+        <!-- 1. 산 높이 -->
+        <div class="ctrl-group">
+          <label for="slider-height">
+            <span>1. 산 높이 (기복 배율)</span>
+            <span class="ctrl-val" id="val-height">100%</span>
+          </label>
+          <input id="slider-height" type="range" min="35" max="165" step="5" value="100" />
+        </div>
+
+        <!-- 2. 등고 간격 -->
+        <div class="ctrl-group">
+          <label for="slider-interval">
+            <span>2. 등고 간격 (선 밀도)</span>
+            <span class="ctrl-val" id="val-interval">80m</span>
+          </label>
+          <input id="slider-interval" type="range" min="35" max="200" step="5" value="80" />
+        </div>
+
+        <!-- 3. 해수면 -->
+        <div class="ctrl-group">
+          <label for="slider-sea">
+            <span>3. 해수면 고도 (침수)</span>
+            <span class="ctrl-val" id="val-sea">120m</span>
+          </label>
+          <input id="slider-sea" type="range" min="-80" max="520" step="10" value="120" />
+        </div>
+
+        <!-- 4. 지형 선택, 5. 시점 전환, 6. 초기화·홈 -->
+        <div class="btn-cluster">
+          <div class="seg-group" role="group" aria-label="4. 지형 종류 선택">
+            <button type="button" class="preset-btn active" data-preset="ridge">산맥</button>
+            <button type="button" class="preset-btn" data-preset="crater">분화구</button>
+            <button type="button" class="preset-btn" data-preset="canyon">협곡</button>
+          </div>
+          <button type="button" id="btn-view" class="action-btn" title="단축키 V">위에서 본 지도</button>
+          <button type="button" id="btn-reset" class="action-btn" title="단축키 R">초기화·홈</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // --- Core State (6 Core Controls + Camera & Diagnostics State) ---
+      const DEFAULTS = {
+        heightScale: 100,     // % (35 ~ 165)
+        contourInterval: 80,  // meters (35 ~ 200)
+        seaLevel: 120,        // meters (-80 ~ 520)
+        preset: 'ridge',      // 'ridge' | 'crater' | 'canyon'
+        topDown: false        // false = 3D oblique, true = top-down map
+      };
+
+      const state = {
+        heightScale: DEFAULTS.heightScale,
+        contourInterval: DEFAULTS.contourInterval,
+        seaLevel: DEFAULTS.seaLevel,
+        preset: DEFAULTS.preset,
+        topDown: DEFAULTS.topDown,
+        yaw: 0.58,
+        pitch: 0.72,
+        targetYaw: 0.58,
+        targetPitch: 0.72,
+        zoom: 1.0,
+        renderMode: 'webgl',
+        stats: {
+          minElevationM: 0,
+          maxElevationM: 0,
+          submergedRatio: 0,
+          contourSegmentCount: 0,
+          contourLevelCount: 0,
+          vertexCount: 0
+        }
+      };
+
+      // --- Circular Planetary Grid Constants ---
+      // Elliptical disk mapping maps a regular (GRID_N+1)x(GRID_N+1) grid smoothly onto an exact circle of radius PLANET_R
+      const GRID_N = 84;
+      const STRIDE = GRID_N + 1;
+      const VERT_COUNT = STRIDE * STRIDE;
+      const PLANET_R = 9.5;
+      const METERS_PER_UNIT = 200; // 1 world unit in Y = 200m elevation
+      const BASE_DEPTH_Y = -2.15;
+
+      const diskX = new Float32Array(VERT_COUNT);
+      const diskZ = new Float32Array(VERT_COUNT);
+      const diskR = new Float32Array(VERT_COUNT);
+      const elevMeters = new Float32Array(VERT_COUNT);
+      const worldY = new Float32Array(VERT_COUNT);
+
+      // Precompute exact circular disk coordinates from [-1, 1]^2
+      for (let j = 0; j <= GRID_N; j++) {
+        const v = (j / GRID_N) * 2 - 1;
+        for (let i = 0; i <= GRID_N; i++) {
+          const u = (i / GRID_N) * 2 - 1;
+          const idx = j * STRIDE + i;
+          const x = u * Math.sqrt(Math.max(0, 1 - 0.5 * v * v)) * PLANET_R;
+          const z = v * Math.sqrt(Math.max(0, 1 - 0.5 * u * u)) * PLANET_R;
+          diskX[idx] = x;
+          diskZ[idx] = z;
+          diskR[idx] = Math.hypot(x, z) / PLANET_R; // normalized 0..1
+        }
+      }
+
+      function rawTerrainMeters(x, z, rNorm, preset) {
+        const nx = x / PLANET_R;
+        const nz = z / PLANET_R;
+        // Smooth coastal drop-off near rim of the circular island
+        const islandMask = Math.max(0, 1 - Math.pow(rNorm, 3.6));
+        const shelfWave = 35 * Math.sin(3.2 * nx + 2.1 * nz) * Math.cos(2.7 * nz - 1.5 * nx);
+
+        if (preset === 'ridge') {
+          // Asymmetric alpine mountain range: steep eastern fault scarp vs gentle western slope
+          const curveX = nx - 0.18 * Math.sin(nz * 2.4);
+          const scarpFactor = curveX >= 0 ? 10.5 : 2.3; // Steep on +x side, gentle on -x side
+          const mainRidge = 880 * Math.exp(-scarpFactor * curveX * curveX) * Math.exp(-0.9 * nz * nz);
+          const secondPeak = 520 * Math.exp(-5.5 * (Math.pow(nx + 0.42, 2) + Math.pow(nz - 0.32, 2)));
+          const southPeak = 440 * Math.exp(-6.5 * (Math.pow(nx - 0.25, 2) + Math.pow(nz + 0.46, 2)));
+          const valleyCut = -190 * Math.exp(-12.0 * Math.pow(nx + 0.15 + 0.3 * nz, 2));
+          const ridges = 58 * Math.sin(7.5 * nx + 4.0 * nz) * Math.exp(-1.8 * rNorm * rNorm);
+          return (mainRidge + secondPeak + southPeak + valleyCut + ridges + shelfWave) * islandMask - 75 * Math.pow(rNorm, 2.2);
+        }
+
+        if (preset === 'crater') {
+          // Caldera volcano: steep inner crater wall, ring rim, gentle outer flank, central resurgent dome
+          const d = Math.hypot(nx - 0.04, nz + 0.03);
+          const rimRing = 860 * Math.exp(-11.5 * Math.pow(d - 0.38, 2));
+          const calderaBowl = -540 * Math.exp(-20.0 * d * d);
+          const centralCone = 590 * Math.exp(-52.0 * (Math.pow(nx - 0.01, 2) + Math.pow(nz + 0.01, 2)));
+          const parasiteCone = 360 * Math.exp(-26.0 * (Math.pow(nx + 0.52, 2) + Math.pow(nz - 0.36, 2)));
+          const radialGullies = 42 * Math.sin(9.0 * Math.atan2(nz, nx)) * Math.exp(-6.0 * Math.pow(d - 0.44, 2));
+          return (140 + rimRing + calderaBowl + centralCone + parasiteCone + radialGullies + shelfWave * 0.6) * islandMask - 65 * rNorm * rNorm;
+        }
+
+        // 'canyon' — High flat-topped mesa sliced by a deep winding S-shaped canyon with vertical cliffs
+        const meander = 0.28 * Math.sin(nz * 3.3) + 0.08 * Math.cos(nz * 6.0);
+        const distToRiver = Math.abs(nx - meander);
+        const plateau = 780 / (1 + Math.exp(10.0 * (rNorm - 0.78)));
+        const steppedTerrace = 95 * Math.tanh(4.0 * Math.sin(distToRiver * 7.5));
+        const canyonGorge = -740 * Math.exp(-38.0 * Math.pow(distToRiver, 2.0));
+        const sideBranch = -370 * Math.exp(-42.0 * Math.pow(nz - 0.35 * nx - 0.15, 2)) * Math.exp(-4.0 * nx * nx);
+        return (plateau + steppedTerrace + canyonGorge + sideBranch + shelfWave * 0.45) * islandMask - 60 * rNorm * rNorm;
+      }
+
+      function elevationColorRGB(elevM, seaM) {
+        if (elevM < seaM) {
+          const depthT = Math.max(0, Math.min(1, (seaM - elevM) / 260));
+          return [
+            0.08 * (1 - depthT) + 0.03 * depthT,
+            0.42 * (1 - depthT) + 0.16 * depthT,
+            0.68 * (1 - depthT) + 0.38 * depthT
+          ];
+        }
+        const rel = Math.max(0, Math.min(1, (elevM - seaM) / 950));
+        if (rel < 0.28) {
+          const t = rel / 0.28;
+          return [0.16 + 0.26 * t, 0.58 + 0.18 * t, 0.36 - 0.12 * t];
+        } else if (rel < 0.62) {
+          const t = (rel - 0.28) / 0.34;
+          return [0.42 + 0.42 * t, 0.76 - 0.14 * t, 0.24 - 0.04 * t];
+        } else if (rel < 0.86) {
+          const t = (rel - 0.62) / 0.24;
+          return [0.84 - 0.12 * t, 0.62 - 0.18 * t, 0.20 + 0.18 * t];
+        } else {
+          const t = (rel - 0.86) / 0.14;
+          return [0.72 + 0.26 * t, 0.44 + 0.53 * t, 0.38 + 0.60 * t];
+        }
+      }
+
+      // Compute heights and triangle-edge contour intersections
+      let latestContourSegments = []; // Array of {x1,y1,z1, x2,y2,z2, elevM, isMajor, isCoast}
+
+      function recomputeTerrainAndContours() {
+        const scale = state.heightScale / 100;
+        const seaM = state.seaLevel;
+        let minM = Infinity;
+        let maxM = -Infinity;
+        let submergedCount = 0;
+
+        for (let idx = 0; idx < VERT_COUNT; idx++) {
+          const hM = rawTerrainMeters(diskX[idx], diskZ[idx], diskR[idx], state.preset) * scale;
+          elevMeters[idx] = hM;
+          worldY[idx] = hM / METERS_PER_UNIT;
+          if (hM < minM) minM = hM;
+          if (hM > maxM) maxM = hM;
+          if (hM <= seaM) submergedCount++;
+        }
+
+        // Calculate actual contour segments across all mesh triangles
+        const interval = Math.max(20, state.contourInterval);
+        const startK = Math.ceil(minM / interval);
+        const endK = Math.floor(maxM / interval);
+        const levels = [];
+        for (let k = startK; k <= endK; k++) {
+          levels.push({ elevM: k * interval, isMajor: (k % 5 === 0), isCoast: false });
+        }
+        // Also include exact sea-level coastline contour for clear observation
+        levels.push({ elevM: seaM, isMajor: false, isCoast: true });
+
+        const segments = [];
+        const yLift = 0.022; // Slight lift above triangle face to prevent z-fighting
+
+        function intersectEdge(iA, iB, targetM) {
+          const hA = elevMeters[iA];
+          const hB = elevMeters[iB];
+          if ((hA < targetM && hB < targetM) || (hA > targetM && hB > targetM) || hA === hB) return null;
+          const t = (targetM - hA) / (hB - hA);
+          if (t < 0 || t > 1) return null;
+          return [
+            diskX[iA] + t * (diskX[iB] - diskX[iA]),
+            (targetM / METERS_PER_UNIT) + yLift,
+            diskZ[iA] + t * (diskZ[iB] - diskZ[iA])
+          ];
+        }
+
+        for (let j = 0; j < GRID_N; j++) {
+          for (let i = 0; i < GRID_N; i++) {
+            const i00 = j * STRIDE + i;
+            const i10 = i00 + 1;
+            const i01 = (j + 1) * STRIDE + i;
+            const i11 = i01 + 1;
+
+            const tris = [
+              [i00, i10, i11],
+              [i00, i11, i01]
+            ];
+
+            for (let tIdx = 0; tIdx < 2; tIdx++) {
+              const a = tris[tIdx][0];
+              const b = tris[tIdx][1];
+              const c = tris[tIdx][2];
+              const tMin = Math.min(elevMeters[a], elevMeters[b], elevMeters[c]);
+              const tMax = Math.max(elevMeters[a], elevMeters[b], elevMeters[c]);
+
+              for (let l = 0; l < levels.length; l++) {
+                const lv = levels[l];
+                if (lv.elevM < tMin || lv.elevM > tMax) continue;
+                const p1 = intersectEdge(a, b, lv.elevM);
+                const p2 = intersectEdge(b, c, lv.elevM);
+                const p3 = intersectEdge(c, a, lv.elevM);
+                const pts = [];
+                if (p1) pts.push(p1);
+                if (p2) pts.push(p2);
+                if (p3) pts.push(p3);
+                if (pts.length >= 2) {
+                  segments.push({
+                    x1: pts[0][0], y1: pts[0][1], z1: pts[0][2],
+                    x2: pts[1][0], y2: pts[1][1], z2: pts[1][2],
+                    elevM: lv.elevM,
+                    isMajor: lv.isMajor,
+                    isCoast: lv.isCoast
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        latestContourSegments = segments;
+        state.stats.minElevationM = Math.round(minM);
+        state.stats.maxElevationM = Math.round(maxM);
+        state.stats.submergedRatio = Number(((submergedCount / VERT_COUNT) * 100).toFixed(1));
+        state.stats.contourSegmentCount = segments.length;
+        state.stats.contourLevelCount = Math.max(0, endK - startK + 1);
+        state.stats.vertexCount = VERT_COUNT;
+      }
+
+      const perimeterIndices = [];
+      for (let i = 0; i < GRID_N; i++) perimeterIndices.push(i);
+      for (let j = 0; j < GRID_N; j++) perimeterIndices.push(j * STRIDE + GRID_N);
+      for (let i = GRID_N; i > 0; i--) perimeterIndices.push(GRID_N * STRIDE + i);
+      for (let j = GRID_N; j > 0; j--) perimeterIndices.push(j * STRIDE);
+      perimeterIndices.push(0); // close loop
+
+      // --- WebGL / Three.js Scene Setup with Safe Fallback ---
+      const stageWrap = document.getElementById('stage-wrap');
+      const webglCanvas = document.getElementById('webgl-canvas');
+      const fallbackCanvas = document.getElementById('fallback-canvas');
+      const fallbackBanner = document.getElementById('fallback-banner');
+      const profileCanvas = document.getElementById('profile-canvas');
+      const profileCtx = profileCanvas.getContext('2d');
+
+      let renderer = null;
+      let scene = null;
+      let camera = null;
+      let planetGroup = null;
+      let terrainGeom = null;
+      let cliffGeom = null;
+      let contourLinesMesh = null;
+      let seaMesh = null;
+      let seaRimLine = null;
+
+      function initThreeScene() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('Three.js unavailable');
+          renderer = new THREE.WebGLRenderer({
+            canvas: webglCanvas,
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance'
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+
+          // Lights
+          const ambient = new THREE.AmbientLight(0x94a3b8, 0.78);
+          scene.add(ambient);
+
+          const sunLight = new THREE.DirectionalLight(0xfef3c7, 0.95);
+          sunLight.position.set(14, 24, 16);
+          scene.add(sunLight);
+
+          const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.45);
+          rimLight.position.set(-16, -8, -14);
+          scene.add(rimLight);
+
+          // Starfield in deep space
+          const starGeo = new THREE.BufferGeometry();
+          const starCount = 420;
+          const starPos = new Float32Array(starCount * 3);
+          for (let i = 0; i < starCount; i++) {
+            const r = 36 + Math.random() * 45;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            starPos[i * 3 + 1] = r * Math.cos(phi);
+            starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+          }
+          starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+          const starMat = new THREE.PointsMaterial({ color: 0xbae6fd, size: 0.18, transparent: true, opacity: 0.75 });
+          scene.add(new THREE.Points(starGeo, starMat));
+
+          planetGroup = new THREE.Group();
+          scene.add(planetGroup);
+
+          // 1. Terrain Surface BufferGeometry
+          terrainGeom = new THREE.BufferGeometry();
+          const posArr = new Float32Array(VERT_COUNT * 3);
+          const colArr = new Float32Array(VERT_COUNT * 3);
+          const indexArr = [];
+          for (let j = 0; j < GRID_N; j++) {
+            for (let i = 0; i < GRID_N; i++) {
+              const i00 = j * STRIDE + i;
+              const i10 = i00 + 1;
+              const i01 = (j + 1) * STRIDE + i;
+              const i11 = i01 + 1;
+              indexArr.push(i00, i01, i11, i00, i11, i10);
+            }
+          }
+          terrainGeom.setIndex(indexArr);
+          terrainGeom.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+          terrainGeom.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+
+          const terrainMat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.72,
+            metalness: 0.08,
+            flatShading: false
+          });
+          const terrainMesh = new THREE.Mesh(terrainGeom, terrainMat);
+          planetGroup.add(terrainMesh);
+
+          // 2. Stratified Cliff Skirt around the Circular Island Perimeter
+          const segCount = perimeterIndices.length - 1;
+          cliffGeom = new THREE.BufferGeometry();
+          const cliffPos = new Float32Array(segCount * 6 * 3);
+          const cliffCol = new Float32Array(segCount * 6 * 3);
+          cliffGeom.setAttribute('position', new THREE.BufferAttribute(cliffPos, 3));
+          cliffGeom.setAttribute('color', new THREE.BufferAttribute(cliffCol, 3));
+          const cliffMat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.85,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+          });
+          planetGroup.add(new THREE.Mesh(cliffGeom, cliffMat));
+
+          // Bottom dark planetary crust cap
+          const bottomCapGeo = new THREE.CircleGeometry(PLANET_R, 96);
+          bottomCapGeo.rotateX(Math.PI / 2);
+          bottomCapGeo.translate(0, BASE_DEPTH_Y, 0);
+          const bottomCapMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+          planetGroup.add(new THREE.Mesh(bottomCapGeo, bottomCapMat));
+
+          // Glowing orbital compass ring around the planet island
+          const ringGeo = new THREE.RingGeometry(PLANET_R + 0.35, PLANET_R + 0.43, 128);
+          ringGeo.rotateX(-Math.PI / 2);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x2dd4bf,
+            transparent: true,
+            opacity: 0.28,
+            side: THREE.DoubleSide
+          });
+          planetGroup.add(new THREE.Mesh(ringGeo, ringMat));
+
+          // 3. Translucent Sea Cylinder
+          const seaGeo = new THREE.CylinderGeometry(PLANET_R - 0.02, PLANET_R - 0.02, 1, 96, 1, false);
+          const seaMat = new THREE.MeshStandardMaterial({
+            color: 0x0ea5e9,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.28,
+            roughness: 0.2,
+            metalness: 0.15,
+            transparent: true,
+            opacity: 0.62
+          });
+          seaMesh = new THREE.Mesh(seaGeo, seaMat);
+          planetGroup.add(seaMesh);
+
+          // Sea Rim Highlight Ring
+          const seaRimGeo = new THREE.BufferGeometry();
+          const rimPts = [];
+          for (let k = 0; k <= 128; k++) {
+            const ang = (k / 128) * Math.PI * 2;
+            rimPts.push(Math.cos(ang) * PLANET_R, 0, Math.sin(ang) * PLANET_R);
+          }
+          seaRimGeo.setAttribute('position', new THREE.Float32BufferAttribute(rimPts, 3));
+          seaRimLine = new THREE.Line(
+            seaRimGeo,
+            new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.75 })
+          );
+          planetGroup.add(seaRimLine);
+
+          // 4. Dynamic Contour LineSegments
+          const emptyLineGeo = new THREE.BufferGeometry();
+          const lineMat = new THREE.LineBasicMaterial({
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.96
+          });
+          contourLinesMesh = new THREE.LineSegments(emptyLineGeo, lineMat);
+          planetGroup.add(contourLinesMesh);
+
+          state.renderMode = 'webgl';
+        } catch (err) {
+          // Activate 2D fallback mode using the exact same calculated height & contour data
+          state.renderMode = '2d-fallback';
+          webglCanvas.style.display = 'none';
+          fallbackCanvas.style.display = 'block';
+          fallbackBanner.style.display = 'block';
+        }
+      }
+
+      function syncThreeMeshes() {
+        if (state.renderMode !== 'webgl') return;
+
+        const posAttr = terrainGeom.getAttribute('position');
+        const colAttr = terrainGeom.getAttribute('color');
+        const posArr = posAttr.array;
+        const colArr = colAttr.array;
+        const seaM = state.seaLevel;
+
+        for (let idx = 0; idx < VERT_COUNT; idx++) {
+          const i3 = idx * 3;
+          posArr[i3] = diskX[idx];
+          posArr[i3 + 1] = worldY[idx];
+          posArr[i3 + 2] = diskZ[idx];
+
+          const rgb = elevationColorRGB(elevMeters[idx], seaM);
+          colArr[i3] = rgb[0];
+          colArr[i3 + 1] = rgb[1];
+          colArr[i3 + 2] = rgb[2];
+        }
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+        terrainGeom.computeVertexNormals();
+
+        // Update perimeter cliff skirt geometry
+        const cPos = cliffGeom.getAttribute('position').array;
+        const cCol = cliffGeom.getAttribute('color').array;
+        const segCount = perimeterIndices.length - 1;
+        for (let s = 0; s < segCount; s++) {
+          const idxA = perimeterIndices[s];
+          const idxB = perimeterIndices[s + 1];
+          const xA = diskX[idxA], yA = worldY[idxA], zA = diskZ[idxA];
+          const xB = diskX[idxB], yB = worldY[idxB], zB = diskZ[idxB];
+          const base = s * 18;
+
+          // Triangle 1 & 2 forming quad from surface edge down to BASE_DEPTH_Y
+          cPos[base] = xA;     cPos[base + 1] = yA;           cPos[base + 2] = zA;
+          cPos[base + 3] = xA; cPos[base + 4] = BASE_DEPTH_Y; cPos[base + 5] = zA;
+          cPos[base + 6] = xB; cPos[base + 7] = yB;           cPos[base + 8] = zB;
+
+          cPos[base + 9] = xB;  cPos[base + 10] = yB;           cPos[base + 11] = zB;
+          cPos[base + 12] = xA; cPos[base + 13] = BASE_DEPTH_Y; cPos[base + 14] = zA;
+          cPos[base + 15] = xB; cPos[base + 16] = BASE_DEPTH_Y; cPos[base + 17] = zB;
+
+          for (let v = 0; v < 6; v++) {
+            const isTop = (v === 0 || v === 2 || v === 3);
+            cCol[base + v * 3] = isTop ? 0.25 : 0.08;
+            cCol[base + v * 3 + 1] = isTop ? 0.36 : 0.13;
+            cCol[base + v * 3 + 2] = isTop ? 0.48 : 0.24;
+          }
+        }
+        cliffGeom.getAttribute('position').needsUpdate = true;
+        cliffGeom.getAttribute('color').needsUpdate = true;
+        cliffGeom.computeVertexNormals();
+
+        // Update Sea Level Cylinder
+        const seaWorldY = seaM / METERS_PER_UNIT;
+        const seaHeight = Math.max(0.05, seaWorldY - (BASE_DEPTH_Y + 0.08));
+        seaMesh.scale.set(1, seaHeight, 1);
+        seaMesh.position.y = (BASE_DEPTH_Y + 0.08) + seaHeight * 0.5;
+        seaRimLine.position.y = seaWorldY + 0.015;
+
+        // Update Glowing Contour LineSegments BufferGeometry
+        const segLen = latestContourSegments.length;
+        const linePos = new Float32Array(segLen * 6);
+        const lineCol = new Float32Array(segLen * 6);
+
+        for (let s = 0; s < segLen; s++) {
+          const seg = latestContourSegments[s];
+          const b = s * 6;
+          linePos[b] = seg.x1;     linePos[b + 1] = seg.y1; linePos[b + 2] = seg.z1;
+          linePos[b + 3] = seg.x2; linePos[b + 4] = seg.y2; linePos[b + 5] = seg.z2;
+
+          let r = 0.85, g = 0.96, bl = 0.98;
+          if (seg.isCoast) {
+            r = 0.18; g = 0.95; bl = 0.88; // Bright cyan coastline
+          } else if (seg.isMajor) {
+            r = 1.0; g = 0.86; bl = 0.32;  // Golden-amber index contour (계곡선)
+          } else if (seg.elevM < seaM) {
+            r = 0.22; g = 0.55; bl = 0.82; // Subtle bathymetric contour
+          }
+          lineCol[b] = r;     lineCol[b + 1] = g;     lineCol[b + 2] = bl;
+          lineCol[b + 3] = r; lineCol[b + 4] = g;     lineCol[b + 5] = bl;
+        }
+
+        const newGeo = new THREE.BufferGeometry();
+        newGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+        newGeo.setAttribute('color', new THREE.BufferAttribute(lineCol, 3));
+        contourLinesMesh.geometry.dispose();
+        contourLinesMesh.geometry = newGeo;
+      }
+
+      function drawCrossSectionAndFallback() {
+        // 1. Draw East-West Cross-Section Profile (along center row j = GRID_N / 2)
+        const w = profileCanvas.width;
+        const h = profileCanvas.height;
+        profileCtx.clearRect(0, 0, w, h);
+
+        const midJ = Math.floor(GRID_N / 2);
+        const minElev = -220;
+        const maxElev = 1150;
+        const mapY = (m) => h - 6 - ((m - minElev) / (maxElev - minElev)) * (h - 12);
+
+        // Sea level fill in cross-section
+        const seaY = mapY(state.seaLevel);
+        profileCtx.fillStyle = 'rgba(14, 165, 233, 0.28)';
+        profileCtx.fillRect(4, seaY, w - 8, Math.max(0, h - 6 - seaY));
+        profileCtx.strokeStyle = '#38bdf8';
+        profileCtx.lineWidth = 1;
+        profileCtx.beginPath();
+        profileCtx.moveTo(4, seaY);
+        profileCtx.lineTo(w - 4, seaY);
+        profileCtx.stroke();
+
+        // Contour horizontal reference ticks on profile
+        const step = state.contourInterval;
+        profileCtx.strokeStyle = 'rgba(251, 191, 36, 0.16)';
+        for (let m = 0; m <= maxElev; m += step) {
+          const yTick = mapY(m);
+          profileCtx.beginPath();
+          profileCtx.moveTo(4, yTick);
+          profileCtx.lineTo(w - 4, yTick);
+          profileCtx.stroke();
+        }
+
+        // Terrain cross-section polygon
+        profileCtx.beginPath();
+        for (let i = 0; i <= GRID_N; i++) {
+          const idx = midJ * STRIDE + i;
+          const px = 4 + (i / GRID_N) * (w - 8);
+          const py = mapY(elevMeters[idx]);
+          if (i === 0) profileCtx.moveTo(px, py);
+          else profileCtx.lineTo(px, py);
+        }
+        profileCtx.strokeStyle = '#2dd4bf';
+        profileCtx.lineWidth = 1.8;
+        profileCtx.stroke();
+        profileCtx.lineTo(w - 4, h - 4);
+        profileCtx.lineTo(4, h - 4);
+        profileCtx.closePath();
+        profileCtx.fillStyle = 'rgba(45, 212, 191, 0.22)';
+        profileCtx.fill();
+
+        // 2. If in 2D Fallback Mode, render full-screen 2D contour map from same data
+        if (state.renderMode === '2d-fallback') {
+          const fCtx = fallbackCanvas.getContext('2d');
+          const fw = fallbackCanvas.width;
+          const fh = fallbackCanvas.height;
+          fCtx.clearRect(0, 0, fw, fh);
+
+          const cx = fw * 0.5;
+          const cy = fh * 0.52;
+          const radiusPx = Math.min(fw, fh) * 0.37 * state.zoom;
+          const scalePx = radiusPx / PLANET_R;
+
+          // Island base circle
+          fCtx.save();
+          fCtx.beginPath();
+          fCtx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+          fCtx.fillStyle = '#07192f';
+          fCtx.fill();
+          fCtx.lineWidth = 2;
+          fCtx.strokeStyle = '#2dd4bf';
+          fCtx.stroke();
+
+          // Render elevation cells
+          const cosY = Math.cos(state.yaw);
+          const sinY = Math.sin(state.yaw);
+          for (let s = 0; s < latestContourSegments.length; s++) {
+            const seg = latestContourSegments[s];
+            const rx1 = seg.x1 * cosY - seg.z1 * sinY;
+            const rz1 = seg.x1 * sinY + seg.z1 * cosY;
+            const rx2 = seg.x2 * cosY - seg.z2 * sinY;
+            const rz2 = seg.x2 * sinY + seg.z2 * cosY;
+
+            fCtx.beginPath();
+            fCtx.moveTo(cx + rx1 * scalePx, cy + rz1 * scalePx);
+            fCtx.lineTo(cx + rx2 * scalePx, cy + rz2 * scalePx);
+            fCtx.strokeStyle = seg.isCoast ? '#2dd4bf' : (seg.isMajor ? '#fbbf24' : 'rgba(226, 232, 240, 0.78)');
+            fCtx.lineWidth = (seg.isCoast || seg.isMajor) ? 1.6 : 0.85;
+            fCtx.stroke();
+          }
+          fCtx.restore();
+        }
+      }
+
+      function updateUIReadouts() {
+        document.getElementById('val-height').textContent = state.heightScale + '%';
+        document.getElementById('val-interval').textContent = state.contourInterval + 'm';
+        document.getElementById('val-sea').textContent = state.seaLevel + 'm';
+        document.getElementById('stat-badge').textContent =
+          '등고선 ' + state.stats.contourLevelCount + '단계 · 침수 ' + state.stats.submergedRatio + '%';
+        document.getElementById('peak-readout').textContent =
+          '최고 ' + state.stats.maxElevationM + 'm';
+        document.getElementById('mode-readout').textContent =
+          state.topDown ? '위에서 본 지도' : '3D 입체 시점';
+
+        const viewBtn = document.getElementById('btn-view');
+        viewBtn.textContent = state.topDown ? '입체 시점 보기' : '위에서 본 지도';
+        viewBtn.classList.toggle('view-active', state.topDown);
+
+        document.querySelectorAll('.preset-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.preset === state.preset);
+        });
+      }
+
+      function rebuildAll() {
+        recomputeTerrainAndContours();
+        syncThreeMeshes();
+        drawCrossSectionAndFallback();
+        updateUIReadouts();
+      }
+
+      function handleResize() {
+        const w = stageWrap.clientWidth || window.innerWidth;
+        const h = stageWrap.clientHeight || Math.max(260, window.innerHeight - 190);
+        if (state.renderMode === 'webgl' && renderer && camera) {
+          renderer.setSize(w, h, false);
+          camera.aspect = w / Math.max(1, h);
+          camera.updateProjectionMatrix();
+        } else {
+          fallbackCanvas.width = w;
+          fallbackCanvas.height = h;
+          drawCrossSectionAndFallback();
+        }
+      }
+
+      document.getElementById('slider-height').addEventListener('input', (e) => {
+        state.heightScale = Number(e.target.value);
+        rebuildAll();
+      });
+
+      document.getElementById('slider-interval').addEventListener('input', (e) => {
+        state.contourInterval = Number(e.target.value);
+        rebuildAll();
+      });
+
+      document.getElementById('slider-sea').addEventListener('input', (e) => {
+        state.seaLevel = Number(e.target.value);
+        rebuildAll();
+      });
+
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.preset = btn.dataset.preset;
+          rebuildAll();
+        });
+      });
+
+      document.getElementById('btn-view').addEventListener('click', () => {
+        state.topDown = !state.topDown;
+        state.targetPitch = state.topDown ? 1.565 : 0.72;
+        updateUIReadouts();
+      });
+
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        state.heightScale = DEFAULTS.heightScale;
+        state.contourInterval = DEFAULTS.contourInterval;
+        state.seaLevel = DEFAULTS.seaLevel;
+        state.preset = DEFAULTS.preset;
+        state.topDown = DEFAULTS.topDown;
+        state.targetYaw = 0.58;
+        state.targetPitch = 0.72;
+        state.zoom = 1.0;
+
+        document.getElementById('slider-height').value = state.heightScale;
+        document.getElementById('slider-interval').value = state.contourInterval;
+        document.getElementById('slider-sea').value = state.seaLevel;
+        rebuildAll();
+      });
+
+      // Pointer drag (Mouse + Touch) to rotate & inspect the contour planet
+      let isDragging = false;
+      let prevX = 0;
+      let prevY = 0;
+
+      stageWrap.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        prevX = e.clientX;
+        prevY = e.clientY;
+        stageWrap.setPointerCapture(e.pointerId);
+      });
+
+      stageWrap.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - prevX;
+        const dy = e.clientY - prevY;
+        prevX = e.clientX;
+        prevY = e.clientY;
+        state.targetYaw -= dx * 0.0075;
+        if (!state.topDown) {
+          state.targetPitch = Math.max(0.24, Math.min(1.52, state.targetPitch + dy * 0.0065));
+        }
+        if (state.renderMode === '2d-fallback') drawCrossSectionAndFallback();
+      });
+
+      stageWrap.addEventListener('pointerup', () => { isDragging = false; });
+      stageWrap.addEventListener('pointercancel', () => { isDragging = false; });
+
+      stageWrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        state.zoom = Math.max(0.68, Math.min(1.45, state.zoom - e.deltaY * 0.0008));
+        if (state.renderMode === '2d-fallback') drawCrossSectionAndFallback();
+      }, { passive: false });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') state.targetYaw -= 0.12;
+        else if (e.key === 'ArrowRight') state.targetYaw += 0.12;
+        else if (e.key === 'ArrowUp' && !state.topDown) state.targetPitch = Math.min(1.52, state.targetPitch + 0.08);
+        else if (e.key === 'ArrowDown' && !state.topDown) state.targetPitch = Math.max(0.24, state.targetPitch - 0.08);
+        else if (e.key === 'v' || e.key === 'V') document.getElementById('btn-view').click();
+        else if (e.key === 'r' || e.key === 'R') document.getElementById('btn-reset').click();
+      });
+
+      window.addEventListener('resize', handleResize);
+
+      window.appDiagnostics = function () {
+        const sampleIndices = [
+          0,
+          Math.floor(VERT_COUNT * 0.25),
+          Math.floor(VERT_COUNT * 0.5),
+          Math.floor(VERT_COUNT * 0.75),
+          VERT_COUNT - 1
+        ];
+        return Object.freeze({
+          appName: 'CONTOUR PLANET | 등고선으로 만드는 작은 행성',
+          renderMode: state.renderMode,
+          preset: state.preset,
+          topDownView: state.topDown,
+          controls: {
+            heightScalePercent: state.heightScale,
+            contourIntervalM: state.contourInterval,
+            seaLevelM: state.seaLevel
+          },
+          terrainMetrics: {
+            totalVertices: state.stats.vertexCount,
+            minElevationM: state.stats.minElevationM,
+            maxElevationM: state.stats.maxElevationM,
+            submergedAreaPercent: state.stats.submergedRatio,
+            contourLevelCount: state.stats.contourLevelCount,
+            contourSegmentCount: state.stats.contourSegmentCount
+          },
+          vertexSamples: sampleIndices.map((idx) => ({
+            index: idx,
+            x: Number(diskX[idx].toFixed(2)),
+            z: Number(diskZ[idx].toFixed(2)),
+            elevationM: Math.round(elevMeters[idx])
+          }))
+        });
+      };
+
+      function animate() {
+        requestAnimationFrame(animate);
+        state.yaw += (state.targetYaw - state.yaw) * 0.12;
+        state.pitch += (state.targetPitch - state.pitch) * 0.12;
+
+        if (state.renderMode === 'webgl' && renderer && scene && camera) {
+          const aspect = camera.aspect || 1;
+          // Responsive camera distance so the entire circular planet fits on portrait & landscape screens
+          const fitMultiplier = aspect < 1 ? (1 / Math.max(0.48, aspect * 0.85)) : 1.0;
+          const baseDist = (state.topDown ? 26.5 : 24.5) * fitMultiplier / state.zoom;
+
+          const camY = Math.sin(state.pitch) * baseDist;
+          const horizDist = Math.cos(state.pitch) * baseDist;
+          camera.position.set(
+            Math.sin(state.yaw) * horizDist,
+            camY,
+            Math.cos(state.yaw) * horizDist
+          );
+          camera.lookAt(0, state.topDown ? 0 : 0.45, 0);
+          renderer.render(scene, camera);
+        }
+      }
+
+      window.onload = function () {
+        initThreeScene();
+        handleResize();
+        rebuildAll();
+        animate();
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,2514 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>COSMIC ODYSSEY | 은하와 블랙홀 사이</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020308;
+      font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #f1f5f9;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    #cosmos-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
+      cursor: grab;
+      touch-action: none;
+    }
+    #cosmos-canvas:active {
+      cursor: grabbing;
+    }
+    /* Ultra-clean translucent dark glass surfaces */
+    .cosmic-glass {
+      background: rgba(6, 9, 20, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.7);
+    }
+    .cosmic-btn {
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cosmic-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(148, 163, 184, 0.32);
+    }
+    .cosmic-btn:active {
+      transform: scale(0.96);
+    }
+    .cosmic-btn-active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(139, 92, 246, 0.28));
+      border-color: rgba(125, 211, 252, 0.55) !important;
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    }
+    /* Custom slim range inputs for the 232px dock */
+    input[type="range"].cosmic-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(148, 163, 184, 0.22);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"].cosmic-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+    input[type="range"].cosmic-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.18);
+    }
+    input[type="range"].cosmic-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+      cursor: pointer;
+    }
+    /* Custom scrollbar for compact modals */
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none">
+
+  <!-- Full-Viewport 3D Universe Stage (100% of screen area) -->
+  <canvas id="cosmos-canvas" aria-label="은하와 블랙홀 3D 우주 시뮬레이션 무대"></canvas>
+
+  <!-- Non-blocking initialization toast (fades out automatically once first GPU frame renders) -->
+  <div id="boot-banner" class="fixed bottom-14 left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-opacity duration-500 opacity-100">
+    <div class="cosmic-glass px-4 py-2 rounded-full flex items-center gap-2.5 text-xs text-sky-200">
+      <span id="boot-dot" class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+      <span id="boot-text">GPU 우주 셰이더 및 85,000개 항성 버퍼 구성 중...</span>
+    </div>
+  </div>
+
+  <!-- WebGL Fallback Notice Banner (Only shown if WebGL is unavailable and 2D fallback is active) -->
+  <div id="fallback-banner" class="hidden fixed top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+    <div class="cosmic-glass px-3.5 py-1.5 rounded-full border-amber-400/40 bg-amber-950/70 text-[11px] text-amber-200 flex items-center gap-2">
+      <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+      <span>현재 브라우저에서 WebGL이 비활성화되어 <strong>2D 캔버스 대체 시각화 모드</strong>로 작동 중입니다.</span>
+    </div>
+  </div>
+
+  <!-- Main UI Container (Hidden in Presentation Mode) -->
+  <div id="ui-chrome" class="fixed inset-0 z-20 pointer-events-none flex flex-col justify-between p-2.5 sm:p-3.5 transition-opacity duration-300">
+
+    <!-- Top Single-Line Toolbar -->
+    <header class="w-full flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+      <!-- Brand + Scene Switcher Pill -->
+      <div class="cosmic-glass rounded-full px-2.5 py-1.5 flex items-center gap-2 pointer-events-auto">
+        <div class="flex items-center gap-1.5 pl-1.5 pr-2 border-r border-white/10">
+          <span class="w-2 h-2 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8]"></span>
+          <span class="text-xs font-bold tracking-wider text-white hidden sm:inline">COSMIC ODYSSEY</span>
+          <span class="text-[11px] text-slate-400 hidden md:inline">| 은하와 블랙홀 사이</span>
+        </div>
+
+        <!-- Core 2 Scenes Switcher -->
+        <div class="flex items-center gap-1" role="tablist" aria-label="핵심 장면 선택">
+          <button id="btn-mode-galaxy" type="button" class="cosmic-btn cosmic-btn-active px-2.5 py-1 rounded-full text-xs font-semibold text-slate-200 border border-transparent flex items-center gap-1.5">
+            <span>🌀</span>
+            <span>은하 탐험</span>
+          </button>
+          <button id="btn-mode-blackhole" type="button" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-semibold text-slate-300 border border-transparent flex items-center gap-1.5">
+            <span>🕳️</span>
+            <span>블랙홀 관측</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Action Bar (Compact Single-Line Buttons) -->
+      <div class="cosmic-glass rounded-full px-2 py-1.5 flex items-center flex-wrap gap-1 pointer-events-auto">
+        <button id="btn-play-pause" type="button" title="일시정지 / 재생 (Space)" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-200 border border-white/10 flex items-center gap-1">
+          <span id="icon-play-pause">⏸</span>
+          <span id="label-play-pause" class="hidden sm:inline">일시정지</span>
+        </button>
+
+        <button id="btn-hero-view" type="button" title="화면을 가득 채우는 영웅 시점으로 이동" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-200 border border-white/10">
+          영웅 시점
+        </button>
+
+        <button id="btn-reset" type="button" title="시점 및 현재 장면 초기화" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-200 border border-white/10">
+          초기화
+        </button>
+
+        <button id="btn-tour" type="button" title="은하 상공 → 나선팔 → 중심부 → 블랙홀 시네마틱 투어" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-sky-200 border border-sky-400/30 flex items-center gap-1">
+          <span>🎬</span>
+          <span id="label-tour">시네마틱 투어</span>
+        </button>
+
+        <span class="h-3.5 w-[1px] bg-white/10 mx-0.5"></span>
+
+        <button id="btn-dock-toggle" type="button" title="조작 설정 도크 열기/닫기" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-200 border border-white/10 flex items-center gap-1">
+          <span>⚙️</span>
+          <span>설정</span>
+        </button>
+
+        <button id="btn-inquiry-toggle" type="button" title="학생 탐구 과제 3가지" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-emerald-200 border border-emerald-400/30 flex items-center gap-1">
+          <span>🧪</span>
+          <span>탐구</span>
+          <span id="badge-inquiry-count" class="font-mono-num text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300">0/3</span>
+        </button>
+
+        <button id="btn-why-toggle" type="button" title="왜 이렇게 보일까? 과학 원리 설명" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-amber-200 border border-amber-400/30">
+          왜 이렇게 보일까?
+        </button>
+
+        <button id="btn-present" type="button" title="UI 숨김 발표 모드 (Esc로 복귀)" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-200 border border-white/10 hidden sm:inline-flex">
+          발표 모드
+        </button>
+
+        <button id="btn-info-toggle" type="button" title="물리 상수 검증 및 렌더러 정보" class="cosmic-btn px-2.5 py-1 rounded-full text-xs font-medium text-slate-300 border border-white/10">
+          정보
+        </button>
+      </div>
+    </header>
+
+    <!-- Middle Area: Holds the collapsed-by-default <=240px right dock and center/left compact overlays -->
+    <div class="relative flex-1 w-full pointer-events-none">
+
+      <!-- Cinematic Tour Progress Subtitle Pill (Hidden unless tour is active) -->
+      <div id="tour-banner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 pointer-events-auto">
+        <div class="cosmic-glass px-4 py-2 rounded-full border-sky-400/40 flex items-center gap-3">
+          <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+          <span id="tour-step-text" class="text-xs font-medium text-sky-100">시네마틱 투어 진행 중...</span>
+          <button id="btn-tour-stop-inline" type="button" class="text-[11px] px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white">중지</button>
+        </div>
+      </div>
+
+      <!-- Compact Control Dock ( strictly <= 240px wide: w-[232px], collapsed by default! ) -->
+      <aside id="control-dock" class="hidden absolute top-2 right-0 w-[232px] max-w-[232px] cosmic-glass rounded-2xl p-3 pointer-events-auto transition-all duration-200">
+        <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-white/10">
+          <div class="flex items-center gap-1.5">
+            <span class="w-1.5 h-4 rounded-full bg-sky-400"></span>
+            <h2 id="dock-title" class="text-xs font-bold text-white tracking-wide">은하 탐험 설정</h2>
+          </div>
+          <button id="btn-dock-close" type="button" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded">✕</button>
+        </div>
+
+        <!-- SCENE A CONTROLS: GALAXY -->
+        <div id="controls-galaxy" class="space-y-3 text-xs">
+          <!-- Spiral Arms (2 ~ 6) -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="slider-arms" class="text-slate-300 font-medium">나선팔 수</label>
+              <span id="val-arms" class="font-mono-num text-sky-300 font-semibold">4개</span>
+            </div>
+            <input id="slider-arms" type="range" min="2" max="6" step="1" value="4" class="cosmic-slider" />
+            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+              <button type="button" data-arm-preset="2" class="hover:text-sky-300 px-1">2팔</button>
+              <button type="button" data-arm-preset="3" class="hover:text-sky-300 px-1">3팔</button>
+              <button type="button" data-arm-preset="4" class="hover:text-sky-300 px-1">4팔</button>
+              <button type="button" data-arm-preset="5" class="hover:text-sky-300 px-1">5팔</button>
+              <button type="button" data-arm-preset="6" class="hover:text-sky-300 px-1">6팔</button>
+            </div>
+          </div>
+
+          <!-- Rotation Speed -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="slider-rot-speed" class="text-slate-300 font-medium">차등 회전 속도</label>
+              <span id="val-rot-speed" class="font-mono-num text-sky-300">1.0x</span>
+            </div>
+            <input id="slider-rot-speed" type="range" min="0" max="3.0" step="0.1" value="1.0" class="cosmic-slider" />
+          </div>
+
+          <!-- Star Density / Quality -->
+          <div>
+            <span class="block text-slate-300 font-medium mb-1.5">별 밀도 / 품질</span>
+            <div class="grid grid-cols-3 gap-1">
+              <button type="button" data-density="30000" class="density-btn cosmic-btn py-1 rounded-lg text-[11px] border border-white/10 text-slate-300">저 (30k)</button>
+              <button type="button" data-density="55000" class="density-btn cosmic-btn py-1 rounded-lg text-[11px] border border-white/10 text-slate-300">중 (55k)</button>
+              <button type="button" data-density="85000" class="density-btn cosmic-btn cosmic-btn-active py-1 rounded-lg text-[11px] border border-white/10 text-white">고 (85k)</button>
+            </div>
+          </div>
+
+          <!-- Color Palette Presets -->
+          <div>
+            <span class="block text-slate-300 font-medium mb-1.5">색상 프리셋</span>
+            <div class="space-y-1">
+              <button type="button" data-palette="0" class="palette-btn cosmic-btn cosmic-btn-active w-full py-1.5 px-2.5 rounded-lg text-left text-[11px] border border-white/10 flex items-center justify-between">
+                <span>청색 성운</span>
+                <span class="flex gap-1">
+                  <i class="w-2.5 h-2.5 rounded-full bg-amber-200 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-fuchsia-500 inline-block"></i>
+                </span>
+              </button>
+              <button type="button" data-palette="1" class="palette-btn cosmic-btn w-full py-1.5 px-2.5 rounded-lg text-left text-[11px] border border-white/10 flex items-center justify-between">
+                <span>황금 중심</span>
+                <span class="flex gap-1">
+                  <i class="w-2.5 h-2.5 rounded-full bg-yellow-100 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block"></i>
+                </span>
+              </button>
+              <button type="button" data-palette="2" class="palette-btn cosmic-btn w-full py-1.5 px-2.5 rounded-lg text-left text-[11px] border border-white/10 flex items-center justify-between">
+                <span>장밋빛 우주</span>
+                <span class="flex gap-1">
+                  <i class="w-2.5 h-2.5 rounded-full bg-orange-200 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></i>
+                  <i class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></i>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Star Orbits Toggle -->
+          <div class="pt-1 border-t border-white/10 flex items-center justify-between">
+            <span class="text-slate-300 font-medium">표본 별의 궤적</span>
+            <button id="btn-toggle-orbits" type="button" class="cosmic-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 text-slate-300">
+              OFF
+            </button>
+          </div>
+        </div>
+
+        <!-- SCENE B CONTROLS: BLACK HOLE -->
+        <div id="controls-blackhole" class="hidden space-y-3 text-xs">
+          <!-- Black Hole Mass (Solar Masses) -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="slider-bh-mass" class="text-slate-300 font-medium">블랙홀 질량 (M)</label>
+              <span id="val-bh-mass" class="font-mono-num text-amber-300 font-semibold">10 M☉</span>
+            </div>
+            <input id="slider-bh-mass" type="range" min="1" max="60" step="1" value="10" class="cosmic-slider" />
+            <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+              <button type="button" data-mass-preset="1" class="hover:text-amber-300 px-1">1M☉</button>
+              <button type="button" data-mass-preset="5" class="hover:text-amber-300 px-1">5M☉</button>
+              <button type="button" data-mass-preset="10" class="hover:text-amber-300 px-1">10M☉</button>
+              <button type="button" data-mass-preset="20" class="hover:text-amber-300 px-1">20M☉</button>
+              <button type="button" data-mass-preset="40" class="hover:text-amber-300 px-1">40M☉</button>
+            </div>
+          </div>
+
+          <!-- Live Schwarzschild Radius Calculation Card inside Dock -->
+          <div class="p-2 rounded-xl bg-slate-900/80 border border-amber-400/25 space-y-1">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-slate-400">슈바르츠실트 반경 r_s</span>
+              <span id="dock-rs-val" class="font-mono-num font-bold text-amber-300">29.53 km</span>
+            </div>
+            <div class="text-[10px] text-slate-400 leading-tight">
+              r_s = 2GM/c² (1 M☉ ≈ 2.95 km)
+            </div>
+          </div>
+
+          <!-- Disk Brightness -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="slider-bh-bright" class="text-slate-300 font-medium">강착 원반 밝기</label>
+              <span id="val-bh-bright" class="font-mono-num text-sky-300">1.2x</span>
+            </div>
+            <input id="slider-bh-bright" type="range" min="0.4" max="2.2" step="0.05" value="1.2" class="cosmic-slider" />
+          </div>
+
+          <!-- Observation Inclination Angle -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="slider-bh-tilt" class="text-slate-300 font-medium">관측 기울기</label>
+              <span id="val-bh-tilt" class="font-mono-num text-sky-300">13°</span>
+            </div>
+            <input id="slider-bh-tilt" type="range" min="-65" max="65" step="1" value="13" class="cosmic-slider" />
+          </div>
+
+          <!-- Gravitational Lensing ON/OFF -->
+          <div class="pt-1.5 border-t border-white/10 flex items-center justify-between">
+            <div>
+              <span class="block text-slate-200 font-medium">중력 렌즈 효과</span>
+              <span class="text-[10px] text-slate-400">빛 휘어짐·배경 왜곡</span>
+            </div>
+            <button id="btn-toggle-lensing" type="button" class="cosmic-btn cosmic-btn-active px-3 py-1 rounded-full text-[11px] font-semibold border border-sky-400/40 text-white">
+              ON
+            </button>
+          </div>
+        </div>
+
+        <!-- Camera Quick Buttons at bottom of dock -->
+        <div class="mt-3 pt-2 border-t border-white/10 grid grid-cols-2 gap-1.5">
+          <button id="btn-dock-home" type="button" class="cosmic-btn py-1 rounded-lg text-[11px] border border-white/10 text-slate-300">
+            홈 시점
+          </button>
+          <button id="btn-dock-hero" type="button" class="cosmic-btn py-1 rounded-lg text-[11px] border border-white/10 text-sky-300">
+            영웅 구도
+          </button>
+        </div>
+      </aside>
+
+      <!-- OVERLAY 1: '왜 이렇게 보일까?' (Why does it look like this? - Hidden by default) -->
+      <section id="overlay-why" class="hidden absolute top-2 left-0 w-full max-w-md cosmic-glass rounded-2xl p-4 pointer-events-auto max-h-[78vh] overflow-y-auto custom-scroll">
+        <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🔭</span>
+            <h2 class="text-sm font-bold text-amber-200">왜 이렇게 보일까? | 우주 광학과 중력의 원리</h2>
+          </div>
+          <button data-close-overlay="overlay-why" type="button" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded">✕</button>
+        </div>
+
+        <div class="space-y-3 text-xs leading-relaxed text-slate-200">
+          <div class="p-2.5 rounded-xl bg-sky-950/40 border border-sky-400/20">
+            <h3 class="font-bold text-sky-300 mb-1">1. 나선팔은 거대한 단일 물체가 아니라 수수억 개 별의 밀도파</h3>
+            <p class="text-slate-300">
+              은하의 나선팔은 단단한 바퀴살이 아니라 별과 성운 가스가 밀집된 영역입니다. 중심핵은 나이 든 황금빛 별들이 빽빽하게 모여 밝게 빛나고, 나선팔에는 갓 태어난 뜨거운 푸른 별들과 붉은/보라색 발광 성운, 그리고 빛을 가리는 어두운 먼지 띠가 겹쳐 보입니다. 또한 중심부에 가까울수록 각속도가 빠른 <strong>차등 회전</strong>을 합니다.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-purple-950/40 border border-purple-400/20">
+            <h3 class="font-bold text-purple-300 mb-1">2. 은하 전체와 블랙홀은 서로 다른 규모의 관측 모형</h3>
+            <p class="text-slate-300">
+              은하 본체는 수만 광년에 이르는 거대한 항성계이며, 블랙홀의 사건의 지평선은 수 km ~ 수천만 km 규모의 극도로 압축된 시공간입니다. 본 앱은 두 천체 현상을 한눈에 탐구할 수 있도록 <strong>거리·시간·밝기를 시각적으로 확대한 교육용 근사 모형</strong>입니다.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-400/20">
+            <h3 class="font-bold text-amber-300 mb-1">3. 사건의 지평선과 타오르는 강착 원반</h3>
+            <p class="text-slate-300">
+              블랙홀 중심의 <strong>사건의 지평선(Event Horizon)</strong> 안쪽에서는 빛조차 탈출할 수 없어 검은 그림자로 보입니다. 반면 주변으로 빨려 들어가는 가스는 극심한 중력 압축과 마찰로 수백만 도 이상 가열되어 눈부신 <strong>강착 원반(Accretion Disk)</strong>을 형성합니다. 다가오는 쪽은 상대론적 도플러 효과로 더 밝게 보입니다.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-400/20">
+            <h3 class="font-bold text-emerald-300 mb-1">4. 중력 렌즈 ON/OFF: 왜 원반이 위·아래로 휘어 보일까?</h3>
+            <p class="text-slate-300">
+              블랙홀의 강력한 중력은 시공간을 휘게 하여 빛의 경로를 꺾습니다(<strong>중력 렌즈</strong>). 이 때문에 블랙홀 <em>뒤쪽</em>에 있는 강착 원반의 빛이 위쪽과 아래쪽으로 휘어 돌아와 우리 눈에 도달하므로, 원반이 검은 그림자 위·아래를 감싸는 고리처럼 보입니다. 설정에서 <strong>렌즈 효과 OFF</strong>로 전환하면 빛이 직진할 때의 평평한 원반과 비교할 수 있습니다.
+            </p>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-300 space-y-1">
+            <div class="font-bold text-white">📐 슈바르츠실트 비회전 블랙홀의 주요 물리 반경 (상세)</div>
+            <div>• <strong>사건의 지평선 반경 (r_s)</strong>: <span class="font-mono-num text-amber-300">r_s = 2GM / c²</span> (태양질량 1개일 때 약 2.95 km)</div>
+            <div>• <strong>광자구 (Photon Sphere)</strong>: <span class="font-mono-num text-sky-300">r_ph = 1.5 r_s</span> (빛이 불안정한 원궤도로 도는 구역)</div>
+            <div>• <strong>최소 안정 원궤도 (ISCO)</strong>: <span class="font-mono-num text-rose-300">r_ISCO = 3.0 r_s</span> (물질이 안정된 원궤도로 돌 수 있는 가장 안쪽 경계)</div>
+            <div class="text-[10px] text-slate-400 pt-1">※ 화면의 3D 예술적 렌더 카메라 거리와 SI 단위 물리 계산값(km)을 혼동하지 마세요.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OVERLAY 2: '탐구' (3 Student Inquiry Tasks - Hidden by default, verified by real control states) -->
+      <section id="overlay-inquiry" class="hidden absolute top-2 left-0 w-full max-w-md cosmic-glass rounded-2xl p-4 pointer-events-auto max-h-[78vh] overflow-y-auto custom-scroll">
+        <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🧪</span>
+            <h2 class="text-sm font-bold text-emerald-300">수업 탐구 가이드 (실제 조작 상태 자동 판별)</h2>
+          </div>
+          <button data-close-overlay="overlay-inquiry" type="button" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded">✕</button>
+        </div>
+
+        <p class="text-[11px] text-slate-300 mb-3 leading-relaxed">
+          아래 3가지 탐구는 버튼 클릭만으로 완료되지 않으며, 여러분이 <strong>실제 장면을 전환하고 설정을 조작해 관측한 상태</strong>를 실시간으로 검사하여 달성됩니다.
+        </p>
+
+        <div class="space-y-2.5 text-xs">
+          <!-- Task 1 -->
+          <div id="card-task-1" class="p-3 rounded-xl bg-slate-900/75 border border-white/10 transition-colors">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-white">탐구 1. 은하 나선팔 수(2개 vs 6개) 형태 비교</span>
+              <span id="status-task-1" class="text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">진행 중</span>
+            </div>
+            <p class="text-[11px] text-slate-300 mb-2">
+              [은하 탐험] 모드에서 설정의 <strong>나선팔 수</strong>를 <strong>2개</strong>와 <strong>6개</strong>로 각각 바꾸어 실제 별들의 공간 분포가 어떻게 달라지는지 관측하세요.
+            </p>
+            <div class="flex items-center gap-2 text-[10px]">
+              <span id="chip-arm-2" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">2개 나선팔 미관측</span>
+              <span id="chip-arm-6" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">6개 나선팔 미관측</span>
+            </div>
+          </div>
+
+          <!-- Task 2 -->
+          <div id="card-task-2" class="p-3 rounded-xl bg-slate-900/75 border border-white/10 transition-colors">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-white">탐구 2. 블랙홀 중력 렌즈 ON / OFF 비교</span>
+              <span id="status-task-2" class="text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">진행 중</span>
+            </div>
+            <p class="text-[11px] text-slate-300 mb-2">
+              [블랙홀 관측] 모드에서 <strong>중력 렌즈 효과</strong>를 <strong>ON</strong>과 <strong>OFF</strong>로 각각 전환하여 원반 뒤쪽 빛의 휘어짐과 배경 별 왜곡을 비교하세요.
+            </p>
+            <div class="flex items-center gap-2 text-[10px]">
+              <span id="chip-lens-on" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">렌즈 ON 미관측</span>
+              <span id="chip-lens-off" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">렌즈 OFF 미관측</span>
+            </div>
+          </div>
+
+          <!-- Task 3 -->
+          <div id="card-task-3" class="p-3 rounded-xl bg-slate-900/75 border border-white/10 transition-colors">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-white">탐구 3. 질량 2배 시 슈바르츠실트 반경(r_s) 2배 확인</span>
+              <span id="status-task-3" class="text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">진행 중</span>
+            </div>
+            <p class="text-[11px] text-slate-300 mb-2">
+              [블랙홀 관측] 모드에서 질량 M을 조절해 처음 관측한 질량보다 <strong>정확히 2배인 질량</strong>(예: 10 M☉ → 20 M☉ 또는 5 M☉ → 10 M☉)을 만들고 r_s가 2배가 되는지 확인하세요.
+            </p>
+            <div id="chip-mass-ratio" class="text-[10px] font-mono-num px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-white/5">
+              관측 기록 대기 중 (블랙홀 모드에서 질량을 2배로 변경해 보세요)
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OVERLAY 3: '정보' (Info & Live Verification Modal - Hidden by default) -->
+      <section id="overlay-info" class="hidden absolute top-2 left-0 w-full max-w-md cosmic-glass rounded-2xl p-4 pointer-events-auto max-h-[78vh] overflow-y-auto custom-scroll">
+        <div class="flex items-center justify-between pb-2.5 mb-3 border-b border-white/10">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🛡️</span>
+            <h2 class="text-sm font-bold text-sky-300">시스템 정보 및 실시간 수치 검증</h2>
+          </div>
+          <button data-close-overlay="overlay-info" type="button" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded">✕</button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <!-- Model Scope Notice -->
+          <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-400/30 text-amber-100 text-[11px] leading-relaxed">
+            <strong>모형 안내:</strong> 본 웹앱의 블랙홀 광학 왜곡과 은하 차등 회전은 실시간 GPU 셰이더로 구현한 <strong>교육용 시각 근사 모형</strong>이며, 정밀 일반상대론 수치해석 시뮬레이션이 아닙니다.
+          </div>
+
+          <!-- Real-Time Code Verification Suite -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/10 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white">실시간 물리·버퍼 무결성 코드 검증</span>
+              <button id="btn-rerun-verify" type="button" class="cosmic-btn px-2 py-0.5 rounded text-[10px] border border-sky-400/30 text-sky-300">재검사 실행</button>
+            </div>
+
+            <div class="space-y-1.5 text-[11px] font-mono-num">
+              <div class="flex items-center justify-between py-1 border-b border-white/5">
+                <span class="text-slate-300">1. 1 M☉ 슈바르츠실트 반경</span>
+                <span id="verify-rs-1" class="text-emerald-300">검증 중...</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-white/5">
+                <span class="text-slate-300">2. 질량 2배 → r_s 2배 선형성</span>
+                <span id="verify-rs-2x" class="text-emerald-300">검증 중...</span>
+              </div>
+              <div class="flex items-center justify-between py-1 border-b border-white/5">
+                <span class="text-slate-300">3. 고정 시드(Seed) 좌표 재현성</span>
+                <span id="verify-seed" class="text-emerald-300">검증 중...</span>
+              </div>
+              <div class="flex items-center justify-between py-1">
+                <span class="text-slate-300">4. GPU 파티클 유효 좌표 검사</span>
+                <span id="verify-buffer" class="text-emerald-300">검증 중...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Renderer & Physical Constants Telemetry -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-white/10 space-y-1 text-[11px] text-slate-300">
+            <div class="font-bold text-white mb-1">렌더 파이프라인 및 SI 물리 상수</div>
+            <div>• 렌더러 상태: <span id="info-renderer-name" class="font-mono-num text-sky-300">확인 중</span></div>
+            <div>• 활성 파티클 수: <span id="info-particle-count" class="font-mono-num text-sky-300">85,000</span></div>
+            <div>• 실측 프레임 시간: <span id="info-frame-stats" class="font-mono-num text-emerald-300">-- ms (-- fps)</span></div>
+            <div class="pt-1 text-[10px] text-slate-400 font-mono-num">
+              G = 6.67430e-11 m³·kg⁻¹·s⁻² | c = 299,792,458 m/s | M_sun = 1.98847e30 kg
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom Minimal Telemetry & Camera Hint Bar -->
+    <footer class="w-full flex items-end justify-between gap-2 pointer-events-none">
+      <!-- Live Physical & Scene Status Pill -->
+      <div class="cosmic-glass rounded-full px-3 py-1.5 flex items-center flex-wrap gap-2.5 text-[11px] pointer-events-auto">
+        <span id="hud-scene-badge" class="font-semibold text-sky-300">은하 탐험</span>
+        <span class="text-white/20">|</span>
+        <span id="hud-primary-metric" class="font-mono-num text-slate-200">나선팔 4개 · 85,000 항성</span>
+        <span class="text-white/20 hidden sm:inline">|</span>
+        <span id="hud-secondary-metric" class="font-mono-num text-amber-300 hidden sm:inline">중심핵 황금·청색 성운 팔레트</span>
+      </div>
+
+      <!-- Subtle Interaction Hint & Measured Frame Time -->
+      <div class="cosmic-glass rounded-full px-3 py-1.5 flex items-center gap-2.5 text-[11px] text-slate-300 pointer-events-auto">
+        <span class="hidden md:inline text-slate-400">드래그: 궤도 회전 · 휠/핀치: 줌</span>
+        <span class="text-white/20 hidden md:inline">|</span>
+        <span id="hud-fps" class="font-mono-num text-slate-300">-- ms</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Presentation Mode Exit Chip (Hidden unless in Presentation Mode) -->
+  <button id="btn-exit-present" type="button" class="hidden fixed bottom-4 right-4 z-30 cosmic-glass px-3.5 py-1.5 rounded-full text-xs text-slate-200 hover:text-white border border-white/20">
+    발표 모드 실행 중 · Esc 또는 클릭하여 UI 복귀
+  </button>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ============================================================================
+       * 1. EXACT SI PHYSICAL CONSTANTS & SCHWARZSCHILD CALCULATOR
+       * ============================================================================ */
+      const PHYSICS = Object.freeze({
+        G: 6.67430e-11,       // Gravitational constant (m^3 kg^-1 s^-2)
+        C: 299792458,         // Speed of light in vacuum (m/s)
+        M_SUN: 1.98847e30,    // Solar mass (kg)
+        SEED: 20261014        // Fixed deterministic seed for reproducible galaxy buffers
+      });
+
+      /**
+       * Computes exact Schwarzschild radius r_s = 2GM / c^2 in kilometers (km)
+       * for a given mass in solar mass units (M_sun).
+       */
+      function calcSchwarzschildKm(solarMasses) {
+        const massKg = solarMasses * PHYSICS.M_SUN;
+        const rsMeters = (2.0 * PHYSICS.G * massKg) / (PHYSICS.C * PHYSICS.C);
+        return rsMeters / 1000.0;
+      }
+
+      /**
+       * Deterministic Mulberry32 PRNG so resetting or regenerating spiral arms
+       * always produces reproducible star coordinates for a given seed.
+       */
+      function createSeededPRNG(seed) {
+        let a = seed >>> 0;
+        return function nextRand() {
+          a = (a + 0x6D2B79F5) >>> 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      /* ============================================================================
+       * 2. APPLICATION STATE & CAMERA INTERPOLATION STATE
+       * ============================================================================ */
+      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const state = {
+        mode: 'galaxy',          // 'galaxy' | 'blackhole'
+        playing: true,
+        simTime: 0.0,
+        presentationMode: false,
+        dockOpen: false,
+        activeOverlay: null,     // null | 'overlay-why' | 'overlay-inquiry' | 'overlay-info'
+
+        // Galaxy parameters
+        galaxyArms: 4,           // 2..6
+        galaxySpeed: 1.0,
+        galaxyDensity: 85000,    // 30000 | 55000 | 85000
+        galaxyPalette: 0,        // 0: 청색 성운, 1: 황금 중심, 2: 장밋빛 우주
+        showOrbits: false,
+
+        // Black hole parameters
+        bhMass: 10,              // Solar masses (1..60)
+        bhBrightness: 1.2,
+        bhLensing: true,
+        bhLensingMix: 1.0,       // Smoothly interpolated 0..1
+
+        // Camera spherical coordinates (current & target for smooth damping)
+        camYaw: 0.45,
+        camPitch: 0.68,          // ~39 degrees looking down at galaxy on first frame
+        camDist: 15.6,           // Aspect-fitted so galaxy spans ~78-82% of screen width
+        targetYaw: 0.45,
+        targetPitch: 0.68,
+        targetDist: 15.6,
+        camPanX: 0.0,
+        camPanY: 0.0,
+        targetPanX: 0.0,
+        targetPanY: 0.0,
+
+        // Cinematic tour state
+        tourActive: false,
+        tourTime: 0.0,
+
+        // Student Inquiry tracking (real state verification)
+        inquiry: {
+          seenArm2: false,
+          seenArm6: false,
+          task1Done: false,
+
+          seenLensOn: false,
+          seenLensOff: false,
+          task2Done: false,
+
+          visitedMasses: new Set(),
+          matchedMassPair: null,
+          task3Done: false
+        },
+
+        // Performance & verification telemetry
+        rendererType: '초기화 중',
+        webglAvailable: false,
+        avgFrameMs: 16.7,
+        lastVerifyResult: {
+          rs1Ok: false,
+          rs2xOk: false,
+          seedOk: false,
+          bufferOk: false,
+          validParticleCount: 0
+        }
+      };
+
+      /* ============================================================================
+       * 3. DOM ELEMENT REFERENCES (Cached once, never destroyed with innerHTML)
+       * ============================================================================ */
+      const dom = {
+        canvas: document.getElementById('cosmos-canvas'),
+        bootBanner: document.getElementById('boot-banner'),
+        bootText: document.getElementById('boot-text'),
+        fallbackBanner: document.getElementById('fallback-banner'),
+        uiChrome: document.getElementById('ui-chrome'),
+
+        btnModeGalaxy: document.getElementById('btn-mode-galaxy'),
+        btnModeBlackhole: document.getElementById('btn-mode-blackhole'),
+        btnPlayPause: document.getElementById('btn-play-pause'),
+        iconPlayPause: document.getElementById('icon-play-pause'),
+        labelPlayPause: document.getElementById('label-play-pause'),
+        btnHeroView: document.getElementById('btn-hero-view'),
+        btnReset: document.getElementById('btn-reset'),
+        btnTour: document.getElementById('btn-tour'),
+        labelTour: document.getElementById('label-tour'),
+        btnDockToggle: document.getElementById('btn-dock-toggle'),
+        btnInquiryToggle: document.getElementById('btn-inquiry-toggle'),
+        badgeInquiryCount: document.getElementById('badge-inquiry-count'),
+        btnWhyToggle: document.getElementById('btn-why-toggle'),
+        btnPresent: document.getElementById('btn-present'),
+        btnInfoToggle: document.getElementById('btn-info-toggle'),
+        btnExitPresent: document.getElementById('btn-exit-present'),
+
+        tourBanner: document.getElementById('tour-banner'),
+        tourStepText: document.getElementById('tour-step-text'),
+        btnTourStopInline: document.getElementById('btn-tour-stop-inline'),
+
+        controlDock: document.getElementById('control-dock'),
+        dockTitle: document.getElementById('dock-title'),
+        btnDockClose: document.getElementById('btn-dock-close'),
+        controlsGalaxy: document.getElementById('controls-galaxy'),
+        controlsBlackhole: document.getElementById('controls-blackhole'),
+
+        sliderArms: document.getElementById('slider-arms'),
+        valArms: document.getElementById('val-arms'),
+        sliderRotSpeed: document.getElementById('slider-rot-speed'),
+        valRotSpeed: document.getElementById('val-rot-speed'),
+        btnToggleOrbits: document.getElementById('btn-toggle-orbits'),
+
+        sliderBhMass: document.getElementById('slider-bh-mass'),
+        valBhMass: document.getElementById('val-bh-mass'),
+        dockRsVal: document.getElementById('dock-rs-val'),
+        sliderBhBright: document.getElementById('slider-bh-bright'),
+        valBhBright: document.getElementById('val-bh-bright'),
+        sliderBhTilt: document.getElementById('slider-bh-tilt'),
+        valBhTilt: document.getElementById('val-bh-tilt'),
+        btnToggleLensing: document.getElementById('btn-toggle-lensing'),
+
+        btnDockHome: document.getElementById('btn-dock-home'),
+        btnDockHero: document.getElementById('btn-dock-hero'),
+
+        overlayWhy: document.getElementById('overlay-why'),
+        overlayInquiry: document.getElementById('overlay-inquiry'),
+        overlayInfo: document.getElementById('overlay-info'),
+
+        cardTask1: document.getElementById('card-task-1'),
+        statusTask1: document.getElementById('status-task-1'),
+        chipArm2: document.getElementById('chip-arm-2'),
+        chipArm6: document.getElementById('chip-arm-6'),
+
+        cardTask2: document.getElementById('card-task-2'),
+        statusTask2: document.getElementById('status-task-2'),
+        chipLensOn: document.getElementById('chip-lens-on'),
+        chipLensOff: document.getElementById('chip-lens-off'),
+
+        cardTask3: document.getElementById('card-task-3'),
+        statusTask3: document.getElementById('status-task-3'),
+        chipMassRatio: document.getElementById('chip-mass-ratio'),
+
+        btnRerunVerify: document.getElementById('btn-rerun-verify'),
+        verifyRs1: document.getElementById('verify-rs-1'),
+        verifyRs2x: document.getElementById('verify-rs-2x'),
+        verifySeed: document.getElementById('verify-seed'),
+        verifyBuffer: document.getElementById('verify-buffer'),
+        infoRendererName: document.getElementById('info-renderer-name'),
+        infoParticleCount: document.getElementById('info-particle-count'),
+        infoFrameStats: document.getElementById('info-frame-stats'),
+
+        hudSceneBadge: document.getElementById('hud-scene-badge'),
+        hudPrimaryMetric: document.getElementById('hud-primary-metric'),
+        hudSecondaryMetric: document.getElementById('hud-secondary-metric'),
+        hudFps: document.getElementById('hud-fps')
+      };
+
+      /* ============================================================================
+       * 4. GLSL SHADERS (Galaxy Particle System, Orbit Trails, Black Hole Lensing)
+       * ============================================================================ */
+
+      // 4A. Galaxy Multi-Layered Star, Nebula & Dust Particle Vertex Shader
+      const GALAXY_VERT_SRC = `
+        attribute vec4 a_polar;   // x: radius, y: baseAngle, z: heightZ, w: armPhase
+        attribute vec4 a_props;   // x: baseSize, y: colorTemp(0..1), z: pType(0=star,1=nebula,2=bg,3=dust), w: twinkleSeed
+
+        uniform mat4 u_viewProj;
+        uniform float u_time;
+        uniform float u_speed;
+        uniform float u_dpr;
+        uniform float u_viewportH;
+        uniform float u_densityScale;
+        uniform int u_palette;
+
+        varying float v_temp;
+        varying float v_type;
+        varying float v_seed;
+        varying float v_alpha;
+        varying float v_radiusNorm;
+
+        void main() {
+          float r = a_polar.x;
+          float theta0 = a_polar.y;
+          float z = a_polar.z;
+          float pType = a_props.z;
+
+          // Differential rotation: inner stars rotate with higher angular velocity than outer stars
+          float omega = 0.0;
+          if (pType < 1.5 || pType > 2.5) {
+            omega = u_time * u_speed * (1.35 / (0.32 + 0.72 * pow(max(r, 0.08), 0.68)));
+          } else {
+            // Distant background stars barely drift
+            omega = u_time * 0.008;
+          }
+
+          float angle = theta0 + omega;
+          vec3 worldPos;
+          if (pType > 1.5 && pType < 2.5) {
+            // Deep 3D celestial sphere background stars
+            worldPos = vec3(
+              r * cos(theta0) * cos(z),
+              r * sin(z),
+              r * sin(theta0) * cos(z)
+            );
+          } else {
+            worldPos = vec3(r * cos(angle), z, r * sin(angle));
+          }
+
+          gl_Position = u_viewProj * vec4(worldPos, 1.0);
+
+          float dist = max(gl_Position.w, 0.8);
+          float perspectiveScale = (u_viewportH * 0.42) / dist;
+
+          float rNorm = clamp(r / 9.4, 0.0, 1.0);
+          v_radiusNorm = rNorm;
+
+          // Attenuate point sizes near the dense galactic center so individual stars and spiral arms remain crisp
+          float coreSizeShrink = mix(0.52, 1.0, smoothstep(0.0, 0.28, rNorm));
+          float rawSize = a_props.x * perspectiveScale * u_dpr * coreSizeShrink;
+
+          if (pType > 0.5 && pType < 1.5) {
+            // Volumetric H-II nebula glow clouds along spiral arms
+            gl_PointSize = clamp(rawSize * 3.1, 3.5, 36.0);
+          } else if (pType > 2.5) {
+            // Dark/warm absorbing dust lane clouds along inner spiral edges
+            gl_PointSize = clamp(rawSize * 2.8, 3.0, 30.0);
+          } else if (pType > 1.5 && pType < 2.5) {
+            // Crisp distant background stars
+            gl_PointSize = clamp(a_props.x * u_dpr * 1.15, 1.0, 3.2);
+          } else {
+            // Galactic bulge & spiral arm stars: mostly fine pinpoints with occasional bright OB giants
+            gl_PointSize = clamp(rawSize * 0.68, 1.05, 8.5);
+          }
+
+          v_temp = a_props.y;
+          v_type = pType;
+          v_seed = a_props.w;
+
+          // Radial energy balancing: prevent additive white blowout in the high-density bulge
+          float coreEnergyDamp = mix(0.22, 0.92, smoothstep(0.0, 0.32, rNorm));
+          if (pType > 1.5 && pType < 2.5) {
+            coreEnergyDamp = 0.85;
+          }
+
+          float twinkle = 0.90 + 0.10 * sin(u_time * 3.0 + a_props.w * 40.0);
+          float distFade = clamp(20.0 / (dist + 5.0), 0.22, 1.0);
+          v_alpha = twinkle * distFade * coreEnergyDamp * u_densityScale;
+        }
+      `;
+
+      // 4B. Galaxy Multi-Layered Star, Nebula & Dust Fragment Shader
+      const GALAXY_FRAG_SRC = `
+        precision highp float;
+
+        uniform int u_palette;
+        varying float v_temp;
+        varying float v_type;
+        varying float v_seed;
+        varying float v_alpha;
+        varying float v_radiusNorm;
+
+        vec3 getPaletteColor(int pal, float temp, float rNorm, float pType) {
+          // Rich warm gold-amber core that transitions into distinct spiral arm & nebula hues
+          vec3 coreGold = vec3(1.0, 0.78, 0.36);
+          vec3 coreIvory = vec3(1.0, 0.94, 0.82);
+          vec3 coreColor = mix(coreIvory, coreGold, smoothstep(0.0, 0.18, rNorm));
+
+          vec3 armHot;
+          vec3 nebulaColor;
+          vec3 outerHalo;
+
+          if (pal == 0) {
+            // 0: 청색 성운 (Golden Core -> Sapphire/Cyan Spiral Arms + Magenta/Violet H-II Nebulae)
+            armHot = mix(vec3(0.22, 0.68, 1.0), vec3(0.55, 0.88, 1.0), temp);
+            nebulaColor = mix(vec3(0.86, 0.18, 0.68), vec3(0.42, 0.20, 0.95), temp);
+            outerHalo = vec3(0.18, 0.42, 0.88);
+          } else if (pal == 1) {
+            // 1: 황금 중심 (Radiant Gold Core -> Warm Champagne Arms + Turquoise/Amber Nebulae)
+            coreColor = mix(vec3(1.0, 0.96, 0.84), vec3(1.0, 0.74, 0.28), smoothstep(0.0, 0.22, rNorm));
+            armHot = mix(vec3(1.0, 0.72, 0.30), vec3(0.38, 0.88, 0.92), temp);
+            nebulaColor = mix(vec3(0.95, 0.45, 0.15), vec3(0.16, 0.78, 0.75), temp);
+            outerHalo = vec3(0.35, 0.62, 0.82);
+          } else {
+            // 2: 장밋빛 우주 (Warm Pearl-Gold Core -> Rose/Magenta Arms + Crimson/Violet Nebulae)
+            coreColor = mix(vec3(1.0, 0.92, 0.84), vec3(1.0, 0.68, 0.42), smoothstep(0.0, 0.20, rNorm));
+            armHot = mix(vec3(1.0, 0.34, 0.62), vec3(0.75, 0.48, 1.0), temp);
+            nebulaColor = mix(vec3(0.92, 0.16, 0.44), vec3(0.58, 0.20, 0.92), temp);
+            outerHalo = vec3(0.48, 0.26, 0.82);
+          }
+
+          if (pType > 0.5 && pType < 1.5) {
+            // Nebula cloud color: warm gold near bulge, rich magenta/violet/cyan in spiral arms
+            return mix(coreGold * 0.9, nebulaColor, smoothstep(0.10, 0.32, rNorm));
+          }
+
+          // Stellar population gradient: golden bulge -> blue/cyan spiral arms -> deep outer halo
+          vec3 diskCol = mix(armHot, nebulaColor, smoothstep(0.62, 0.96, temp) * 0.65);
+          diskCol = mix(diskCol, outerHalo, smoothstep(0.68, 1.0, rNorm));
+          float bulgeToDisk = smoothstep(0.08, 0.30, rNorm);
+          vec3 starCol = mix(coreColor, diskCol, bulgeToDisk);
+
+          // Young hot OB stars along spiral arm ridges
+          return mix(starCol, vec3(0.84, 0.94, 1.0), pow(temp, 3.5) * bulgeToDisk * 0.55);
+        }
+
+        void main() {
+          vec2 uv = gl_PointCoord * 2.0 - 1.0;
+          float d2 = dot(uv, uv);
+          if (d2 > 1.0) discard;
+          float d = sqrt(d2);
+
+          // 1. Dark Absorbing Spiral Dust Lanes (pType == 3.0)
+          // Rendered with premultiplied alpha (ONE, ONE_MINUS_SRC_ALPHA): low RGB + moderate alpha absorbs background light!
+          if (v_type > 2.5) {
+            float dustProfile = exp(-d2 * 3.2) * (1.0 - d2);
+            float absorbAlpha = clamp(dustProfile * 0.24, 0.0, 0.32);
+            vec3 darkUmber = vec3(0.025, 0.012, 0.032) * absorbAlpha;
+            gl_FragColor = vec4(darkUmber, absorbAlpha);
+            return;
+          }
+
+          vec3 col = getPaletteColor(u_palette, v_temp, v_radiusNorm, v_type);
+
+          // 2. Soft Volumetric H-II Nebula Knots (pType == 1.0)
+          if (v_type > 0.5 && v_type < 1.5) {
+            float cloud = exp(-d2 * 3.8) * (1.0 - d2);
+            float w = cloud * 0.075 * v_alpha;
+            vec3 nebEmission = col * w;
+            // Subtle alpha occlusion prevents overlapping nebulae from saturating to pure white
+            gl_FragColor = vec4(nebEmission, w * 0.35);
+            return;
+          }
+
+          // 3. Crisp Optical Stars (pType == 0.0 or 2.0)
+          float core = exp(-d2 * 26.0);
+          float halo = exp(-d * 4.2) * (1.0 - d);
+          float energy = (core * 0.85 + halo * 0.48) * v_alpha;
+
+          // Preserve saturation in bright cores via soft HDR shoulder compression
+          vec3 rawEmission = col * halo * 0.85 + mix(col, vec3(1.0, 0.96, 0.88), 0.45) * core * 0.95;
+          vec3 compressedCol = rawEmission / (1.0 + rawEmission * 0.42);
+          vec3 finalPremult = compressedCol * energy * 0.52;
+
+          // Small occlusion alpha bounds maximum central surface brightness to warm gold/ivory instead of flat white
+          float occAlpha = clamp(energy * 0.26, 0.0, 0.45);
+          gl_FragColor = vec4(finalPremult, occAlpha);
+        }
+      `;
+
+      // 4C. Orbit Trail Line Shader (for '별의 궤적' toggle & Galactic Core Volumetric Glow)
+      const LINE_VERT_SRC = `
+        attribute vec3 a_pos;
+        attribute vec4 a_color;
+        uniform mat4 u_viewProj;
+        varying vec4 v_color;
+        void main() {
+          gl_Position = u_viewProj * vec4(a_pos, 1.0);
+          v_color = a_color;
+        }
+      `;
+
+      const LINE_FRAG_SRC = `
+        precision mediump float;
+        varying vec4 v_color;
+        void main() {
+          gl_FragColor = v_color;
+        }
+      `;
+
+      // 4D. Black Hole Full-Viewport Gravitational Lensing & Volumetric Accretion Disk Shader
+      const BH_VERT_SRC = `
+        attribute vec2 a_quad;
+        varying vec2 v_uv;
+        void main() {
+          v_uv = a_quad;
+          gl_Position = vec4(a_quad, 0.0, 1.0);
+        }
+      `;
+
+      const BH_FRAG_SRC = `
+        precision highp float;
+
+        varying vec2 v_uv;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform vec3 u_camPos;
+        uniform mat3 u_camMat;
+        uniform float u_rs;           // Visual event horizon radius in scene units
+        uniform float u_brightness;
+        uniform float u_lensingMix;   // 1.0 = Gravitational Lensing ON, 0.0 = OFF
+
+        // Non-degenerate 2D/3D hashes free of axis-zero or polar seam artifacts
+        float hash21(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+
+        vec2 hash22(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.xx + p3.yz) * p3.zy);
+        }
+
+        // C2-continuous Quintic-interpolated 2D noise (eliminates linear/cubic grid creases & triangle facets)
+        float noise2D(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+          float a = hash21(i);
+          float b = hash21(i + vec2(1.0, 0.0));
+          float c = hash21(i + vec2(0.0, 1.0));
+          float d = hash21(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+        }
+
+        // C2-continuous 3D noise for seamless spherical background nebula
+        float hash31(vec3 p3) {
+          p3 = fract(p3 * 0.1031);
+          p3 += dot(p3, p3.zyx + 31.32);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+
+        float noise3D(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+          float n000 = hash31(i);
+          float n100 = hash31(i + vec3(1.0, 0.0, 0.0));
+          float n010 = hash31(i + vec3(0.0, 1.0, 0.0));
+          float n110 = hash31(i + vec3(1.0, 1.0, 0.0));
+          float n001 = hash31(i + vec3(0.0, 0.0, 1.0));
+          float n101 = hash31(i + vec3(1.0, 0.0, 1.0));
+          float n011 = hash31(i + vec3(0.0, 1.0, 1.0));
+          float n111 = hash31(i + vec3(1.0, 1.0, 1.0));
+          float nx00 = mix(n000, n100, u.x);
+          float nx10 = mix(n010, n110, u.x);
+          float nx01 = mix(n001, n101, u.x);
+          float nx11 = mix(n011, n111, u.x);
+          float nxy0 = mix(nx00, nx10, u.y);
+          float nxy1 = mix(nx01, nx11, u.y);
+          return mix(nxy0, nxy1, u.z);
+        }
+
+        // Smooth 5-octave Cartesian FBM (no polar coordinate seam or wedge distortion)
+        float fbmCartesian(vec2 p) {
+          float v = 0.0;
+          float a = 0.5;
+          mat2 rot = mat2(0.80, 0.60, -0.60, 0.80);
+          for (int i = 0; i < 5; i++) {
+            v += a * noise2D(p);
+            p = rot * p * 2.03 + vec2(13.7, 7.9);
+            a *= 0.5;
+          }
+          return v;
+        }
+
+        // Seamless 3D directional background starfield & cosmic nebula (warped by gravitational lensing)
+        vec3 sampleBackgroundCosmos(vec3 dir) {
+          vec3 d = normalize(dir);
+          // Equirectangular projection with smooth pole damping for crisp stars
+          float phi = atan(d.z, d.x);
+          float theta = asin(clamp(d.y, -0.999, 0.999));
+          float cosTheta = sqrt(max(1.0 - d.y * d.y, 0.02));
+          vec2 sphereUV = vec2(phi * 3.2 * cosTheta, theta * 6.4);
+
+          vec3 stars = vec3(0.0);
+          for (int layer = 0; layer < 2; layer++) {
+            float scale = (layer == 0) ? 14.0 : 28.0;
+            vec2 grid = sphereUV * scale + float(layer) * 23.5;
+            vec2 id = floor(grid);
+            vec2 gv = fract(grid) - 0.5;
+            vec2 rnd = hash22(id);
+            if (rnd.x > 0.74) {
+              vec2 offset = (rnd - 0.5) * 0.62;
+              float dist2 = dot(gv - offset, gv - offset);
+              float starIntensity = exp(-dist2 * 52.0) * smoothstep(0.74, 0.99, rnd.x);
+              vec3 starTint = mix(vec3(0.62, 0.82, 1.0), vec3(1.0, 0.86, 0.66), rnd.y);
+              stars += starTint * starIntensity * 1.5;
+            }
+          }
+
+          // Seamless 3D noise for Milky Way background band (zero seam at +-pi)
+          float band = exp(-pow(d.y * 2.6 + 0.22 * d.x, 2.0) * 2.8);
+          float neb1 = noise3D(d * 3.8 + vec3(1.2, 3.4, 5.6));
+          float neb2 = noise3D(d * 8.2 - vec3(2.5, 1.1, 4.3));
+          float neb = neb1 * 0.65 + neb2 * 0.35;
+          vec3 nebulaCol = mix(vec3(0.02, 0.05, 0.12), vec3(0.16, 0.07, 0.26), neb) * band;
+          nebulaCol += vec3(0.05, 0.15, 0.25) * neb * neb * band;
+
+          return vec3(0.006, 0.009, 0.020) + nebulaCol + stars;
+        }
+
+        // Seamless Cartesian Dual-Flow Accretion Disk Evaluator (Zero triangular patches, zero banding)
+        vec4 evaluateAccretionDisk(vec3 p, vec3 rayDir, float innerR, float outerR) {
+          float r = length(p.xz);
+          if (r <= innerR || r >= outerR) return vec4(0.0);
+
+          float normR = clamp((r - innerR) / (outerR - innerR), 0.0, 1.0);
+          // Smooth anti-aliased inner ISCO edge and soft outer plasma taper
+          float radialMask = smoothstep(0.0, 0.085, normR) * (1.0 - smoothstep(0.58, 1.0, normR));
+          if (radialMask <= 0.0005) return vec4(0.0);
+
+          // Continuous Cartesian spiral shear + Dual-Phase Keplerian advection (no atan seam, no wind-up!)
+          float baseTwist = -2.35 * log(max(r / innerR, 0.1)) + u_time * 0.55;
+          float diffOmega = 1.45 / pow(max(r / innerR, 0.5), 1.15);
+
+          float cycle = u_time * 0.18;
+          float ph0 = fract(cycle);
+          float ph1 = fract(cycle + 0.5);
+          float wBlend = abs(ph0 * 2.0 - 1.0);
+          wBlend = wBlend * wBlend * (3.0 - 2.0 * wBlend);
+
+          float ang0 = baseTwist + (ph0 - 0.5) * 2.4 * diffOmega;
+          float ang1 = baseTwist + (ph1 - 0.5) * 2.4 * diffOmega + 1.570796;
+
+          float c0 = cos(ang0), s0 = sin(ang0);
+          float c1 = cos(ang1), s1 = sin(ang1);
+
+          vec2 uv0 = mat2(c0, -s0, s0, c0) * p.xz * 1.45;
+          vec2 uv1 = mat2(c1, -s1, s1, c1) * p.xz * 1.45 + vec2(9.2, 4.7);
+
+          float turb0 = fbmCartesian(uv0);
+          float turb1 = fbmCartesian(uv1);
+          float turb = mix(turb0, turb1, wBlend);
+
+          // Fine secondary plasma wisps in Cartesian coordinates
+          float detailAng = -1.2 * log(max(r / innerR, 0.1)) + u_time * 1.1;
+          float cd = cos(detailAng), sd = sin(detailAng);
+          vec2 uvDetail = mat2(cd, -sd, sd, cd) * p.xz * 3.4;
+          float fineWisp = fbmCartesian(uvDetail);
+
+          // Soft organic radial density filaments (no harsh periodic sine stripes)
+          float softRings = 0.72 + 0.28 * sin(normR * 18.0 + turb * 5.2);
+          float plasmaDensity = radialMask * smoothstep(0.18, 0.88, turb * 0.68 + fineWisp * 0.32) * softRings;
+
+          // Blackbody thermal gradient: blazing white-gold inner ISCO -> warm amber -> deep crimson outer
+          vec3 colInner = vec3(1.0, 0.97, 0.88);
+          vec3 colMid   = vec3(1.0, 0.60, 0.18);
+          vec3 colOuter = vec3(0.76, 0.16, 0.05);
+          vec3 col = mix(colInner, colMid, smoothstep(0.0, 0.36, normR));
+          col = mix(col, colOuter, smoothstep(0.36, 0.92, normR));
+
+          // Relativistic Doppler beaming computed purely from Cartesian tangent vector (-z, 0, x)/r
+          vec3 tangentVel = vec3(-p.z, 0.0, p.x) / max(r, 0.001);
+          float doppler = dot(tangentVel, -rayDir);
+          float beaming = clamp(1.0 + doppler * 0.56, 0.42, 1.82);
+          col = mix(col, vec3(0.88, 0.95, 1.0), max(doppler, 0.0) * 0.30);
+
+          float radialBoost = 2.15 / (0.32 + normR * 1.65);
+          float emission = plasmaDensity * beaming * radialBoost * u_brightness;
+          float alpha = clamp(plasmaDensity * 0.92, 0.0, 0.98);
+
+          return vec4(col * emission, alpha);
+        }
+
+        void main() {
+          // Aspect-invariant framing: ensures the black hole & full accretion disk occupy ~72-78% of viewport
+          float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+          vec2 sensorUV = v_uv * vec2(1.0, 1.0 / aspect) * max(1.0, aspect / 1.72);
+          vec3 rd = normalize(u_camMat * vec3(sensorUV, -1.85));
+          vec3 ro = u_camPos;
+
+          float rs = u_rs;
+          float innerDisk = rs * 1.55;
+          float outerDisk = rs * 4.85;
+
+          vec3 accumColor = vec3(0.0);
+          float transmittance = 1.0;
+          bool swallowed = false;
+          float minR = 1000.0;
+
+          // Fast exact analytical path when Lensing is completely OFF (0% step artifacts)
+          if (u_lensingMix < 0.001) {
+            // 1. Exact analytical ray-sphere intersection for Event Horizon shadow
+            float b = dot(ro, rd);
+            float c = dot(ro, ro) - rs * rs;
+            float disc = b * b - c;
+            float tSphere = 1e9;
+            if (disc > 0.0) {
+              float tHit = -b - sqrt(disc);
+              if (tHit > 0.0) {
+                tSphere = tHit;
+                swallowed = true;
+              }
+            }
+            // Closest approach distance of straight line to origin
+            float tClosest = max(0.0, -b);
+            minR = length(ro + rd * tClosest);
+
+            // 2. Exact analytical ray-plane (y = 0) intersection for Accretion Disk
+            if (abs(rd.y) > 1e-5) {
+              float tPlane = -ro.y / rd.y;
+              if (tPlane > 0.0 && tPlane < tSphere) {
+                vec3 hitPos = ro + rd * tPlane;
+                vec4 diskSample = evaluateAccretionDisk(hitPos, rd, innerDisk, outerDisk);
+                if (diskSample.a > 0.001) {
+                  accumColor += transmittance * diskSample.rgb;
+                  transmittance *= (1.0 - diskSample.a * 0.85);
+                }
+              }
+            }
+
+            // Smooth anti-aliased edge at the unlensed event horizon boundary
+            float horizonEdge = smoothstep(rs * 0.985, rs * 1.02, minR);
+            vec3 bg = sampleBackgroundCosmos(rd) * horizonEdge;
+            accumColor += transmittance * bg;
+          } else {
+            // Continuous Per-Pixel Geodesic Ray Integration (Lensing ON or smoothly transitioning)
+            vec3 pos = ro;
+            vec3 dir = rd;
+            float strength = 1.55 * rs * rs * u_lensingMix;
+
+            for (int i = 0; i < 110; i++) {
+              float r = length(pos);
+              minR = min(minR, r);
+
+              if (r <= rs) {
+                swallowed = true;
+                break;
+              }
+
+              // Smooth continuous step sizing (no abrupt slab clamping that causes concentric rings)
+              float stepSize = clamp(0.16 * (r - rs * 0.72), 0.032 * rs, 0.48);
+
+              // Relativistic light bending acceleration toward the singularity
+              vec3 accel = -pos * (strength / (r * r * r * max(r, 0.25)));
+              vec3 nextDir = normalize(dir + accel * stepSize);
+              vec3 nextPos = pos + nextDir * stepSize;
+
+              // Sub-step exact root interpolation if ray segment penetrates Event Horizon
+              float nextR = length(nextPos);
+              if (nextR <= rs) {
+                swallowed = true;
+                minR = rs;
+                break;
+              }
+
+              // Exact linear root refinement when crossing the equatorial accretion disk plane (y = 0)
+              if ((pos.y > 0.0 && nextPos.y <= 0.0) || (pos.y < 0.0 && nextPos.y >= 0.0)) {
+                float tCross = abs(pos.y) / max(abs(pos.y - nextPos.y), 1e-6);
+                vec3 hitPos = mix(pos, nextPos, tCross);
+                vec3 hitDir = normalize(mix(dir, nextDir, tCross));
+                vec4 diskSample = evaluateAccretionDisk(hitPos, hitDir, innerDisk, outerDisk);
+                if (diskSample.a > 0.001) {
+                  accumColor += transmittance * diskSample.rgb;
+                  transmittance *= (1.0 - diskSample.a * 0.82);
+                }
+              }
+
+              pos = nextPos;
+              dir = nextDir;
+
+              if (r > 24.0 && dot(pos, dir) > 0.0) {
+                break;
+              }
+              if (transmittance < 0.015) {
+                break;
+              }
+            }
+
+            // Smooth Photon Sphere ring & continuous atmospheric glow around the shadow
+            float photonSphereR = rs * (1.0 + 0.48 * u_lensingMix);
+            float ringProfile = exp(-pow((minR - photonSphereR) / (rs * 0.095), 2.0));
+            float softCorona  = exp(-max(minR - photonSphereR, 0.0) / (rs * 0.65)) * 0.16;
+            vec3 photonRingCol = vec3(1.0, 0.85, 0.58) * (ringProfile * 0.68 + softCorona) * u_brightness * u_lensingMix;
+            accumColor += transmittance * photonRingCol;
+
+            if (!swallowed) {
+              float shadowAA = smoothstep(rs * 0.99, rs * 1.03, minR);
+              vec3 bg = sampleBackgroundCosmos(dir);
+              float einsteinBoost = 1.0 + 0.55 * u_lensingMix * exp(-max(minR - photonSphereR, 0.0) / (rs * 0.75));
+              accumColor += transmittance * bg * einsteinBoost * shadowAA;
+            }
+          }
+
+          // Smooth ACES Filmic Tone Mapping for cinematic HDR highlight rolloff
+          vec3 x = accumColor;
+          vec3 mapped = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+          mapped = pow(mapped, vec3(0.94));
+
+          gl_FragColor = vec4(mapped, 1.0);
+        }
+      `;
+
+      /* ============================================================================
+       * 5. 3D MATRIX UTILITIES & DETERMINISTIC GALAXY BUFFER GENERATOR
+       * ============================================================================ */
+      function createPerspectiveMatrix(fovRad, aspect, near, far) {
+        // Aspect-aware horizontal & vertical scaling so the galaxy stays within 75-85% of viewport width
+        // across both wide monitors and narrow split-screen preview panes
+        const baseTanH = Math.tan(fovRad * 0.5) * 1.55;
+        const tanH = baseTanH * Math.max(1.0, aspect / 1.72);
+        const tanV = tanH / Math.max(aspect, 0.25);
+
+        const fx = 1.0 / tanH;
+        const fy = 1.0 / tanV;
+        const nf = 1.0 / (near - far);
+        return new Float32Array([
+          fx, 0, 0, 0,
+          0, fy, 0, 0,
+          0, 0, (far + near) * nf, -1,
+          0, 0, (2 * far * near) * nf, 0
+        ]);
+      }
+
+      function createLookAtMatrix(eye, target, up) {
+        let zx = eye[0] - target[0];
+        let zy = eye[1] - target[1];
+        let zz = eye[2] - target[2];
+        let len = Math.hypot(zx, zy, zz) || 1;
+        zx /= len; zy /= len; zz /= len;
+
+        let xx = up[1] * zz - up[2] * zy;
+        let xy = up[2] * zx - up[0] * zz;
+        let xz = up[0] * zy - up[1] * zx;
+        len = Math.hypot(xx, xy, xz) || 1;
+        xx /= len; xy /= len; xz /= len;
+
+        const yx = zy * xz - zz * xy;
+        const yy = zz * xx - zx * xz;
+        const yz = zx * xy - zy * xx;
+
+        return new Float32Array([
+          xx, yx, zx, 0,
+          xy, yy, zy, 0,
+          xz, yz, zz, 0,
+          -(xx * eye[0] + xy * eye[1] + xz * eye[2]),
+          -(yx * eye[0] + yy * eye[1] + yz * eye[2]),
+          -(zx * eye[0] + zy * eye[1] + zz * eye[2]),
+          1
+        ]);
+      }
+
+      function multiplyMat4(a, b) {
+        const out = new Float32Array(16);
+        for (let i = 0; i < 4; i++) {
+          const ai0 = a[i], ai1 = a[i + 4], ai2 = a[i + 8], ai3 = a[i + 12];
+          out[i]      = ai0 * b[0]  + ai1 * b[1]  + ai2 * b[2]  + ai3 * b[3];
+          out[i + 4]  = ai0 * b[4]  + ai1 * b[5]  + ai2 * b[6]  + ai3 * b[7];
+          out[i + 8]  = ai0 * b[8]  + ai1 * b[9]  + ai2 * b[10] + ai3 * b[11];
+          out[i + 12] = ai0 * b[12] + ai1 * b[13] + ai2 * b[14] + ai3 * b[15];
+        }
+        return out;
+      }
+
+      /**
+       * Generates the flat Float32Array GPU vertex buffer for the spiral galaxy
+       * using a deterministic seeded PRNG.8 floats per particle:
+       * [r, theta0, z, armPhase, size, colorTemp, pType, twinkleSeed]
+       */
+      function generateGalaxyVertexArray(totalCount, numArms, seedValue) {
+        const rand = createSeededPRNG(seedValue + numArms * 7919);
+        const data = new Float32Array(totalCount * 8);
+
+        // Ordered rendering layers:
+        // 1) Deep background stars -> 2) Soft H-II nebulae -> 3) Dark absorbing dust lanes -> 4) Bulge & Spiral Arm stars
+        const bgCount = Math.floor(totalCount * 0.07);
+        const nebulaCount = Math.floor(totalCount * 0.065);
+        const dustCount = Math.floor(totalCount * 0.055);
+        const coreCount = Math.floor(totalCount * 0.13);
+
+        const maxRadius = 9.2;
+        const armWind = 0.54; // Crisp logarithmic spiral pitch
+
+        // Box-Muller Gaussian helper
+        function gauss() {
+          const u1 = Math.max(rand(), 1e-6);
+          const u2 = rand();
+          return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+        }
+
+        for (let i = 0; i < totalCount; i++) {
+          const idx = i * 8;
+          let r, theta0, z, armPhase = 0, size, temp, pType;
+
+          if (i < bgCount) {
+            // Layer 1: Deep 3D background starfield surrounding the galaxy
+            pType = 2.0;
+            r = 22.0 + rand() * 35.0;
+            theta0 = rand() * Math.PI * 2.0;
+            z = (rand() - 0.5) * Math.PI * 0.92;
+            size = 0.9 + Math.pow(rand(), 3.2) * 1.8;
+            temp = rand();
+          } else if (i < bgCount + nebulaCount) {
+            // Layer 2: Soft glowing H-II Nebula clouds beaded along the spiral arms
+            pType = 1.0;
+            const armIdx = i % numArms;
+            const armBaseAngle = (armIdx / numArms) * Math.PI * 2.0;
+            r = 1.05 + Math.pow(rand(), 0.86) * (maxRadius - 1.45);
+            const spiralAngle = Math.log(r + 0.35) / armWind;
+            const spread = (0.14 + 0.025 * r) * gauss();
+            theta0 = armBaseAngle + spiralAngle + spread;
+            z = gauss() * (0.12 + 0.012 * r);
+            size = 2.2 + rand() * 2.2;
+            temp = rand();
+          } else if (i < bgCount + nebulaCount + dustCount) {
+            // Layer 3: Dark absorbing spiral dust lanes hugging the inner concave edge of each spiral arm
+            pType = 3.0;
+            const armIdx = i % numArms;
+            const armBaseAngle = (armIdx / numArms) * Math.PI * 2.0;
+            r = 0.85 + Math.pow(rand(), 0.88) * (maxRadius - 1.65);
+            const spiralAngle = Math.log(r + 0.35) / armWind;
+            // Offset slightly inside the spiral arm ridge to carve dark dust lanes between arms
+            theta0 = armBaseAngle + spiralAngle - 0.22 + gauss() * 0.10;
+            z = gauss() * 0.06;
+            size = 2.0 + rand() * 1.8;
+            temp = rand() * 0.4;
+          } else if (i < bgCount + nebulaCount + dustCount + coreCount) {
+            // Layer 4A: Golden-amber Galactic Bulge / Core (smooth distribution without single-pixel pileup)
+            pType = 0.0;
+            const u = rand();
+            r = 0.06 + Math.pow(u, 1.12) * 2.15;
+            theta0 = rand() * Math.PI * 2.0;
+            // Mild bar/elliptical triaxiality in the bulge
+            const thickness = 0.52 * Math.exp(-r * 0.72) + 0.06;
+            z = gauss() * thickness * 0.42;
+            size = 0.95 + Math.pow(rand(), 2.8) * 1.9;
+            temp = 0.08 + rand() * 0.38;
+          } else {
+            // Layer 4B: Crisp Spiral Arm & Disk Stars (with secondary branching spurs)
+            pType = 0.0;
+            const armIdx = i % numArms;
+            const armBaseAngle = (armIdx / numArms) * Math.PI * 2.0;
+            const u = rand();
+            r = 0.55 + Math.pow(u, 0.84) * (maxRadius - 0.55);
+            const spiralAngle = Math.log(r + 0.35) / armWind;
+
+            // Sharp main spiral ridge + delicate outer spurs
+            const isRidge = rand() < 0.62;
+            const isSpur = !isRidge && rand() < 0.35;
+            const angularSpread = isRidge
+              ? (0.11 + 0.018 * r) * gauss()
+              : (isSpur ? (0.32 + 0.038 * r) * gauss() + 0.26 : (0.24 + 0.030 * r) * gauss());
+
+            theta0 = armBaseAngle + spiralAngle + angularSpread;
+            const diskHeight = 0.25 * Math.exp(-r * 0.26) + 0.035;
+            z = gauss() * diskHeight;
+            size = 0.85 + Math.pow(rand(), 3.5) * 2.6;
+            // Ridge stars are hotter/bluer; broader arm stars include warm & intermediate stars
+            temp = isRidge ? (0.45 + 0.55 * rand()) : (0.15 + 0.75 * rand());
+            armPhase = armIdx / numArms;
+          }
+
+          data[idx]     = r;
+          data[idx + 1] = theta0;
+          data[idx + 2] = z;
+          data[idx + 3] = armPhase;
+          data[idx + 4] = size;
+          data[idx + 5] = temp;
+          data[idx + 6] = pType;
+          data[idx + 7] = rand();
+        }
+
+        return data;
+      }
+
+      /* ============================================================================
+       * 6. WEBGL RENDERING ENGINE & 2D CANVAS FALLBACK
+       * ============================================================================ */
+      let gl = null;
+      let ctx2d = null;
+      let galaxyProgram = null;
+      let lineProgram = null;
+      let bhProgram = null;
+
+      let galaxyVBO = null;
+      let orbitLineVBO = null;
+      let quadVBO = null;
+      let currentGalaxyArray = null;
+      let orbitVertexCount = 0;
+
+      // Fallback 2D star sample array (only used when WebGL is completely unavailable)
+      let fallbackStars = [];
+
+      function compileShader(glCtx, type, source) {
+        const shader = glCtx.createShader(type);
+        glCtx.shaderSource(shader, source);
+        glCtx.compileShader(shader);
+        if (!glCtx.getShaderParameter(shader, glCtx.COMPILE_STATUS)) {
+          const info = glCtx.getShaderInfoLog(shader);
+          glCtx.deleteShader(shader);
+          throw new Error('GLSL 컴파일 오류: ' + info);
+        }
+        return shader;
+      }
+
+      function createProgram(glCtx, vsSource, fsSource) {
+        const vs = compileShader(glCtx, glCtx.VERTEX_SHADER, vsSource);
+        const fs = compileShader(glCtx, glCtx.FRAGMENT_SHADER, fsSource);
+        const prog = glCtx.createProgram();
+        glCtx.attachShader(prog, vs);
+        glCtx.attachShader(prog, fs);
+        glCtx.linkProgram(prog);
+        if (!glCtx.getProgramParameter(prog, glCtx.LINK_STATUS)) {
+          const info = glCtx.getProgramInfoLog(prog);
+          throw new Error('GLSL 프로그램 링크 오류: ' + info);
+        }
+        return prog;
+      }
+
+      function initRenderer() {
+        try {
+          const contextAttribs = {
+            alpha: false,
+            antialias: true,
+            depth: false,
+            stencil: false,
+            premultipliedAlpha: false,
+            preserveDrawingBuffer: false
+          };
+          gl = dom.canvas.getContext('webgl2', contextAttribs) ||
+               dom.canvas.getContext('webgl', contextAttribs) ||
+               dom.canvas.getContext('experimental-webgl', contextAttribs);
+
+          if (!gl) {
+            throw new Error('WebGL context unavailable');
+          }
+
+          const isWebGL2 = (typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext);
+          state.webglAvailable = true;
+          state.rendererType = isWebGL2 ? 'WebGL 2.0 GPU 파이프라인' : 'WebGL 1.0 GPU 파이프라인';
+
+          // Compile the 3 GPU shader programs
+          galaxyProgram = createProgram(gl, GALAXY_VERT_SRC, GALAXY_FRAG_SRC);
+          lineProgram   = createProgram(gl, LINE_VERT_SRC, LINE_FRAG_SRC);
+          bhProgram     = createProgram(gl, BH_VERT_SRC, BH_FRAG_SRC);
+
+          // Create reusable GPU buffers (no leaks on arm regeneration)
+          galaxyVBO    = gl.createBuffer();
+          orbitLineVBO = gl.createBuffer();
+          quadVBO      = gl.createBuffer();
+
+          // Full-screen quad for Black Hole raymarching
+          gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+          gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+            gl.STATIC_DRAW
+          );
+
+          rebuildGalaxyBuffer();
+        } catch (err) {
+          // Graceful fallback to 2D Canvas without pretending to be WebGL
+          gl = null;
+          state.webglAvailable = false;
+          state.rendererType = '2D 캔버스 대체 렌더러 (WebGL 비활성)';
+          dom.fallbackBanner.classList.remove('hidden');
+          ctx2d = dom.canvas.getContext('2d');
+          rebuildGalaxyBuffer();
+        }
+      }
+
+      function rebuildGalaxyBuffer() {
+        currentGalaxyArray = generateGalaxyVertexArray(
+          state.galaxyDensity,
+          state.galaxyArms,
+          PHYSICS.SEED
+        );
+
+        if (state.webglAvailable && gl) {
+          gl.bindBuffer(gl.ARRAY_BUFFER, galaxyVBO);
+          gl.bufferData(gl.ARRAY_BUFFER, currentGalaxyArray, gl.STATIC_DRAW);
+        } else {
+          // Populate lightweight 2D fallback sample from the deterministic buffer
+          fallbackStars = [];
+          const step = Math.max(1, Math.floor(state.galaxyDensity / 2200));
+          for (let i = 0; i < state.galaxyDensity; i += step) {
+            const idx = i * 8;
+            fallbackStars.push({
+              r: currentGalaxyArray[idx],
+              theta0: currentGalaxyArray[idx + 1],
+              z: currentGalaxyArray[idx + 2],
+              size: currentGalaxyArray[idx + 4],
+              temp: currentGalaxyArray[idx + 5],
+              pType: currentGalaxyArray[idx + 6]
+            });
+          }
+        }
+      }
+
+      /**
+       * Updates sample star orbital trail arcs showing differential rotation
+       * when '별의 궤적' is toggled ON.
+       */
+      function updateOrbitTrailsBuffer() {
+        if (!state.webglAvailable || !gl) return;
+
+        const radii = [1.2, 2.2, 3.4, 4.7, 6.1, 7.6, 9.0];
+        const segments = 56;
+        const floats = [];
+
+        for (let rIdx = 0; rIdx < radii.length; rIdx++) {
+          const r = radii[rIdx];
+          const omega = state.simTime * state.galaxySpeed * (1.35 / (0.28 + 0.72 * Math.pow(r, 0.68)));
+          // Arc length proportional to angular velocity at radius r so students see differential speed
+          const arcSpan = 1.65 / (0.35 + 0.45 * Math.pow(r, 0.55));
+          const baseAngle = rIdx * 1.1 + omega;
+
+          for (let s = 0; s < segments; s++) {
+            const t0 = s / segments;
+            const t1 = (s + 1) / segments;
+            const a0 = baseAngle - arcSpan * (1.0 - t0);
+            const a1 = baseAngle - arcSpan * (1.0 - t1);
+
+            const alpha0 = t0 * t0 * 0.65;
+            const alpha1 = t1 * t1 * 0.65;
+
+            floats.push(
+              r * Math.cos(a0), 0.02, r * Math.sin(a0), 0.35, 0.82, 1.0, alpha0,
+              r * Math.cos(a1), 0.02, r * Math.sin(a1), 0.35, 0.82, 1.0, alpha1
+            );
+          }
+        }
+
+        const arr = new Float32Array(floats);
+        orbitVertexCount = arr.length / 7;
+        gl.bindBuffer(gl.ARRAY_BUFFER, orbitLineVBO);
+        gl.bufferData(gl.ARRAY_BUFFER, arr, gl.DYNAMIC_DRAW);
+      }
+
+      /* ============================================================================
+       * 7. VIEWPORT RESIZING & REAL-TIME RENDER FUNCTIONS
+       * ============================================================================ */
+      let viewportW = window.innerWidth;
+      let viewportH = window.innerHeight;
+      let currentDPR = 1.0;
+
+      function handleResize() {
+        viewportW = Math.max(window.innerWidth, 1);
+        viewportH = Math.max(window.innerHeight, 1);
+        // Cap DPR to 1.75 in Black Hole raymarching or 2.0 in Galaxy for crisp optical quality without GPU overload
+        const maxDpr = state.mode === 'blackhole' ? 1.5 : 2.0;
+        currentDPR = Math.min(window.devicePixelRatio || 1, maxDpr);
+
+        const targetW = Math.floor(viewportW * currentDPR);
+        const targetH = Math.floor(viewportH * currentDPR);
+
+        if (dom.canvas.width !== targetW || dom.canvas.height !== targetH) {
+          dom.canvas.width = targetW;
+          dom.canvas.height = targetH;
+        }
+        if (state.webglAvailable && gl) {
+          gl.viewport(0, 0, dom.canvas.width, dom.canvas.height);
+        }
+      }
+
+      function computeCameraPosition() {
+        const cosP = Math.cos(state.camPitch);
+        const sinP = Math.sin(state.camPitch);
+        const cosY = Math.cos(state.camYaw);
+        const sinY = Math.sin(state.camYaw);
+
+        const eye = [
+          state.camPanX + state.camDist * cosP * sinY,
+          state.camPanY + state.camDist * sinP,
+          state.camDist * cosP * cosY
+        ];
+        const target = [state.camPanX, state.camPanY, 0.0];
+        return { eye, target };
+      }
+
+      function renderGalaxyWebGL() {
+        gl.clearColor(0.006, 0.009, 0.022, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        const aspect = dom.canvas.width / Math.max(dom.canvas.height, 1);
+        const proj = createPerspectiveMatrix(45 * Math.PI / 180, aspect, 0.1, 140.0);
+        const { eye, target } = computeCameraPosition();
+        const view = createLookAtMatrix(eye, target, [0, 1, 0]);
+        const viewProj = multiplyMat4(proj, view);
+
+        gl.enable(gl.BLEND);
+        // Premultiplied radiative transfer blending: allows dark dust absorption and prevents central white blowout
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+        // 1. Optional Differential Rotation Star Orbits
+        if (state.showOrbits) {
+          updateOrbitTrailsBuffer();
+          gl.useProgram(lineProgram);
+          const uVP = gl.getUniformLocation(lineProgram, 'u_viewProj');
+          gl.uniformMatrix4fv(uVP, false, viewProj);
+
+          gl.bindBuffer(gl.ARRAY_BUFFER, orbitLineVBO);
+          const aPos = gl.getAttribLocation(lineProgram, 'a_pos');
+          const aCol = gl.getAttribLocation(lineProgram, 'a_color');
+          gl.enableVertexAttribArray(aPos);
+          gl.enableVertexAttribArray(aCol);
+          gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 28, 0);
+          gl.vertexAttribPointer(aCol, 4, gl.FLOAT, false, 28, 12);
+          gl.drawArrays(gl.LINES, 0, orbitVertexCount);
+          gl.disableVertexAttribArray(aPos);
+          gl.disableVertexAttribArray(aCol);
+        }
+
+        // 2. Render Ordered Galaxy Layers (Background -> Nebulae -> Dark Dust Lanes -> Bulge & Spiral Stars)
+        gl.useProgram(galaxyProgram);
+
+        const densityScale = Math.sqrt(55000.0 / Math.max(state.galaxyDensity, 10000));
+
+        gl.uniformMatrix4fv(gl.getUniformLocation(galaxyProgram, 'u_viewProj'), false, viewProj);
+        gl.uniform1f(gl.getUniformLocation(galaxyProgram, 'u_time'), state.simTime);
+        gl.uniform1f(gl.getUniformLocation(galaxyProgram, 'u_speed'), state.galaxySpeed);
+        gl.uniform1f(gl.getUniformLocation(galaxyProgram, 'u_dpr'), currentDPR);
+        gl.uniform1f(gl.getUniformLocation(galaxyProgram, 'u_viewportH'), dom.canvas.height);
+        gl.uniform1f(gl.getUniformLocation(galaxyProgram, 'u_densityScale'), densityScale);
+        gl.uniform1i(gl.getUniformLocation(galaxyProgram, 'u_palette'), state.galaxyPalette);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, galaxyVBO);
+        const aPolar = gl.getAttribLocation(galaxyProgram, 'a_polar');
+        const aProps = gl.getAttribLocation(galaxyProgram, 'a_props');
+        gl.enableVertexAttribArray(aPolar);
+        gl.enableVertexAttribArray(aProps);
+        gl.vertexAttribPointer(aPolar, 4, gl.FLOAT, false, 32, 0);
+        gl.vertexAttribPointer(aProps, 4, gl.FLOAT, false, 32, 16);
+
+        gl.drawArrays(gl.POINTS, 0, state.galaxyDensity);
+
+        gl.disableVertexAttribArray(aPolar);
+        gl.disableVertexAttribArray(aProps);
+      }
+
+      function renderBlackHoleWebGL() {
+        gl.disable(gl.BLEND);
+        gl.useProgram(bhProgram);
+
+        const { eye, target } = computeCameraPosition();
+
+        // Build orthonormal 3x3 camera basis matrix for fragment raymarching
+        let fx = target[0] - eye[0];
+        let fy = target[1] - eye[1];
+        let fz = target[2] - eye[2];
+        let flen = Math.hypot(fx, fy, fz) || 1;
+        fx /= flen; fy /= flen; fz /= flen;
+
+        // Right = normalize(cross(forward, up))
+        let rx = fy * 0 - fz * 1;
+        let ry = fz * 0 - fx * 0;
+        let rz = fx * 1 - fy * 0;
+        let rlen = Math.hypot(rx, ry, rz) || 1;
+        rx /= rlen; ry /= rlen; rz /= rlen;
+
+        // True Up = cross(right, forward)
+        const ux = ry * fz - rz * fy;
+        const uy = rz * fx - rx * fz;
+        const uz = rx * fy - ry * fx;
+
+        const camMat = new Float32Array([
+          rx, ry, rz,
+          ux, uy, uz,
+          -fx, -fy, -fz
+        ]);
+
+        // Visual event horizon radius scales smoothly with mass while keeping the full accretion disk
+        // (outerDisk = 4.85 * visualRs) cleanly inside 70~80% of the screen width at default/hero camera distance
+        const massNorm = (state.bhMass - 1.0) / 59.0;
+        const visualRs = 0.50 + 0.11 * massNorm;
+
+        gl.uniform2f(gl.getUniformLocation(bhProgram, 'u_resolution'), dom.canvas.width, dom.canvas.height);
+        gl.uniform1f(gl.getUniformLocation(bhProgram, 'u_time'), state.simTime);
+        gl.uniform3f(gl.getUniformLocation(bhProgram, 'u_camPos'), eye[0], eye[1], eye[2]);
+        gl.uniformMatrix3fv(gl.getUniformLocation(bhProgram, 'u_camMat'), false, camMat);
+        gl.uniform1f(gl.getUniformLocation(bhProgram, 'u_rs'), visualRs);
+        gl.uniform1f(gl.getUniformLocation(bhProgram, 'u_brightness'), state.bhBrightness);
+        gl.uniform1f(gl.getUniformLocation(bhProgram, 'u_lensingMix'), state.bhLensingMix);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+        const aQuad = gl.getAttribLocation(bhProgram, 'a_quad');
+        gl.enableVertexAttribArray(aQuad);
+        gl.vertexAttribPointer(aQuad, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.disableVertexAttribArray(aQuad);
+      }
+
+      /**
+       * Genuine 2D Canvas Fallback Renderer (only used if WebGL is completely disabled)
+       */
+      function renderFallback2D() {
+        if (!ctx2d) return;
+        const w = dom.canvas.width;
+        const h = dom.canvas.height;
+        ctx2d.fillStyle = '#03050c';
+        ctx2d.fillRect(0, 0, w, h);
+
+        const cx = w * 0.5;
+        const cy = h * 0.5;
+        const scale = Math.min(w, h) * (0.44 / Math.max(state.camDist * 0.08, 0.35));
+
+        if (state.mode === 'galaxy') {
+          const sinP = Math.sin(state.camPitch);
+          for (let i = 0; i < fallbackStars.length; i++) {
+            const s = fallbackStars[i];
+            if (s.pType > 1.5 && s.pType < 2.5) continue;
+            const omega = state.simTime * state.galaxySpeed * (1.35 / (0.28 + 0.72 * Math.pow(Math.max(s.r, 0.05), 0.68)));
+            const a = s.theta0 + omega + state.camYaw;
+            const x = cx + Math.cos(a) * s.r * scale;
+            const y = cy + (Math.sin(a) * s.r * sinP - s.z * 0.6) * scale;
+            ctx2d.fillStyle = s.r < 2.2 ? 'rgba(255,232,180,0.85)' : 'rgba(90,195,255,0.65)';
+            ctx2d.fillRect(x, y, Math.max(1.5, s.size), Math.max(1.5, s.size));
+          }
+        } else {
+          const rsPx = Math.min(w, h) * 0.14;
+          const grad = ctx2d.createRadialGradient(cx, cy, rsPx * 0.9, cx, cy, rsPx * 3.4);
+          grad.addColorStop(0, 'rgba(0,0,0,1)');
+          grad.addColorStop(0.32, 'rgba(255,210,130,0.95)');
+          grad.addColorStop(0.65, 'rgba(245,110,30,0.55)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx2d.fillStyle = grad;
+          ctx2d.beginPath();
+          ctx2d.arc(cx, cy, rsPx * 3.4, 0, Math.PI * 2);
+          ctx2d.fill();
+
+          ctx2d.fillStyle = '#000000';
+          ctx2d.beginPath();
+          ctx2d.arc(cx, cy, rsPx, 0, Math.PI * 2);
+          ctx2d.fill();
+        }
+      }
+
+      /* ============================================================================
+       * 8. STUDENT INQUIRY VERIFIER & PHYSICAL INTEGRITY SELF-CHECK
+       * ============================================================================ */
+      function evaluateStudentInquiries() {
+        const inq = state.inquiry;
+
+        // Task 1: Check if student actually observed 2 arms and 6 arms in Galaxy mode
+        if (state.mode === 'galaxy') {
+          if (state.galaxyArms === 2) inq.seenArm2 = true;
+          if (state.galaxyArms === 6) inq.seenArm6 = true;
+        }
+        if (inq.seenArm2) {
+          dom.chipArm2.textContent = '2개 나선팔 확인됨 ✓';
+          dom.chipArm2.className = 'px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-400/40';
+        }
+        if (inq.seenArm6) {
+          dom.chipArm6.textContent = '6개 나선팔 확인됨 ✓';
+          dom.chipArm6.className = 'px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-400/40';
+        }
+        if (inq.seenArm2 && inq.seenArm6 && !inq.task1Done) {
+          inq.task1Done = true;
+          dom.statusTask1.textContent = '완료 ✓';
+          dom.statusTask1.className = 'text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40';
+          dom.cardTask1.classList.add('border-emerald-400/40');
+        }
+
+        // Task 2: Check if student actually observed Lensing ON and Lensing OFF in Black Hole mode
+        if (state.mode === 'blackhole') {
+          if (state.bhLensing) inq.seenLensOn = true;
+          if (!state.bhLensing) inq.seenLensOff = true;
+        }
+        if (inq.seenLensOn) {
+          dom.chipLensOn.textContent = '렌즈 ON 관측됨 ✓';
+          dom.chipLensOn.className = 'px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-400/40';
+        }
+        if (inq.seenLensOff) {
+          dom.chipLensOff.textContent = '렌즈 OFF 관측됨 ✓';
+          dom.chipLensOff.className = 'px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-400/40';
+        }
+        if (inq.seenLensOn && inq.seenLensOff && !inq.task2Done) {
+          inq.task2Done = true;
+          dom.statusTask2.textContent = '완료 ✓';
+          dom.statusTask2.className = 'text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40';
+          dom.cardTask2.classList.add('border-emerald-400/40');
+        }
+
+        // Task 3: Check if student visited two masses where M2 = 2 * M1 in Black Hole mode
+        if (state.mode === 'blackhole') {
+          const curM = state.bhMass;
+          inq.visitedMasses.add(curM);
+
+          for (const prevM of inq.visitedMasses) {
+            const mSmall = Math.min(prevM, curM);
+            const mLarge = Math.max(prevM, curM);
+            if (mSmall > 0 && mLarge === mSmall * 2) {
+              const rsSmall = calcSchwarzschildKm(mSmall);
+              const rsLarge = calcSchwarzschildKm(mLarge);
+              if (Math.abs((rsLarge / rsSmall) - 2.0) < 1e-6) {
+                inq.matchedMassPair = { mSmall, mLarge, rsSmall, rsLarge };
+              }
+            }
+          }
+
+          if (inq.matchedMassPair) {
+            const p = inq.matchedMassPair;
+            dom.chipMassRatio.textContent = `${p.mSmall}M☉ (${p.rsSmall.toFixed(2)}km) → ${p.mLarge}M☉ (${p.rsLarge.toFixed(2)}km) = 2.00배 확인 ✓`;
+            dom.chipMassRatio.className = 'text-[10px] font-mono-num px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-400/40';
+            if (!inq.task3Done) {
+              inq.task3Done = true;
+              dom.statusTask3.textContent = '완료 ✓';
+              dom.statusTask3.className = 'text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/40';
+              dom.cardTask3.classList.add('border-emerald-400/40');
+            }
+          } else {
+            const curRs = calcSchwarzschildKm(curM).toFixed(2);
+            const target2x = curM * 2 <= 60 ? `${curM * 2}M☉` : `${Math.floor(curM / 2)}M☉`;
+            dom.chipMassRatio.textContent = `현재 ${curM}M☉ (r_s = ${curRs}km) 관측됨 · 비교를 위해 ${target2x}으로 조절해 보세요`;
+          }
+        }
+
+        const doneCount = (inq.task1Done ? 1 : 0) + (inq.task2Done ? 1 : 0) + (inq.task3Done ? 1 : 0);
+        dom.badgeInquiryCount.textContent = `${doneCount}/3`;
+      }
+
+      /**
+       * Executes real runtime numerical verification of physical formulas,
+       * deterministic seed reproducibility, and active particle coordinate buffers.
+       */
+      function runLiveVerificationSuite() {
+        // 1. 1 Solar Mass Schwarzschild Radius check
+        const rs1 = calcSchwarzschildKm(1.0);
+        const rs1Ok = Math.abs(rs1 - 2.953339) < 0.001;
+        dom.verifyRs1.textContent = `${rs1.toFixed(3)} km (${rs1Ok ? '정상' : '오류'})`;
+        dom.verifyRs1.className = rs1Ok ? 'text-emerald-300' : 'text-rose-400';
+
+        // 2. Mass 2x -> Radius 2x linearity check
+        const rs10 = calcSchwarzschildKm(10.0);
+        const rs20 = calcSchwarzschildKm(20.0);
+        const ratio = rs20 / rs10;
+        const rs2xOk = Math.abs(ratio - 2.0) < 1e-9;
+        dom.verifyRs2x.textContent = `${ratio.toFixed(6)}배 (${rs2xOk ? '정상' : '오류'})`;
+        dom.verifyRs2x.className = rs2xOk ? 'text-emerald-300' : 'text-rose-400';
+
+        // 3. Deterministic Seed Reproducibility Check
+        const sampleA = generateGalaxyVertexArray(120, state.galaxyArms, PHYSICS.SEED);
+        const sampleB = generateGalaxyVertexArray(120, state.galaxyArms, PHYSICS.SEED);
+        let seedMatch = sampleA.length === sampleB.length;
+        for (let i = 0; i < sampleA.length; i++) {
+          if (sampleA[i] !== sampleB[i]) {
+            seedMatch = false;
+            break;
+          }
+        }
+        dom.verifySeed.textContent = seedMatch
+          ? `시드 #${PHYSICS.SEED} 100% 일치`
+          : '시드 불일치';
+        dom.verifySeed.className = seedMatch ? 'text-emerald-300' : 'text-rose-400';
+
+        // 4. Active Particle Coordinate Buffer NaN/Bounds Check
+        let validParticles = 0;
+        let hasInvalid = false;
+        if (currentGalaxyArray) {
+          const total = currentGalaxyArray.length / 8;
+          for (let i = 0; i < total; i++) {
+            const idx = i * 8;
+            const r = currentGalaxyArray[idx];
+            const th = currentGalaxyArray[idx + 1];
+            const z = currentGalaxyArray[idx + 2];
+            if (Number.isFinite(r) && Number.isFinite(th) && Number.isFinite(z) && r >= 0 && r <= 65.0) {
+              validParticles++;
+            } else {
+              hasInvalid = true;
+            }
+          }
+        }
+        const bufferOk = !hasInvalid && validParticles === state.galaxyDensity;
+        dom.verifyBuffer.textContent = `${validParticles.toLocaleString()}개 유효 (${bufferOk ? '무결성 확인' : '오류'})`;
+        dom.verifyBuffer.className = bufferOk ? 'text-emerald-300' : 'text-rose-400';
+
+        dom.infoRendererName.textContent = state.rendererType;
+        dom.infoParticleCount.textContent = `${state.galaxyDensity.toLocaleString()}개`;
+
+        state.lastVerifyResult = { rs1Ok, rs2xOk, seedOk: seedMatch, bufferOk, validParticleCount: validParticles };
+      }
+
+      /* ============================================================================
+       * 9. UI SYNCHRONIZATION, CAMERA PRESETS & CINEMATIC TOUR
+       * ============================================================================ */
+      const PALETTE_NAMES = [
+        '청색 성운 · 황금 중심핵',
+        '황금 중심 · 샴페인 나선팔',
+        '장밋빛 우주 · 마젠타 성운'
+      ];
+
+      function updateHUDAndControls() {
+        const isGalaxy = state.mode === 'galaxy';
+
+        // Scene mode tab highlight
+        dom.btnModeGalaxy.classList.toggle('cosmic-btn-active', isGalaxy);
+        dom.btnModeBlackhole.classList.toggle('cosmic-btn-active', !isGalaxy);
+
+        // Control dock sections
+        dom.dockTitle.textContent = isGalaxy ? '은하 탐험 설정' : '블랙홀 관측 설정';
+        dom.controlsGalaxy.classList.toggle('hidden', !isGalaxy);
+        dom.controlsBlackhole.classList.toggle('hidden', isGalaxy);
+
+        // Galaxy values
+        dom.sliderArms.value = String(state.galaxyArms);
+        dom.valArms.textContent = `${state.galaxyArms}개`;
+        dom.sliderRotSpeed.value = String(state.galaxySpeed);
+        dom.valRotSpeed.textContent = `${state.galaxySpeed.toFixed(1)}x`;
+        dom.btnToggleOrbits.textContent = state.showOrbits ? 'ON' : 'OFF';
+        dom.btnToggleOrbits.classList.toggle('cosmic-btn-active', state.showOrbits);
+
+        // Black hole values & live Schwarzschild radius calculation
+        const rsKm = calcSchwarzschildKm(state.bhMass);
+        const photonKm = rsKm * 1.5;
+        dom.sliderBhMass.value = String(state.bhMass);
+        dom.valBhMass.textContent = `${state.bhMass} M☉`;
+        dom.dockRsVal.textContent = `${rsKm.toFixed(2)} km`;
+
+        dom.sliderBhBright.value = String(state.bhBrightness);
+        dom.valBhBright.textContent = `${state.bhBrightness.toFixed(2)}x`;
+
+        const degTilt = Math.round((state.targetPitch * 180) / Math.PI);
+        dom.sliderBhTilt.value = String(Math.max(-65, Math.min(65, degTilt)));
+        dom.valBhTilt.textContent = `${degTilt}°`;
+
+        dom.btnToggleLensing.textContent = state.bhLensing ? 'ON' : 'OFF';
+        dom.btnToggleLensing.classList.toggle('cosmic-btn-active', state.bhLensing);
+
+        // Bottom HUD Telemetry Pill
+        if (isGalaxy) {
+          dom.hudSceneBadge.textContent = '🌀 은하 탐험';
+          dom.hudPrimaryMetric.textContent = `나선팔 ${state.galaxyArms}개 · ${state.galaxyDensity.toLocaleString()} 항성`;
+          dom.hudSecondaryMetric.textContent = PALETTE_NAMES[state.galaxyPalette];
+        } else {
+          dom.hudSceneBadge.textContent = '🕳️ 블랙홀 관측';
+          dom.hudPrimaryMetric.textContent = `질량 ${state.bhMass} M☉ | r_s = ${rsKm.toFixed(2)} km`;
+          dom.hudSecondaryMetric.textContent = `광자구 ${photonKm.toFixed(2)} km · 중력 렌즈 ${state.bhLensing ? 'ON' : 'OFF'}`;
+        }
+
+        evaluateStudentInquiries();
+      }
+
+      function applyCameraPreset(presetName) {
+        if (state.mode === 'galaxy') {
+          if (presetName === 'hero') {
+            // Hero View: ~39 degree tilt, full spiral galaxy spans ~78-82% of viewport width without side clipping
+            state.targetYaw = 0.45;
+            state.targetPitch = 0.68;
+            state.targetDist = 15.6;
+            state.targetPanX = 0.0;
+            state.targetPanY = 0.0;
+          } else {
+            // Home View
+            state.targetYaw = 0.35;
+            state.targetPitch = 0.74;
+            state.targetDist = 16.8;
+            state.targetPanX = 0.0;
+            state.targetPanY = 0.0;
+          }
+        } else {
+          if (presetName === 'hero') {
+            // Black Hole Hero Composition: entire event horizon & warped accretion disk fit within 70-80% of screen
+            state.targetYaw = 0.18;
+            state.targetPitch = 0.23; // ~13 degrees
+            state.targetDist = 6.85;
+            state.targetPanX = 0.0;
+            state.targetPanY = 0.0;
+          } else {
+            state.targetYaw = 0.0;
+            state.targetPitch = 0.28;
+            state.targetDist = 7.6;
+            state.targetPanX = 0.0;
+            state.targetPanY = 0.0;
+          }
+        }
+        updateHUDAndControls();
+      }
+
+      function switchSceneMode(newMode, snapImmediate) {
+        if (state.mode === newMode && !snapImmediate) return;
+        state.mode = newMode;
+        handleResize();
+        applyCameraPreset('hero');
+
+        if (snapImmediate) {
+          state.camYaw = state.targetYaw;
+          state.camPitch = state.targetPitch;
+          state.camDist = state.targetDist;
+          state.camPanX = state.targetPanX;
+          state.camPanY = state.targetPanY;
+        }
+        updateHUDAndControls();
+      }
+
+      function stopCinematicTour() {
+        if (!state.tourActive) return;
+        state.tourActive = false;
+        dom.tourBanner.classList.add('hidden');
+        dom.btnTour.classList.remove('cosmic-btn-active');
+        dom.labelTour.textContent = '시네마틱 투어';
+      }
+
+      function startCinematicTour() {
+        state.tourActive = true;
+        state.tourTime = 0.0;
+        state.playing = true;
+        dom.iconPlayPause.textContent = '⏸';
+        dom.labelPlayPause.textContent = '일시정지';
+        dom.tourBanner.classList.remove('hidden');
+        dom.btnTour.classList.add('cosmic-btn-active');
+        dom.labelTour.textContent = '투어 중지';
+        switchSceneMode('galaxy', false);
+      }
+
+      /**
+       * Drives the actual camera and scene state through 4 cinematic stages:
+       * 1) 은하 상공 조망 -> 2) 나선팔 사이 비행 -> 3) 황금 중심핵 접근 -> 4) 블랙홀 영웅 관측
+       */
+      function updateCinematicTour(dt) {
+        if (!state.tourActive) return;
+        const speedFactor = prefersReducedMotion ? 0.55 : 1.0;
+        state.tourTime += dt * speedFactor;
+        const t = state.tourTime;
+
+        if (t < 6.0) {
+          if (state.mode !== 'galaxy') switchSceneMode('galaxy', false);
+          dom.tourStepText.textContent = '1/4 단계 · 은하 상공 조망: 거대한 나선팔 구조 관찰';
+          state.targetPitch = 1.02 - (t / 6.0) * 0.25;
+          state.targetYaw += dt * 0.28 * speedFactor;
+          state.targetDist = 16.5 - (t / 6.0) * 2.5;
+        } else if (t < 12.5) {
+          const p = (t - 6.0) / 6.5;
+          dom.tourStepText.textContent = '2/4 단계 · 나선팔 사이 비행: 푸른 젊은 별과 마젠타 성운 통과';
+          state.targetPitch = 0.28 + 0.12 * Math.sin(p * Math.PI);
+          state.targetYaw += dt * 0.42 * speedFactor;
+          state.targetDist = 14.0 - p * 5.8;
+        } else if (t < 18.0) {
+          const p = (t - 12.5) / 5.5;
+          dom.tourStepText.textContent = '3/4 단계 · 은하 중심부 진입: 고밀도 황금 중심핵과 초대질량 영역';
+          state.targetPitch = 0.36 * (1.0 - p * 0.4);
+          state.targetYaw += dt * 0.52 * speedFactor;
+          state.targetDist = 8.2 - p * 5.2;
+        } else if (t < 27.0) {
+          if (state.mode !== 'blackhole') {
+            switchSceneMode('blackhole', true);
+            state.bhLensing = true;
+            updateHUDAndControls();
+          }
+          const p = (t - 18.0) / 9.0;
+          dom.tourStepText.textContent = '4/4 단계 · 블랙홀 영웅 관측: 사건의 지평선과 중력 렌즈 고리';
+          state.targetPitch = 0.20 + 0.22 * Math.sin(p * Math.PI * 1.3);
+          state.targetYaw += dt * 0.32 * speedFactor;
+          state.targetDist = 6.85 - 0.45 * Math.sin(p * Math.PI);
+        } else {
+          // Loop cleanly back to stage 1
+          state.tourTime = 0.0;
+        }
+      }
+
+      /* ============================================================================
+       * 10. POINTER / TOUCH ORBIT CAMERA & UI EVENT LISTENERS
+       * ============================================================================ */
+      const activePointers = new Map();
+      let lastPinchDist = null;
+
+      dom.canvas.addEventListener('pointerdown', (e) => {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        dom.canvas.setPointerCapture(e.pointerId);
+        if (state.tourActive) stopCinematicTour();
+      });
+
+      dom.canvas.addEventListener('pointermove', (e) => {
+        if (!activePointers.has(e.pointerId)) return;
+        const prev = activePointers.get(e.pointerId);
+        const cur = { x: e.clientX, y: e.clientY };
+        activePointers.set(e.pointerId, cur);
+
+        if (activePointers.size === 1) {
+          const dx = cur.x - prev.x;
+          const dy = cur.y - prev.y;
+          state.targetYaw -= dx * 0.0065;
+          state.targetPitch = Math.max(-1.38, Math.min(1.38, state.targetPitch + dy * 0.0065));
+          if (state.mode === 'blackhole') {
+            const degTilt = Math.round((state.targetPitch * 180) / Math.PI);
+            dom.sliderBhTilt.value = String(Math.max(-65, Math.min(65, degTilt)));
+            dom.valBhTilt.textContent = `${degTilt}°`;
+          }
+        } else if (activePointers.size === 2) {
+          const pts = Array.from(activePointers.values());
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (lastPinchDist !== null) {
+            const delta = lastPinchDist - dist;
+            const minD = state.mode === 'galaxy' ? 3.2 : 3.2;
+            const maxD = state.mode === 'galaxy' ? 36.0 : 18.0;
+            state.targetDist = Math.max(minD, Math.min(maxD, state.targetDist + delta * 0.035));
+          }
+          lastPinchDist = dist;
+        }
+      });
+
+      function handlePointerUp(e) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size < 2) lastPinchDist = null;
+      }
+      dom.canvas.addEventListener('pointerup', handlePointerUp);
+      dom.canvas.addEventListener('pointercancel', handlePointerUp);
+
+      dom.canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (state.tourActive) stopCinematicTour();
+        const minD = state.mode === 'galaxy' ? 3.2 : 3.2;
+        const maxD = state.mode === 'galaxy' ? 36.0 : 18.0;
+        const zoomFactor = 1.0 + Math.sign(e.deltaY) * 0.085;
+        state.targetDist = Math.max(minD, Math.min(maxD, state.targetDist * zoomFactor));
+      }, { passive: false });
+
+      // Toolbar Buttons
+      dom.btnModeGalaxy.addEventListener('click', () => {
+        stopCinematicTour();
+        switchSceneMode('galaxy', false);
+      });
+
+      dom.btnModeBlackhole.addEventListener('click', () => {
+        stopCinematicTour();
+        switchSceneMode('blackhole', true);
+      });
+
+      dom.btnPlayPause.addEventListener('click', () => {
+        state.playing = !state.playing;
+        dom.iconPlayPause.textContent = state.playing ? '⏸' : '▶';
+        dom.labelPlayPause.textContent = state.playing ? '일시정지' : '재생';
+      });
+
+      dom.btnHeroView.addEventListener('click', () => {
+        stopCinematicTour();
+        applyCameraPreset('hero');
+      });
+
+      dom.btnDockHome.addEventListener('click', () => {
+        stopCinematicTour();
+        applyCameraPreset('home');
+      });
+
+      dom.btnDockHero.addEventListener('click', () => {
+        stopCinematicTour();
+        applyCameraPreset('hero');
+      });
+
+      dom.btnReset.addEventListener('click', () => {
+        stopCinematicTour();
+        state.simTime = 0.0;
+        state.playing = true;
+        dom.iconPlayPause.textContent = '⏸';
+        dom.labelPlayPause.textContent = '일시정지';
+
+        if (state.mode === 'galaxy') {
+          state.galaxyArms = 4;
+          state.galaxySpeed = 1.0;
+          state.galaxyPalette = 0;
+          state.showOrbits = false;
+          rebuildGalaxyBuffer();
+          syncPaletteAndDensityButtons();
+        } else {
+          state.bhMass = 10;
+          state.bhBrightness = 1.2;
+          state.bhLensing = true;
+        }
+        applyCameraPreset('hero');
+        updateHUDAndControls();
+      });
+
+      dom.btnTour.addEventListener('click', () => {
+        if (state.tourActive) {
+          stopCinematicTour();
+        } else {
+          startCinematicTour();
+        }
+      });
+
+      dom.btnTourStopInline.addEventListener('click', () => {
+        stopCinematicTour();
+      });
+
+      // Dock Open / Close
+      function setDockOpen(open) {
+        state.dockOpen = open;
+        dom.controlDock.classList.toggle('hidden', !open);
+        dom.btnDockToggle.classList.toggle('cosmic-btn-active', open);
+      }
+
+      dom.btnDockToggle.addEventListener('click', () => {
+        setDockOpen(!state.dockOpen);
+      });
+      dom.btnDockClose.addEventListener('click', () => {
+        setDockOpen(false);
+      });
+
+      // Overlays ('왜 이렇게 보일까?', '탐구', '정보')
+      function toggleOverlay(overlayId) {
+        const overlays = ['overlay-why', 'overlay-inquiry', 'overlay-info'];
+        const nextActive = state.activeOverlay === overlayId ? null : overlayId;
+        state.activeOverlay = nextActive;
+
+        overlays.forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.classList.toggle('hidden', id !== nextActive);
+        });
+
+        dom.btnWhyToggle.classList.toggle('cosmic-btn-active', nextActive === 'overlay-why');
+        dom.btnInquiryToggle.classList.toggle('cosmic-btn-active', nextActive === 'overlay-inquiry');
+        dom.btnInfoToggle.classList.toggle('cosmic-btn-active', nextActive === 'overlay-info');
+
+        if (nextActive === 'overlay-info') {
+          runLiveVerificationSuite();
+        }
+      }
+
+      dom.btnWhyToggle.addEventListener('click', () => toggleOverlay('overlay-why'));
+      dom.btnInquiryToggle.addEventListener('click', () => toggleOverlay('overlay-inquiry'));
+      dom.btnInfoToggle.addEventListener('click', () => toggleOverlay('overlay-info'));
+
+      document.querySelectorAll('[data-close-overlay]').forEach((btn) => {
+        btn.addEventListener('click', () => toggleOverlay(null));
+      });
+
+      dom.btnRerunVerify.addEventListener('click', () => {
+        runLiveVerificationSuite();
+      });
+
+      // Presentation Mode (Esc to exit)
+      function setPresentationMode(active) {
+        state.presentationMode = active;
+        dom.uiChrome.classList.toggle('hidden', active);
+        dom.btnExitPresent.classList.toggle('hidden', !active);
+      }
+
+      dom.btnPresent.addEventListener('click', () => setPresentationMode(true));
+      dom.btnExitPresent.addEventListener('click', () => setPresentationMode(false));
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (state.presentationMode) {
+            setPresentationMode(false);
+          } else if (state.activeOverlay) {
+            toggleOverlay(null);
+          } else if (state.dockOpen) {
+            setDockOpen(false);
+          }
+        } else if (e.code === 'Space' && e.target === document.body) {
+          e.preventDefault();
+          dom.btnPlayPause.click();
+        }
+      });
+
+      // Galaxy Controls
+      dom.sliderArms.addEventListener('input', (e) => {
+        state.galaxyArms = parseInt(e.target.value, 10);
+        rebuildGalaxyBuffer();
+        updateHUDAndControls();
+      });
+
+      document.querySelectorAll('[data-arm-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.galaxyArms = parseInt(btn.getAttribute('data-arm-preset'), 10);
+          rebuildGalaxyBuffer();
+          updateHUDAndControls();
+        });
+      });
+
+      dom.sliderRotSpeed.addEventListener('input', (e) => {
+        state.galaxySpeed = parseFloat(e.target.value);
+        updateHUDAndControls();
+      });
+
+      function syncPaletteAndDensityButtons() {
+        document.querySelectorAll('.density-btn').forEach((b) => {
+          const d = parseInt(b.getAttribute('data-density'), 10);
+          b.classList.toggle('cosmic-btn-active', d === state.galaxyDensity);
+        });
+        document.querySelectorAll('.palette-btn').forEach((b) => {
+          const p = parseInt(b.getAttribute('data-palette'), 10);
+          b.classList.toggle('cosmic-btn-active', p === state.galaxyPalette);
+        });
+      }
+
+      document.querySelectorAll('.density-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.galaxyDensity = parseInt(btn.getAttribute('data-density'), 10);
+          rebuildGalaxyBuffer();
+          syncPaletteAndDensityButtons();
+          updateHUDAndControls();
+          if (state.activeOverlay === 'overlay-info') runLiveVerificationSuite();
+        });
+      });
+
+      document.querySelectorAll('.palette-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.galaxyPalette = parseInt(btn.getAttribute('data-palette'), 10);
+          syncPaletteAndDensityButtons();
+          updateHUDAndControls();
+        });
+      });
+
+      dom.btnToggleOrbits.addEventListener('click', () => {
+        state.showOrbits = !state.showOrbits;
+        updateHUDAndControls();
+      });
+
+      // Black Hole Controls
+      dom.sliderBhMass.addEventListener('input', (e) => {
+        state.bhMass = parseInt(e.target.value, 10);
+        updateHUDAndControls();
+      });
+
+      document.querySelectorAll('[data-mass-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.bhMass = parseInt(btn.getAttribute('data-mass-preset'), 10);
+          updateHUDAndControls();
+        });
+      });
+
+      dom.sliderBhBright.addEventListener('input', (e) => {
+        state.bhBrightness = parseFloat(e.target.value);
+        updateHUDAndControls();
+      });
+
+      dom.sliderBhTilt.addEventListener('input', (e) => {
+        const deg = parseFloat(e.target.value);
+        state.targetPitch = (deg * Math.PI) / 180.0;
+        dom.valBhTilt.textContent = `${Math.round(deg)}°`;
+      });
+
+      dom.btnToggleLensing.addEventListener('click', () => {
+        state.bhLensing = !state.bhLensing;
+        updateHUDAndControls();
+      });
+
+      window.addEventListener('resize', handleResize);
+
+      /* ============================================================================
+       * 11. MAIN ANIMATION LOOP & REAL FRAME-TIME MEASUREMENT
+       * ============================================================================ */
+      let lastTimeMs = performance.now();
+      let frameCounter = 0;
+      let bootBannerDismissed = false;
+
+      function animateLoop(nowMs) {
+        requestAnimationFrame(animateLoop);
+
+        const rawDtMs = Math.max(0.5, Math.min(100.0, nowMs - lastTimeMs));
+        lastTimeMs = nowMs;
+        const dt = rawDtMs / 1000.0;
+
+        // Exponential moving average of real measured frame time (never faked)
+        state.avgFrameMs = state.avgFrameMs * 0.92 + rawDtMs * 0.08;
+
+        if (state.playing) {
+          state.simTime += dt;
+        }
+
+        // Update Cinematic Tour if active
+        if (state.tourActive) {
+          updateCinematicTour(dt);
+        }
+
+        // Smooth camera interpolation
+        const damp = prefersReducedMotion ? 1.0 : Math.min(1.0, dt * 8.5);
+        state.camYaw   += (state.targetYaw   - state.camYaw)   * damp;
+        state.camPitch += (state.targetPitch - state.camPitch) * damp;
+        state.camDist  += (state.targetDist  - state.camDist)  * damp;
+        state.camPanX  += (state.targetPanX  - state.camPanX)  * damp;
+        state.camPanY  += (state.targetPanY  - state.camPanY)  * damp;
+
+        // Smooth gravitational lensing transition mix (0.0 <-> 1.0)
+        const targetLens = state.bhLensing ? 1.0 : 0.0;
+        state.bhLensingMix += (targetLens - state.bhLensingMix) * Math.min(1.0, dt * 7.5);
+
+        // Render active scene
+        if (state.webglAvailable && gl) {
+          if (state.mode === 'galaxy') {
+            renderGalaxyWebGL();
+          } else {
+            renderBlackHoleWebGL();
+          }
+        } else {
+          renderFallback2D();
+        }
+
+        // Dismiss initial boot banner smoothly once first frames are drawn
+        if (!bootBannerDismissed && frameCounter > 4) {
+          bootBannerDismissed = true;
+          dom.bootBanner.classList.replace('opacity-100', 'opacity-0');
+          setTimeout(() => {
+            dom.bootBanner.classList.add('hidden');
+          }, 550);
+        }
+
+        // Periodically update real measured frame time display
+        frameCounter++;
+        if (frameCounter % 15 === 0) {
+          const ms = state.avgFrameMs;
+          const approxFps = Math.round(1000.0 / Math.max(ms, 1.0));
+          dom.hudFps.textContent = `${ms.toFixed(1)} ms (${approxFps} fps)`;
+          if (state.activeOverlay === 'overlay-info') {
+            dom.infoFrameStats.textContent = `${ms.toFixed(1)} ms (${approxFps} fps)`;
+          }
+        }
+      }
+
+      window.onload = function () {
+        initRenderer();
+        handleResize();
+        updateHUDAndControls();
+        runLiveVerificationSuite();
+        requestAnimationFrame(animateLoop);
+      };
+    })();
+  </script>
+</body>
+</html>

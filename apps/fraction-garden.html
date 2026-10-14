@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>FRACTION GARDEN | 분수로 피우는 정원</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #061c21;
+      --bg-mid: #0c2e36;
+      --panel-bg: rgba(8, 31, 37, 0.88);
+      --border-teal: rgba(110, 231, 183, 0.26);
+      --coral: #ff6f61;
+      --coral-soft: #ff9a8b;
+      --lime: #a3e635;
+      --lime-soft: #bef264;
+      --mint: #5eead4;
+      --text-main: #f0fdfa;
+      --text-sub: #99f6e4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 32%, #113e48 0%, var(--bg-deep) 78%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    }
+    /* 하단 80px 안전공간을 컨테이너 높이에 실제 반영 */
+    #app-shell {
+      position: relative;
+      width: 100vw;
+      height: calc(100dvh - 80px);
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+    #stage-wrap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    #webgl-canvas, #fallback-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    #fallback-canvas { display: none; }
+    /* 상단 헤더 및 수학 기준 안내 */
+    .top-bar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 16px;
+      padding: 12px 18px;
+      background: linear-gradient(180deg, rgba(5, 22, 27, 0.9) 0%, rgba(5, 22, 27, 0) 100%);
+      pointer-events: none;
+    }
+    .brand-box, .formula-banner { pointer-events: auto; }
+    .brand-title {
+      font-size: clamp(1rem, 2vw, 1.35rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(163, 230, 53, 0.18);
+      border: 1px solid rgba(163, 230, 53, 0.45);
+      color: var(--lime-soft);
+      font-weight: 700;
+    }
+    .math-note {
+      font-size: clamp(0.72rem, 1.3vw, 0.82rem);
+      color: var(--text-sub);
+      margin-top: 2px;
+      opacity: 0.92;
+    }
+    .formula-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-teal);
+      padding: 6px 14px;
+      border-radius: 14px;
+      backdrop-filter: blur(8px);
+      font-size: clamp(0.82rem, 1.5vw, 0.98rem);
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    }
+    .pill-coral { color: var(--coral-soft); }
+    .pill-lime { color: var(--lime-soft); }
+    .pill-mint { color: var(--mint); }
+    /* 3D 화단 위 플로팅 라벨 */
+    #labels-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+    .bed-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(6, 26, 32, 0.86);
+      border: 1px solid rgba(153, 246, 228, 0.35);
+      border-radius: 10px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      color: var(--text-main);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: opacity 0.2s;
+    }
+    .control-dock {
+      position: relative;
+      z-index: 10;
+      margin: 0 auto 10px auto;
+      width: min(96vw, 1080px);
+      background: var(--panel-bg);
+      border: 1px solid var(--border-teal);
+      border-radius: 18px;
+      padding: 10px 14px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .dock-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+    }
+    .sliders-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 14px;
+      flex: 1 1 auto;
+    }
+    .frac-ctrl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(15, 52, 62, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 5px 10px;
+      border-radius: 12px;
+      flex: 1 1 250px;
+    }
+    .frac-ctrl.coral-theme { border-left: 4px solid var(--coral); }
+    .frac-ctrl.lime-theme { border-left: 4px solid var(--lime); }
+    .frac-ctrl.hidden { display: none; }
+    .frac-tag {
+      font-size: 0.78rem;
+      font-weight: 800;
+      min-width: 72px;
+    }
+    .slider-pair {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      flex: 1;
+      align-items: center;
+    }
+    .slider-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.76rem;
+      flex: 1 1 115px;
+    }
+    .slider-item label {
+      color: var(--text-sub);
+      font-weight: 600;
+      min-width: 54px;
+    }
+    .slider-item input[type="range"] {
+      flex: 1;
+      accent-color: var(--mint);
+      cursor: pointer;
+      height: 6px;
+    }
+    .coral-theme input[type="range"] { accent-color: var(--coral); }
+    .lime-theme input[type="range"] { accent-color: var(--lime); }
+    .actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .act-btn {
+      appearance: none;
+      border: 1px solid rgba(153, 246, 228, 0.3);
+      background: rgba(17, 64, 76, 0.85);
+      color: var(--text-main);
+      padding: 7px 12px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .act-btn:hover {
+      background: rgba(26, 91, 107, 0.95);
+      transform: translateY(-1px);
+    }
+    .act-btn.active {
+      background: linear-gradient(135deg, #0d9488, #0f766e);
+      border-color: var(--lime-soft);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(163, 230, 53, 0.35);
+    }
+    .act-btn.reset-btn {
+      background: rgba(255, 111, 97, 0.18);
+      border-color: rgba(255, 111, 97, 0.45);
+      color: var(--coral-soft);
+    }
+    .guide-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: rgba(240, 253, 250, 0.78);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 5px;
+    }
+    #webgl-notice {
+      display: none;
+      position: absolute;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      background: rgba(15, 45, 54, 0.95);
+      border: 1px solid var(--coral);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+    }
+    @media (max-width: 680px) {
+      .top-bar { padding: 8px 12px; }
+      .control-dock { padding: 8px 10px; margin-bottom: 6px; }
+      .act-btn { padding: 6px 9px; font-size: 0.74rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell">
+    <header class="top-bar">
+      <div class="brand-box">
+        <div class="brand-title">
+          <span>🌸 FRACTION GARDEN | 분수로 피우는 정원</span>
+          <span class="brand-badge" id="mode-badge">3D 수학 정원</span>
+        </div>
+        <p class="math-note">
+          ※ 바깥쪽 정원 꽃잎은 장식이며, <strong>분수 값은 동일 면적 원형 화단의 부채꼴 조각</strong>을 기준으로 계산·비교합니다.
+        </p>
+      </div>
+      <div class="formula-banner" id="formula-display" aria-live="polite">
+        화단 A: 1/2
+      </div>
+    </header>
+
+    <div id="webgl-notice">WebGL 입체 렌더링을 사용할 수 없어 동일 분수 계산의 2D 정원 모드로 동작 중입니다.</div>
+
+    <main id="stage-wrap">
+      <canvas id="webgl-canvas" aria-label="분수 정원 입체 화면"></canvas>
+      <canvas id="fallback-canvas" aria-label="분수 정원 2D 화면"></canvas>
+      <div id="labels-layer"></div>
+    </main>
+
+    <section class="control-dock" aria-label="분수 조작부">
+      <div class="dock-row">
+        <div class="sliders-group">
+          <!-- 화단 A: 핵심 조작 1(분모 2~12), 핵심 조작 2(분자 0~분모) -->
+          <div class="frac-ctrl coral-theme" id="ctrl-a">
+            <span class="frac-tag pill-coral" id="label-frac-a">산호 화단 1/2</span>
+            <div class="slider-pair">
+              <div class="slider-item">
+                <label for="denom-a">분모 <span id="val-da">2</span></label>
+                <input type="range" id="denom-a" min="2" max="12" step="1" value="2" />
+              </div>
+              <div class="slider-item">
+                <label for="numer-a">분자 <span id="val-na">1</span></label>
+                <input type="range" id="numer-a" min="0" max="2" step="1" value="1" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 화단 B: 두 번째 분수 활성화 시 동일하게 분모 2~12, 분자 0~분모 조절 -->
+          <div class="frac-ctrl lime-theme" id="ctrl-b">
+            <span class="frac-tag pill-lime" id="label-frac-b">라임 화단 1/3</span>
+            <div class="slider-pair">
+              <div class="slider-item">
+                <label for="denom-b">분모 <span id="val-db">3</span></label>
+                <input type="range" id="denom-b" min="2" max="12" step="1" value="3" />
+              </div>
+              <div class="slider-item">
+                <label for="numer-b">분자 <span id="val-nb">1</span></label>
+                <input type="range" id="numer-b" min="0" max="3" step="1" value="1" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 핵심 조작 3, 4, 5, 6 버튼 그룹 -->
+        <div class="actions-group">
+          <button type="button" class="act-btn active" id="btn-second" title="두 번째 분수 화단과 합계 화단을 표시하거나 숨깁니다">
+            🌿 두 번째 분수 숨기기
+          </button>
+          <button type="button" class="act-btn" id="btn-common" title="최소공배수(공통분모)로 화단 조각을 실제 분할합니다">
+            🧩 공통분모 보기
+          </button>
+          <button type="button" class="act-btn" id="btn-equiv" title="전체 면적은 그대로 두고 조각 수만 2배로 나눕니다">
+            ✨ 동치분수 2배
+          </button>
+          <button type="button" class="act-btn reset-btn" id="btn-reset" title="처음 분수 값과 기본 카메라 시점으로 돌아갑니다">
+            🏠 초기화·홈
+          </button>
+        </div>
+      </div>
+
+      <div class="guide-footer">
+        <span id="explain-text">산호 화단(1/2)과 라임 화단(1/3)을 최소공배수 6등분으로 합치면 5/6(6조각 중 5조각)가 피어납니다.</span>
+        <span>🖱️ 드래그/터치: 시점 회전 · 휠/핀치: 확대 · 키보드 ←→(분자) ↑↓(분모)</span>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // 최대공약수 & 최소공배수
+      function gcd(a, b) {
+        a = Math.abs(a); b = Math.abs(b);
+        while (b) { const t = b; b = a % b; a = t; }
+        return a || 1;
+      }
+      function lcm(a, b) {
+        return Math.abs(a * b) / gcd(a, b);
+      }
+
+      // 애플리케이션 상태 (첫 화면에서 정원 전체와 1/2 + 1/3 = 5/6 예시가 한눈에 보이도록 초기화)
+      const state = {
+        dA: 2,
+        nA: 1,
+        dB: 3,
+        nB: 1,
+        showSecond: true,
+        commonDenom: false,
+        equiv2x: false,
+        webglActive: false,
+        camTheta: 0,
+        camPhi: 0.92,
+        camDist: 14.5,
+        targetCamDist: 14.5,
+        targetLookX: 0
+      };
+
+      // 진단 및 2D/3D 공유용 화단 메타데이터 저장소
+      const gardenRuntime = {
+        beds: [],
+        vertexSamples: []
+      };
+
+      // DOM 요소 참조
+      const dom = {
+        denomA: document.getElementById('denom-a'),
+        numerA: document.getElementById('numer-a'),
+        denomB: document.getElementById('denom-b'),
+        numerB: document.getElementById('numer-b'),
+        valDA: document.getElementById('val-da'),
+        valNA: document.getElementById('val-na'),
+        valDB: document.getElementById('val-db'),
+        valNB: document.getElementById('val-nb'),
+        labelA: document.getElementById('label-frac-a'),
+        labelB: document.getElementById('label-frac-b'),
+        ctrlB: document.getElementById('ctrl-b'),
+        btnSecond: document.getElementById('btn-second'),
+        btnCommon: document.getElementById('btn-common'),
+        btnEquiv: document.getElementById('btn-equiv'),
+        btnReset: document.getElementById('btn-reset'),
+        formula: document.getElementById('formula-display'),
+        explain: document.getElementById('explain-text'),
+        labelsLayer: document.getElementById('labels-layer'),
+        webglCanvas: document.getElementById('webgl-canvas'),
+        fallbackCanvas: document.getElementById('fallback-canvas'),
+        webglNotice: document.getElementById('webgl-notice'),
+        modeBadge: document.getElementById('mode-badge'),
+        stageWrap: document.getElementById('stage-wrap')
+      };
+
+      function computeGardenPlan() {
+        const mult = state.equiv2x ? 2 : 1;
+        const baseLcm = state.showSecond ? lcm(state.dA, state.dB) : state.dA;
+
+        // 화단 A 실제 분할 수와 선택 조각 수
+        const baseSubA = (state.commonDenom && state.showSecond) ? baseLcm : state.dA;
+        const scaleA = baseSubA / state.dA;
+        const slicesA = baseSubA * mult;
+        const activeA = state.nA * scaleA * mult;
+
+        const beds = [];
+        beds.push({
+          id: 'bed-A',
+          title: '산호 화단 A',
+          displayFrac: `${ activeA }/${ slicesA }`,
+          baseFrac: `${ state.nA }/${ state.dA }`,
+          totalSlices: slicesA,
+          coralSlices: activeA,
+          limeSlices: 0,
+          activeSlices: activeA,
+          areaRatio: slicesA > 0 ? activeA / slicesA : 0,
+          petalTheme: 'coral'
+        });
+
+        if (state.showSecond) {
+          const baseSubB = state.commonDenom ? baseLcm : state.dB;
+          const scaleB = baseSubB / state.dB;
+          const slicesB = baseSubB * mult;
+          const activeB = state.nB * scaleB * mult;
+
+          beds.push({
+            id: 'bed-B',
+            title: '라임 화단 B',
+            displayFrac: `${ activeB }/${ slicesB }`,
+            baseFrac: `${ state.nB }/${ state.dB }`,
+            totalSlices: slicesB,
+            coralSlices: 0,
+            limeSlices: activeB,
+            activeSlices: activeB,
+            areaRatio: slicesB > 0 ? activeB / slicesB : 0,
+            petalTheme: 'lime'
+          });
+
+          // 합계 화단: 최소공배수(baseLcm) 기준으로 실제 분할 계산 (동치분수 2배 시 *2 반영)
+          const sumDenom = baseLcm * mult;
+          const sumCoral = (state.nA * (baseLcm / state.dA)) * mult;
+          const sumLime = (state.nB * (baseLcm / state.dB)) * mult;
+          const sumTotalActive = sumCoral + sumLime;
+
+          // 첫 번째 합계 온전한 화단 (최대 1 = sumDenom 조각)
+          const bed1Coral = Math.min(sumCoral, sumDenom);
+          const remainingAfterCoral1 = Math.max(0, sumDenom - bed1Coral);
+          const bed1Lime = Math.min(sumLime, remainingAfterCoral1);
+          const bed1Active = bed1Coral + bed1Lime;
+
+          beds.push({
+            id: 'bed-sum-1',
+            title: sumTotalActive > sumDenom ? '합계 화단 (1번째 온전한 원)' : '합계 화단 (A + B)',
+            displayFrac: `${ bed1Active }/${ sumDenom }`,
+            baseFrac: `${ sumTotalActive }/${ sumDenom }`,
+            totalSlices: sumDenom,
+            coralSlices: bed1Coral,
+            limeSlices: bed1Lime,
+            activeSlices: bed1Active,
+            areaRatio: sumDenom > 0 ? bed1Active / sumDenom : 0,
+            petalTheme: 'mix'
+          });
+
+          // 합이 1을 초과하면 두 번째 온전한 화단까지 실제 표현
+          if (sumTotalActive > sumDenom) {
+            const bed2Coral = Math.max(0, sumCoral - bed1Coral);
+            const bed2Lime = Math.max(0, sumLime - bed1Lime);
+            const bed2Active = bed2Coral + bed2Lime;
+            beds.push({
+              id: 'bed-sum-2',
+              title: '합계 화단 (2번째 추가 원)',
+              displayFrac: `${ bed2Active }/${ sumDenom }`,
+              baseFrac: `${ bed2Active }/${ sumDenom }`,
+              totalSlices: sumDenom,
+              coralSlices: bed2Coral,
+              limeSlices: bed2Lime,
+              activeSlices: bed2Active,
+              areaRatio: sumDenom > 0 ? bed2Active / sumDenom : 0,
+              petalTheme: 'mix'
+            });
+          }
+        }
+
+        // 화단 개수에 따라 가로 배치 좌표 설정 (모두 동일한 반지름 R = 2.15)
+        const spacing = beds.length >= 4 ? 5.3 : 5.7;
+        const startX = -((beds.length - 1) * spacing) / 2;
+        beds.forEach((b, idx) => {
+          b.x = startX + idx * spacing;
+          b.z = 0;
+          b.radius = 2.15;
+        });
+
+        return {
+          beds,
+          mult,
+          baseLcm,
+          sumDenom: baseLcm * mult,
+          sumNumer: state.showSecond
+            ? (state.nA * (baseLcm / state.dA) + state.nB * (baseLcm / state.dB)) * mult
+            : state.nA * mult
+        };
+      }
+
+      let scene, camera, renderer, gardenGroup, fireflies;
+      const BED_RADIUS = 2.15;
+
+      function initThreeScene() {
+        try {
+          if (typeof THREE === 'undefined') return false;
+          renderer = new THREE.WebGLRenderer({
+            canvas: dom.webglCanvas,
+            antialias: true,
+            powerPreference: 'high-performance'
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+          scene = new THREE.Scene();
+          scene.fog = new THREE.FogExp2(0x071e24, 0.022);
+
+          camera = new THREE.PerspectiveCamera(40, 1, 0.1, 120);
+
+          // 부드러운 정원 조명
+          const hemiLight = new THREE.HemisphereLight(0xa7f3d0, 0x062026, 0.85);
+          scene.add(hemiLight);
+
+          const dirLight = new THREE.DirectionalLight(0xfff7ed, 0.95);
+          dirLight.position.set(8, 16, 11);
+          dirLight.castShadow = true;
+          dirLight.shadow.mapSize.width = 1024;
+          dirLight.shadow.mapSize.height = 1024;
+          scene.add(dirLight);
+
+          const rimLight = new THREE.PointLight(0x2dd4bf, 0.7, 35);
+          rimLight.position.set(0, 6, -9);
+          scene.add(rimLight);
+
+          // 정원 잔디 바닥 원판
+          const groundGeo = new THREE.CircleGeometry(36, 64);
+          groundGeo.rotateX(-Math.PI / 2);
+          const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x08252c,
+            roughness: 0.92,
+            metalness: 0.05
+          });
+          const ground = new THREE.Mesh(groundGeo, groundMat);
+          ground.position.y = -0.15;
+          ground.receiveShadow = true;
+          scene.add(ground);
+
+          // 은은한 반딧불 입자
+          const particleCount = 70;
+          const pGeo = new THREE.BufferGeometry();
+          const pPos = new Float32Array(particleCount * 3);
+          for (let i = 0; i < particleCount; i++) {
+            pPos[i * 3] = (Math.random() - 0.5) * 28;
+            pPos[i * 3 + 1] = 0.6 + Math.random() * 4.5;
+            pPos[i * 3 + 2] = (Math.random() - 0.5) * 14;
+          }
+          pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+          const pMat = new THREE.PointsMaterial({
+            color: 0xd9f99d,
+            size: 0.14,
+            transparent: true,
+            opacity: 0.75
+          });
+          fireflies = new THREE.Points(pGeo, pMat);
+          scene.add(fireflies);
+
+          gardenGroup = new THREE.Group();
+          scene.add(gardenGroup);
+          return true;
+        } catch (err) {
+          return false;
+        }
+      }
+
+      // 정확한 면적 비율을 갖는 원형 부채꼴(Sector) 기하 구조 생성
+      function createWedgeGeometry(radius, startAngle, endAngle, height) {
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0);
+        shape.absarc(0, 0, radius, startAngle, endAngle, false);
+        shape.lineTo(0, 0);
+
+        const extrudeSettings = {
+          depth: height,
+          bevelEnabled: false,
+          curveSegments: 18
+        };
+        const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        // XY 평면에 그려진 부채꼴을 수평(XZ) 화단 위로 회전시켜 Y축으로 솟아오르게 배치
+        geo.rotateX(-Math.PI / 2);
+        return geo;
+      }
+
+      function rebuild3DGarden(plan) {
+        if (!state.webglActive || !gardenGroup) return;
+
+        // 기존 메쉬 및 메모리 정리
+        while (gardenGroup.children.length > 0) {
+          const child = gardenGroup.children.pop();
+          child.traverse((obj) => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) {
+              if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+              else obj.material.dispose();
+            }
+          });
+        }
+
+        gardenRuntime.vertexSamples = [];
+
+        plan.beds.forEach((bed) => {
+          const bedNode = new THREE.Group();
+          bedNode.position.set(bed.x, 0, bed.z);
+          bedNode.userData = { bedId: bed.id };
+
+          // 1) 화단 테두리 링 (모든 화단이 정확히 동일한 크기임을 보여주는 기준 테두리)
+          const rimGeo = new THREE.RingGeometry(BED_RADIUS + 0.02, BED_RADIUS + 0.22, 48);
+          rimGeo.rotateX(-Math.PI / 2);
+          const rimMat = new THREE.MeshStandardMaterial({
+            color: 0x2dd4bf,
+            roughness: 0.4,
+            metalness: 0.2,
+            side: THREE.DoubleSide
+          });
+          const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+          rimMesh.position.y = 0.04;
+          bedNode.add(rimMesh);
+
+          // 2) 바깥쪽 장식 꽃잎 (분수 계산과 무관한 순수 정원 장식 요소)
+          const petalCount = 12;
+          for (let p = 0; p < petalCount; p++) {
+            const pAngle = (p / petalCount) * Math.PI * 2;
+            const petalGeo = new THREE.ConeGeometry(0.36, 0.85, 5);
+            petalGeo.rotateX(Math.PI / 2.35);
+            const isCoral = bed.petalTheme === 'coral' || (bed.petalTheme === 'mix' && p % 2 === 0);
+            const petalMat = new THREE.MeshStandardMaterial({
+              color: isCoral ? 0xff7f66 : 0xa3e635,
+              emissive: isCoral ? 0x3b100c : 0x1a2e05,
+              roughness: 0.5,
+              transparent: true,
+              opacity: 0.55
+            });
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            const dist = BED_RADIUS + 0.48;
+            petal.position.set(Math.cos(pAngle) * dist, 0.12, -Math.sin(pAngle) * dist);
+            petal.rotation.y = pAngle - Math.PI / 2;
+            bedNode.add(petal);
+          }
+
+          // 3) 동일 면적 원형 부채꼴 조각 (분모 수만큼 정확히 2π/N 분할)
+          const N = bed.totalSlices;
+          const stepAngle = (Math.PI * 2) / N;
+
+          for (let i = 0; i < N; i++) {
+            // 12시 방향(π/2)부터 시계방향으로 회전하도록 각도 계산
+            const a0 = Math.PI / 2 - (i + 1) * stepAngle;
+            const a1 = Math.PI / 2 - i * stepAngle;
+
+            let sliceType = 'empty';
+            if (i < bed.coralSlices) sliceType = 'coral';
+            else if (i < bed.coralSlices + bed.limeSlices) sliceType = 'lime';
+
+            const isSelected = sliceType !== 'empty';
+            // 분자만큼 실제 조각이 솟아올라 색칠됨
+            const wedgeHeight = isSelected ? 0.48 : 0.12;
+            const wGeo = createWedgeGeometry(BED_RADIUS, a0, a1, wedgeHeight);
+
+            let colorHex = 0x11363e;
+            let emissiveHex = 0x031114;
+            if (sliceType === 'coral') {
+              colorHex = 0xff6f61;
+              emissiveHex = 0x4c1410;
+            } else if (sliceType === 'lime') {
+              colorHex = 0xa3e635;
+              emissiveHex = 0x223806;
+            }
+
+            const wMat = new THREE.MeshStandardMaterial({
+              color: colorHex,
+              emissive: emissiveHex,
+              roughness: isSelected ? 0.32 : 0.82,
+              metalness: 0.08
+            });
+
+            const wedgeMesh = new THREE.Mesh(wGeo, wMat);
+            wedgeMesh.castShadow = isSelected;
+            wedgeMesh.receiveShadow = true;
+            wedgeMesh.userData = {
+              isFractionWedge: true,
+              bedId: bed.id,
+              sliceIndex: i,
+              selected: isSelected,
+              angularSpan: stepAngle
+            };
+            bedNode.add(wedgeMesh);
+
+            // 첫 번째 조각의 실제 정점 샘플 수집 (진단용 읽기 전용 데이터)
+            if (gardenRuntime.vertexSamples.length < 6 && wGeo.attributes.position) {
+              const posAttr = wGeo.attributes.position;
+              gardenRuntime.vertexSamples.push({
+                bedId: bed.id,
+                sliceIndex: i,
+                selected: isSelected,
+                vertexCount: posAttr.count,
+                sampleXYZ: [
+                  Number(posAttr.getX(0).toFixed(3)),
+                  Number(posAttr.getY(0).toFixed(3)),
+                  Number(posAttr.getZ(0).toFixed(3))
+                ]
+              });
+            }
+
+            // 부채꼴 분할 경계선 (동일 면적을 명확히 구분하는 밝은 선)
+            const linePts = [
+              new THREE.Vector3(0, wedgeHeight + 0.015, 0),
+              new THREE.Vector3(
+                Math.cos(a1) * BED_RADIUS,
+                wedgeHeight + 0.015,
+                -Math.sin(a1) * BED_RADIUS
+              )
+            ];
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+            const lineMat = new THREE.LineBasicMaterial({
+              color: isSelected ? 0xffffff : 0x5eead4,
+              transparent: true,
+              opacity: isSelected ? 0.9 : 0.45
+            });
+            bedNode.add(new THREE.Line(lineGeo, lineMat));
+
+            // 선택된 조각 중앙에 피어나는 작은 꽃봉오리 장식
+            if (isSelected) {
+              const midAngle = (a0 + a1) * 0.5;
+              const budRadius = BED_RADIUS * 0.58;
+              const budGeo = new THREE.SphereGeometry(Math.min(0.16, 1.1 / N), 12, 12);
+              const budMat = new THREE.MeshStandardMaterial({
+                color: sliceType === 'coral' ? 0xffedd5 : 0xecfccb,
+                emissive: sliceType === 'coral' ? 0xff6f61 : 0x84cc16,
+                emissiveIntensity: 0.45
+              });
+              const bud = new THREE.Mesh(budGeo, budMat);
+              bud.position.set(
+                Math.cos(midAngle) * budRadius,
+                wedgeHeight + 0.14,
+                -Math.sin(midAngle) * budRadius
+              );
+              bedNode.add(bud);
+            }
+          }
+
+          gardenGroup.add(bedNode);
+        });
+      }
+
+      function render2DFallback() {
+        const canvas = dom.fallbackCanvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const beds = gardenRuntime.beds;
+        if (!beds.length) return;
+
+        const count = beds.length;
+        const maxRadius = Math.min((w / (count * 2.55)), h * 0.27, 130);
+        const centerY = h * 0.47;
+
+        beds.forEach((bed, idx) => {
+          const cx = (w / (count + 1)) * (idx + 1);
+          const cy = centerY;
+
+          // 바깥 장식 꽃잎 (장식용)
+          for (let p = 0; p < 12; p++) {
+            const ang = (p / 12) * Math.PI * 2;
+            const px = cx + Math.cos(ang) * (maxRadius + 14);
+            const py = cy + Math.sin(ang) * (maxRadius + 14);
+            ctx.beginPath();
+            ctx.arc(px, py, 7, 0, Math.PI * 2);
+            const isCoral = bed.petalTheme === 'coral' || (bed.petalTheme === 'mix' && p % 2 === 0);
+            ctx.fillStyle = isCoral ? 'rgba(255, 111, 97, 0.38)' : 'rgba(163, 230, 53, 0.38)';
+            ctx.fill();
+          }
+
+          // 동일 크기 원형 화단 부채꼴 조각
+          const N = bed.totalSlices;
+          const step = (Math.PI * 2) / N;
+          for (let i = 0; i < N; i++) {
+            const start = -Math.PI / 2 + i * step;
+            const end = start + step;
+            let fill = '#11363e';
+            if (i < bed.coralSlices) fill = '#ff6f61';
+            else if (i < bed.coralSlices + bed.limeSlices) fill = '#a3e635';
+
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.arc(cx, cy, maxRadius, start, end);
+            ctx.closePath();
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.lineWidth = 1.6;
+            ctx.strokeStyle = i < bed.activeSlices ? '#ffffff' : 'rgba(94, 234, 212, 0.5)';
+            ctx.stroke();
+          }
+
+          // 화단 라벨
+          ctx.fillStyle = '#f0fdfa';
+          ctx.font = 'bold 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${bed.title}: ${bed.displayFrac}`, cx, cy + maxRadius + 36);
+        });
+      }
+
+      function syncGardenAndUI() {
+        // 분모 변경 시 분자 상한선 보정
+        if (state.nA > state.dA) state.nA = state.dA;
+        if (state.nB > state.dB) state.nB = state.dB;
+
+        dom.denomA.value = state.dA;
+        dom.numerA.max = state.dA;
+        dom.numerA.value = state.nA;
+        dom.valDA.textContent = state.dA;
+        dom.valNA.textContent = state.nA;
+
+        dom.denomB.value = state.dB;
+        dom.numerB.max = state.dB;
+        dom.numerB.value = state.nB;
+        dom.valDB.textContent = state.dB;
+        dom.valNB.textContent = state.nB;
+
+        dom.ctrlB.classList.toggle('hidden', !state.showSecond);
+        dom.btnSecond.classList.toggle('active', state.showSecond);
+        dom.btnSecond.textContent = state.showSecond ? '🌿 두 번째 분수 숨기기' : '🌱 두 번째 분수 추가';
+
+        dom.btnCommon.classList.toggle('active', state.commonDenom);
+        dom.btnEquiv.classList.toggle('active', state.equiv2x);
+        dom.btnEquiv.textContent = state.equiv2x ? '✨ 원래대로 (÷2)' : '✨ 동치분수 2배';
+
+        const plan = computeGardenPlan();
+        gardenRuntime.beds = plan.beds;
+
+        const bedA = plan.beds[0];
+        dom.labelA.textContent = state.equiv2x || state.commonDenom
+          ? `산호 ${state.nA}/${state.dA} = ${bedA.displayFrac}`
+          : `산호 화단 ${state.nA}/${state.dA}`;
+
+        if (state.showSecond) {
+          const bedB = plan.beds[1];
+          dom.labelB.textContent = state.equiv2x || state.commonDenom
+            ? `라임 ${state.nB}/${state.dB} = ${bedB.displayFrac}`
+            : `라임 화단 ${state.nB}/${state.dB}`;
+
+          const wholePart = Math.floor(plan.sumNumer / plan.sumDenom);
+          const remPart = plan.sumNumer % plan.sumDenom;
+          const mixedText = (plan.sumNumer > plan.sumDenom)
+            ? (remPart === 0 ? ` = ${wholePart}` : ` = ${wholePart}과 ${remPart}/${plan.sumDenom}`)
+            : '';
+
+          dom.formula.innerHTML = `
+            <span class="pill-coral">A: ${bedA.displayFrac}</span>
+            <span>+</span>
+            <span class="pill-lime">B: ${bedB.displayFrac}</span>
+            <span>=</span>
+            <span class="pill-mint">합계: ${plan.sumNumer}/${plan.sumDenom}${mixedText}</span>
+          `;
+
+          dom.explain.textContent =
+            `공통분모(최소공배수) ${plan.sumDenom}등분 기준: 산호 ${plan.beds[0].coralSlices}조각과 라임 ${plan.beds[1].limeSlices}조각을 합쳐 총 ${plan.sumNumer}조각(${plan.sumNumer}/${plan.sumDenom})이 됩니다.`;
+        } else {
+          dom.formula.innerHTML = `
+            <span class="pill-coral">산호 화단 A: ${bedA.displayFrac}</span>
+            <span class="pill-mint">(선택 면적 ${(bedA.areaRatio * 100).toFixed(1)}%)</span>
+          `;
+          dom.explain.textContent = state.equiv2x
+            ? `동치분수 변환: 전체 부채꼴 면적(${state.nA}/${state.dA})은 그대로 보존하면서 조각 수만 ${bedA.totalSlices}등분 중 ${bedA.activeSlices}조각으로 2배 세분화했습니다.`
+            : `원형 화단을 동일 면적으로 ${bedA.totalSlices}등분한 뒤 ${bedA.activeSlices}조각을 솟아오르게 색칠했습니다.`;
+        }
+
+        // 플로팅 DOM 라벨 생성
+        dom.labelsLayer.innerHTML = '';
+        plan.beds.forEach((b) => {
+          const tag = document.createElement('div');
+          tag.className = 'bed-label';
+          tag.id = `label-${b.id}`;
+          tag.textContent = `${b.title} · ${b.displayFrac}`;
+          dom.labelsLayer.appendChild(tag);
+        });
+
+        fitCameraToGarden();
+
+        if (state.webglActive) {
+          rebuild3DGarden(plan);
+        } else {
+          render2DFallback();
+        }
+      }
+
+      function fitCameraToGarden() {
+        const rect = dom.stageWrap.getBoundingClientRect();
+        const aspect = Math.max(0.45, rect.width / Math.max(1, rect.height));
+        const bedCount = gardenRuntime.beds.length || 1;
+        const totalSpanX = bedCount === 1 ? 6.5 : bedCount * 5.7 + 1.8;
+
+        if (state.webglActive && camera) {
+          const vFovRad = (camera.fov * Math.PI) / 180;
+          const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * aspect);
+          const distForWidth = (totalSpanX * 0.54) / Math.tan(hFovRad / 2);
+          const distForHeight = 4.6 / Math.tan(vFovRad / 2);
+          state.targetCamDist = Math.max(9.2, distForWidth, distForHeight);
+        }
+      }
+
+      function updateFloatingLabels() {
+        if (!state.webglActive || !camera) return;
+        const rect = dom.stageWrap.getBoundingClientRect();
+        gardenRuntime.beds.forEach((b) => {
+          const el = document.getElementById(`label-${b.id}`);
+          if (!el) return;
+          const pos = new THREE.Vector3(b.x, 0.65, b.z - BED_RADIUS - 0.55);
+          pos.project(camera);
+          const sx = (pos.x * 0.5 + 0.5) * rect.width;
+          const sy = (-pos.y * 0.5 + 0.5) * rect.height;
+          el.style.left = `${sx}px`;
+          el.style.top = `${sy}px`;
+        });
+      }
+
+      function handleResize() {
+        const rect = dom.stageWrap.getBoundingClientRect();
+        const w = Math.max(300, Math.floor(rect.width));
+        const h = Math.max(240, Math.floor(rect.height));
+
+        if (state.webglActive && renderer && camera) {
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          fitCameraToGarden();
+        } else {
+          dom.fallbackCanvas.width = w;
+          dom.fallbackCanvas.height = h;
+          render2DFallback();
+        }
+      }
+
+      function bindInteractionEvents() {
+        dom.denomA.addEventListener('input', (e) => {
+          state.dA = parseInt(e.target.value, 10);
+          syncGardenAndUI();
+        });
+        dom.numerA.addEventListener('input', (e) => {
+          state.nA = parseInt(e.target.value, 10);
+          syncGardenAndUI();
+        });
+        dom.denomB.addEventListener('input', (e) => {
+          state.dB = parseInt(e.target.value, 10);
+          syncGardenAndUI();
+        });
+        dom.numerB.addEventListener('input', (e) => {
+          state.nB = parseInt(e.target.value, 10);
+          syncGardenAndUI();
+        });
+
+        dom.btnSecond.addEventListener('click', () => {
+          state.showSecond = !state.showSecond;
+          syncGardenAndUI();
+        });
+        dom.btnCommon.addEventListener('click', () => {
+          state.commonDenom = !state.commonDenom;
+          syncGardenAndUI();
+        });
+        dom.btnEquiv.addEventListener('click', () => {
+          state.equiv2x = !state.equiv2x;
+          syncGardenAndUI();
+        });
+        dom.btnReset.addEventListener('click', () => {
+          state.dA = 2;
+          state.nA = 1;
+          state.dB = 3;
+          state.nB = 1;
+          state.showSecond = true;
+          state.commonDenom = false;
+          state.equiv2x = false;
+          state.camTheta = 0;
+          state.camPhi = 0.92;
+          syncGardenAndUI();
+        });
+
+        // 마우스 및 터치 시점 조작
+        let dragging = false;
+        let prevX = 0;
+        let prevY = 0;
+
+        dom.webglCanvas.addEventListener('pointerdown', (e) => {
+          dragging = true;
+          prevX = e.clientX;
+          prevY = e.clientY;
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!dragging) return;
+          const dx = e.clientX - prevX;
+          const dy = e.clientY - prevY;
+          prevX = e.clientX;
+          prevY = e.clientY;
+          state.camTheta -= dx * 0.007;
+          state.camPhi = Math.max(0.42, Math.min(1.38, state.camPhi - dy * 0.006));
+        });
+        window.addEventListener('pointerup', () => { dragging = false; });
+
+        dom.webglCanvas.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          state.targetCamDist = Math.max(7, Math.min(28, state.targetCamDist + e.deltaY * 0.01));
+        }, { passive: false });
+
+        // 키보드 방향키 조작 (화단 A 분자/분모 빠른 탐색)
+        window.addEventListener('keydown', (e) => {
+          if (e.target && e.target.tagName === 'INPUT') return;
+          if (e.key === 'ArrowRight') {
+            state.nA = Math.min(state.dA, state.nA + 1);
+            syncGardenAndUI();
+          } else if (e.key === 'ArrowLeft') {
+            state.nA = Math.max(0, state.nA - 1);
+            syncGardenAndUI();
+          } else if (e.key === 'ArrowUp') {
+            state.dA = Math.min(12, state.dA + 1);
+            syncGardenAndUI();
+          } else if (e.key === 'ArrowDown') {
+            state.dA = Math.max(2, state.dA - 1);
+            syncGardenAndUI();
+          }
+        });
+
+        window.addEventListener('resize', handleResize);
+      }
+
+      window.appDiagnostics = function () {
+        let meshWedgeCount = 0;
+        let selectedMeshWedges = 0;
+        if (state.webglActive && gardenGroup) {
+          gardenGroup.traverse((obj) => {
+            if (obj.userData && obj.userData.isFractionWedge) {
+              meshWedgeCount++;
+              if (obj.userData.selected) selectedMeshWedges++;
+            }
+          });
+        } else {
+          gardenRuntime.beds.forEach((b) => {
+            meshWedgeCount += b.totalSlices;
+            selectedMeshWedges += b.activeSlices;
+          });
+        }
+
+        const plan = computeGardenPlan();
+        return Object.freeze({
+          mode: state.webglActive ? '3D_WEBGL' : '2D_CANVAS_FALLBACK',
+          totalWedgeCount: meshWedgeCount,
+          selectedWedgeCount: selectedMeshWedges,
+          beds: plan.beds.map((b) => ({
+            id: b.id,
+            totalSlices: b.totalSlices,
+            activeSlices: b.activeSlices,
+            selectedAreaRatio: Number(b.areaRatio.toFixed(6)),
+            selectedGeometricArea: Number((b.areaRatio * Math.PI * BED_RADIUS * BED_RADIUS).toFixed(4))
+          })),
+          fractionCalculation: {
+            fractionA: `${state.nA}/${state.dA}`,
+            fractionB: state.showSecond ? `${state.nB}/${state.dB}` : null,
+            commonDenominatorLCM: plan.baseLcm,
+            equivMultiplier: plan.mult,
+            sumResult: `${plan.sumNumer}/${plan.sumDenom}`,
+            wholeBedsForSum: plan.beds.filter(b => b.id.startsWith('bed-sum')).length
+          },
+          vertexSamples: gardenRuntime.vertexSamples.slice(0, 6)
+        });
+      };
+
+      function animate(timestamp) {
+        requestAnimationFrame(animate);
+        if (!state.webglActive || !renderer || !scene || !camera) return;
+
+        // 부드러운 카메라 거리 보간 및 위치 갱신
+        state.camDist += (state.targetCamDist - state.camDist) * 0.1;
+        const cx = Math.sin(state.camTheta) * Math.sin(state.camPhi) * state.camDist;
+        const cy = Math.cos(state.camPhi) * state.camDist;
+        const cz = Math.cos(state.camTheta) * Math.sin(state.camPhi) * state.camDist;
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(0, 0.2, 0);
+
+        if (fireflies) {
+          fireflies.rotation.y = (timestamp || 0) * 0.00012;
+        }
+
+        renderer.render(scene, camera);
+        updateFloatingLabels();
+      }
+
+      window.onload = function () {
+        state.webglActive = initThreeScene();
+        if (!state.webglActive) {
+          dom.webglCanvas.style.display = 'none';
+          dom.fallbackCanvas.style.display = 'block';
+          dom.labelsLayer.style.display = 'none';
+          dom.webglNotice.style.display = 'block';
+          dom.modeBadge.textContent = '2D 정원 모드';
+        }
+        bindInteractionEvents();
+        handleResize();
+        syncGardenAndUI();
+        if (state.webglActive) {
+          animate(0);
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

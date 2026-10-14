@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MAGNETICA | 자기장으로 빚는 금속</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-midnight: #04060c;
+      --glass-bg: rgba(10, 14, 26, 0.76);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --accent-cyan: #22d3ee;
+      --accent-magenta: #f43f5e;
+      --accent-gold: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-midnight);
+      color: #f8fafc;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    .font-display {
+      font-family: 'Space Grotesk', 'Noto Sans KR', sans-serif;
+      letter-spacing: 0.06em;
+    }
+
+    #webgl-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      touch-action: none;
+      background: radial-gradient(circle at 50% 44%, #0f172a 0%, #050811 62%, #020307 100%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+    }
+
+    .preset-btn {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .preset-btn:hover {
+      border-color: rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.09);
+    }
+    .preset-btn.active {
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.25), rgba(244, 63, 94, 0.22));
+      border-color: #22d3ee;
+      color: #ffffff;
+      box-shadow: 0 0 18px rgba(34, 211, 238, 0.28);
+    }
+
+    .finish-chip {
+      transition: all 0.18s ease;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .finish-chip.active {
+      border-color: #f8fafc;
+      background: rgba(255, 255, 255, 0.18);
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.22);
+    }
+
+    /* Accessible 2D Overlay Handles for 3D Magnets */
+    .magnet-handle {
+      position: fixed;
+      z-index: 15;
+      transform: translate(-50%, -50%);
+      width: 54px;
+      height: 54px;
+      border-radius: 9999px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+      background: rgba(8, 12, 24, 0.72);
+      backdrop-filter: blur(6px);
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 12px;
+      line-height: 1.1;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65);
+    }
+    .magnet-handle:active {
+      cursor: grabbing;
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+    .magnet-handle.selected {
+      border-color: #22d3ee;
+      box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.28), 0 6px 24px rgba(0, 0, 0, 0.8);
+    }
+    .magnet-handle:focus-visible {
+      outline: 3px solid #fbbf24;
+      outline-offset: 3px;
+    }
+    .pole-badge-n {
+      color: #fda4af;
+    }
+    .pole-badge-s {
+      color: #7dd3fc;
+    }
+
+    /* Custom Range Sliders for Projector Visibility */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 2px solid #22d3ee;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 2px solid #22d3ee;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+    }
+
+    /* Slide-over Lesson & Verification Drawer */
+    #lesson-drawer {
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+    }
+    #lesson-drawer.drawer-closed {
+      transform: translateX(105%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    #lesson-drawer.drawer-open {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Custom Scrollbar for Drawer */
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="select-none">
+
+  <!-- Full-Screen 3D Canvas Container -->
+  <div id="webgl-container" role="region" aria-label="자기장 크롬 유체 3D 인터랙티브 조형물 공간"></div>
+
+  <!-- Accessible 2D Screen Handles synced with 3D Magnets -->
+  <button id="handle-mag-0" type="button" class="magnet-handle selected" aria-label="자석 A 위치 조작 핸들 (드래그 또는 화살표키로 이동)">
+    <span class="text-[11px] tracking-tighter text-slate-300">자석 A</span>
+    <span id="handle-mag-0-pole" class="text-xs font-extrabold pole-badge-n">N극 ↑</span>
+  </button>
+
+  <button id="handle-mag-1" type="button" class="magnet-handle" aria-label="자석 B 위치 조작 핸들 (드래그 또는 화살표키로 이동)">
+    <span class="text-[11px] tracking-tighter text-slate-300">자석 B</span>
+    <span id="handle-mag-1-pole" class="text-xs font-extrabold pole-badge-s">S극 ↑</span>
+  </button>
+
+  <!-- WebGL Fallback Notice (Hidden unless WebGL fails) -->
+  <div id="webgl-fallback" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-6 text-center">
+    <div class="max-w-lg rounded-2xl border border-rose-500/40 bg-slate-900/90 p-8 shadow-2xl">
+      <h2 class="text-2xl font-bold text-white mb-3">WebGL 3D 렌더링을 초기화할 수 없습니다</h2>
+      <p class="text-slate-300 text-sm leading-relaxed mb-4">
+        현재 브라우저 또는 학교 PC 그래픽 설정에서 WebGL 하드웨어 가속이 비활성화되어 있습니다. 브라우저 설정에서 하드웨어 가속을 켜거나 최신 Chrome/Edge 브라우저로 다시 열어 주세요.
+      </p>
+      <p id="webgl-error-detail" class="text-xs font-mono text-rose-300 bg-black/40 p-3 rounded-lg"></p>
+    </div>
+  </div>
+
+  <!-- Thin Top Bar -->
+  <header class="fixed top-0 left-0 right-0 z-20 pointer-events-none px-3 py-2.5 sm:px-5 sm:py-3 flex flex-wrap items-center justify-between gap-2">
+    <!-- Brand & Live Telemetry Pill -->
+    <div class="pointer-events-auto glass-panel rounded-full px-3.5 py-1.5 flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3C7.5 3 4 6.5 4 11c0 5.25 8 10 8 10s8-4.75 8-10c0-4.5-3.5-8-8-8z"/>
+          <circle cx="12" cy="11" r="3" />
+        </svg>
+        <h1 class="font-display text-sm sm:text-base font-bold tracking-wider text-white">MAGNETICA</h1>
+        <span class="hidden md:inline-block text-xs text-slate-300 font-medium border-l border-white/15 pl-2.5">자기장으로 빚는 금속</span>
+      </div>
+      <div class="hidden xl:flex items-center gap-2 text-[11px] font-mono text-slate-300 border-l border-white/15 pl-3" aria-live="polite">
+        <span>최대 |B|: <strong id="hud-bmax" class="text-cyan-300">1.42</strong></span>
+        <span>·</span>
+        <span>프레임: <strong id="hud-frametime" class="text-emerald-300">16.2</strong> ms</span>
+      </div>
+    </div>
+
+    <!-- Center Scene Presets (4 Distinct Sculptural States) -->
+    <nav aria-label="조형물 장면 프리셋" class="pointer-events-auto glass-panel rounded-full p-1 flex items-center gap-1 overflow-x-auto max-w-full">
+      <button type="button" data-preset="lake" class="preset-btn rounded-full px-3 py-1 text-xs sm:text-sm font-semibold text-slate-200 whitespace-nowrap" aria-label="거울 호수 프리셋">
+        거울 호수
+      </button>
+      <button type="button" data-preset="spikes" class="preset-btn active rounded-full px-3 py-1 text-xs sm:text-sm font-semibold text-slate-200 whitespace-nowrap" aria-label="자기장 가시 프리셋">
+        자기장 가시
+      </button>
+      <button type="button" data-preset="bridge" class="preset-btn rounded-full px-3 py-1 text-xs sm:text-sm font-semibold text-slate-200 whitespace-nowrap" aria-label="두 자석 브리지 프리셋">
+        두 자석 브리지
+      </button>
+      <button type="button" data-preset="wave" class="preset-btn rounded-full px-3 py-1 text-xs sm:text-sm font-semibold text-slate-200 whitespace-nowrap" aria-label="파동 조각 프리셋">
+        파동 조각
+      </button>
+    </nav>
+
+    <!-- Right Action Controls: Material Finish, Field Lines, Cinematic Show, Lesson Drawer -->
+    <div class="pointer-events-auto flex items-center gap-1.5 sm:gap-2">
+      <!-- Material Finish Switcher -->
+      <div class="glass-panel rounded-full p-1 hidden sm:flex items-center gap-1" role="group" aria-label="금속 표면 재질 선택">
+        <button type="button" data-finish="0" class="finish-chip active rounded-full px-2.5 py-1 text-xs font-semibold text-slate-100" aria-label="크롬 재질">
+          크롬
+        </button>
+        <button type="button" data-finish="1" class="finish-chip rounded-full px-2.5 py-1 text-xs font-semibold text-amber-200" aria-label="골드 재질">
+          골드
+        </button>
+        <button type="button" data-finish="2" class="finish-chip rounded-full px-2.5 py-1 text-xs font-semibold text-cyan-200" aria-label="오로라 재질">
+          오로라
+        </button>
+      </div>
+
+      <!-- Magnetic Field Visualization Toggle -->
+      <button id="btn-toggle-field" type="button" aria-pressed="false" class="glass-panel rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-100 hover:border-cyan-400 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12c3-6 6-6 9 0s6 6 9 0M3 6c3-4 6-4 9 0s6 4 9 0M3 18c3-4 6-4 9 0s6 4 9 0"/>
+        </svg>
+        <span>자기장 보기</span>
+      </button>
+
+      <!-- 10s Cinematic Show Button -->
+      <button id="btn-cinematic" type="button" aria-pressed="false" class="glass-panel rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold text-amber-200 hover:border-amber-400 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polygon points="5 3 19 12 5 21 5 3" stroke-linejoin="round"/>
+        </svg>
+        <span id="label-cinematic">시네마틱 쇼</span>
+      </button>
+
+      <!-- Lesson & Verification Drawer Button -->
+      <button id="btn-open-drawer" type="button" aria-expanded="false" aria-controls="lesson-drawer" class="glass-panel rounded-full px-3.5 py-1.5 text-xs sm:text-sm font-bold text-cyan-200 border-cyan-500/40 hover:bg-cyan-500/20 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"/>
+          <path stroke-linecap="round" d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 16.5h.01"/>
+        </svg>
+        <span>왜 이렇게 움직일까?</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Cinematic Progress Banner (Shown only during 10s show) -->
+  <div id="cinematic-banner" class="hidden fixed top-16 left-1/2 -translate-x-1/2 z-20 glass-panel rounded-full px-4 py-1.5 flex items-center gap-3">
+    <span class="text-xs font-semibold text-amber-300 tracking-wide">10초 시네마틱 쇼 진행 중</span>
+    <div class="w-28 h-1.5 bg-white/15 rounded-full overflow-hidden">
+      <div id="cinematic-progress" class="h-full bg-gradient-to-r from-cyan-400 via-amber-300 to-rose-400 w-0"></div>
+    </div>
+    <button id="btn-stop-cinematic" type="button" class="text-xs font-bold text-rose-300 hover:text-white px-1.5 py-0.5 rounded">
+      중지
+    </button>
+  </div>
+
+  <!-- Compact Bottom Control Bar -->
+  <footer class="fixed bottom-0 left-0 right-0 z-20 pointer-events-none px-3 pb-2.5 sm:px-5 sm:pb-3.5 flex flex-col items-center">
+    <div class="pointer-events-auto glass-panel rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 w-full max-w-6xl flex flex-col gap-2.5">
+      
+      <!-- Top Row of Bottom Bar: Action Buttons + 3 Core Sliders -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+        
+        <!-- Playback, Shockwave, Reset -->
+        <div class="lg:col-span-4 flex flex-wrap items-center gap-1.5">
+          <button id="btn-shockwave" type="button" class="rounded-xl bg-gradient-to-r from-cyan-500/30 to-rose-500/30 border border-cyan-400/60 hover:border-white px-3 py-1.5 text-xs sm:text-sm font-bold text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition" aria-label="표면 충격파 발생">
+            <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>
+            </svg>
+            <span>충격파</span>
+          </button>
+
+          <button id="btn-play-pause" type="button" aria-pressed="false" class="rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-100 flex items-center gap-1.5 transition" aria-label="시뮬레이션 일시정지 및 재생 전환">
+            <svg id="icon-pause" class="w-4 h-4 text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <rect x="6" y="4" width="4" height="16" rx="1"/>
+              <rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+            <svg id="icon-play" class="w-4 h-4 text-emerald-300 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <polygon points="6 4 20 12 6 20 6 4"/>
+            </svg>
+            <span id="label-play-pause">일시정지</span>
+          </button>
+
+          <button id="btn-reset" type="button" class="rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-1.5 transition" aria-label="초기 상태로 리셋">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0 1 15-3.4M20 15a9 9 0 0 1-15 3.4"/>
+            </svg>
+            <span>초기화</span>
+          </button>
+        </div>
+
+        <!-- 3 Real-Time Physics Sliders -->
+        <div class="lg:col-span-8 grid grid-cols-3 gap-3 sm:gap-4 items-center">
+          <!-- Field Strength -->
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-xs font-semibold">
+              <label for="slider-field" class="text-slate-200">자기장 세기</label>
+              <span id="val-field" class="font-mono text-cyan-300">1.35</span>
+            </div>
+            <input id="slider-field" type="range" min="0.0" max="2.4" step="0.05" value="1.35" aria-label="자기장 세기 조절" />
+          </div>
+
+          <!-- Viscosity / Damping -->
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-xs font-semibold">
+              <label for="slider-viscosity" class="text-slate-200">점성 (감쇠)</label>
+              <span id="val-viscosity" class="font-mono text-amber-300">0.35</span>
+            </div>
+            <input id="slider-viscosity" type="range" min="0.05" max="0.95" step="0.05" value="0.35" aria-label="점성 및 반응 감쇠 속도 조절" />
+          </div>
+
+          <!-- Wave Amplitude -->
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-xs font-semibold">
+              <label for="slider-wave" class="text-slate-200">파동 진폭</label>
+              <span id="val-wave" class="font-mono text-rose-300">0.30</span>
+            </div>
+            <input id="slider-wave" type="range" min="0.0" max="1.0" step="0.05" value="0.30" aria-label="표면 파동 진폭 조절" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row of Bottom Bar: Keyboard/Button Accessible Magnet Controls & Polarity Flip -->
+      <div class="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-slate-300 font-semibold mr-1">조작 자석:</span>
+          <button id="btn-select-mag-0" type="button" class="rounded-lg px-2.5 py-1 font-bold border border-cyan-400 bg-cyan-500/20 text-white transition" aria-label="자석 A 선택">
+            자석 A (<span id="status-mag-0-pole">N극</span>)
+          </button>
+          <button id="btn-select-mag-1" type="button" class="rounded-lg px-2.5 py-1 font-bold border border-white/15 bg-white/5 text-slate-300 transition" aria-label="자석 B 선택">
+            자석 B (<span id="status-mag-1-pole">S극</span>)
+          </button>
+
+          <div class="h-4 w-px bg-white/15 mx-1 hidden sm:block"></div>
+
+          <!-- Directional Step Buttons for Mouse-Free / Classroom Projector Verification -->
+          <div class="flex items-center gap-1" role="group" aria-label="선택한 자석 단계별 이동">
+            <button id="btn-mag-closer" type="button" class="rounded-lg bg-white/10 hover:bg-white/20 px-2.5 py-1 font-semibold text-slate-100 border border-white/15 transition" aria-label="선택 자석 조형물 가까이 이동">
+              가까이
+            </button>
+            <button id="btn-mag-further" type="button" class="rounded-lg bg-white/10 hover:bg-white/20 px-2.5 py-1 font-semibold text-slate-100 border border-white/15 transition" aria-label="선택 자석 조형물 멀리 이동">
+              멀리
+            </button>
+            <button id="btn-mag-left" type="button" class="rounded-lg bg-white/10 hover:bg-white/20 px-2.5 py-1 font-semibold text-slate-100 border border-white/15 transition" aria-label="선택 자석 왼쪽 회전 이동">
+              왼쪽
+            </button>
+            <button id="btn-mag-right" type="button" class="rounded-lg bg-white/10 hover:bg-white/20 px-2.5 py-1 font-semibold text-slate-100 border border-white/15 transition" aria-label="선택 자석 오른쪽 회전 이동">
+              오른쪽
+            </button>
+          </div>
+
+          <button id="btn-mag-flip" type="button" class="rounded-lg bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/50 px-2.5 py-1 font-bold text-rose-200 transition ml-1" aria-label="선택한 자석 N극 S극 극성 전환">
+            극성 반전 (N↔S)
+          </button>
+        </div>
+
+        <!-- Live Magnet Coordinates Readout -->
+        <div class="hidden md:flex items-center gap-3 font-mono text-[11px] text-slate-300" aria-live="polite">
+          <span>선택 자석 거리 r = <strong id="hud-mag-dist" class="text-cyan-300">2.35</strong></span>
+          <span>각도 θ = <strong id="hud-mag-angle" class="text-amber-300">-35°</strong></span>
+          <span class="text-slate-400">드래그: 자석/카메라 회전 · 화살표키: 선택 자석 이동</span>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- Collapsible Slide-Over Drawer: '왜 이렇게 움직일까?' & Live Numerical Verification -->
+  <aside id="lesson-drawer" class="drawer-closed fixed top-14 bottom-28 right-3 sm:right-5 z-30 w-[calc(100vw-1.5rem)] max-w-md glass-panel rounded-2xl flex flex-col overflow-hidden" aria-label="수업 설명 및 물리 수치 검증 패널">
+    <!-- Drawer Header -->
+    <div class="px-5 py-3.5 border-b border-white/15 flex items-center justify-between bg-slate-900/60">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+        </svg>
+        <h2 class="text-base font-bold text-white">왜 이렇게 움직일까? · 수치 검증</h2>
+      </div>
+      <button id="btn-close-drawer" type="button" class="rounded-lg p-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition" aria-label="설명 패널 닫기">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Drawer Content -->
+    <div class="p-5 overflow-y-auto custom-scroll space-y-5 text-sm leading-relaxed text-slate-200">
+      
+      <!-- Section 1: Core Physics Principles -->
+      <section class="space-y-2.5">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-300">1. 핵심 원리: 자기장의 세기와 표면 변형</h3>
+        <div class="rounded-xl bg-white/5 border border-white/10 p-3.5 space-y-2 text-xs sm:text-sm">
+          <p>
+            <strong>자성유체는 N극에 끌리고 S극에 밀리는 물질이 아닙니다.</strong> 초상자성 나노입자가 담긴 유체는 외부 자기장 <span class="font-mono text-cyan-300">B(r)</span> 방향으로 자화되며, 표면의 자기 응력과 솟아오르는 변형은 장 세기의 제곱인 <strong class="text-amber-300 font-mono">|B(r)|²</strong>에 비례하는 교육용 근사로 계산됩니다.
+          </p>
+          <p>
+            따라서 <strong>단독 자석의 N극과 S극을 반전</strong>하면 자기장 화살표(<span class="font-mono">B</span>)의 방향은 정반대로 뒤집히지만, <span class="font-mono">|B|²</span> 크기는 동일하므로 돌기 높이는 변하지 않습니다. 반면 <strong>두 자석이 함께 있을 때</strong>는 합성장 <span class="font-mono text-cyan-300">B = B₁ + B₂</span>의 벡터 간섭(<span class="font-mono">2B₁·B₂</span>) 때문에 한 자석의 극성을 바꾸면 두 자석 사이의 브리지와 합성장 분포가 뚜렷하게 달라집니다.
+          </p>
+        </div>
+      </section>
+
+      <!-- Section 2: Distance & Viscosity -->
+      <section class="space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-300">2. 거리 감쇠(1/r³)와 점성의 역할</h3>
+        <ul class="rounded-xl bg-white/5 border border-white/10 p-3.5 space-y-2 text-xs sm:text-sm list-disc list-inside">
+          <li>
+            <strong>자석 거리와 장 감소:</strong> 자기 쌍극자장 <span class="font-mono text-cyan-300">B(r) ∝ [3r̂(m·r̂) - m] / r³</span>은 거리의 세제곱에 반비례하여 급격히 감소합니다(특이점 방지를 위해 작은 정규화 길이 ε 포함). 자석을 조금만 가까이 가져가도 돌기가 강하게 솟구칩니다.
+          </li>
+          <li>
+            <strong>점성(Viscosity)과 반응 속도:</strong> 점성이 낮으면 자석 이동과 충격파에 유체가 즉각 출렁이고, 점성이 높으면 내부 마찰 감쇠가 커져 자석을 옮겼을 때 표면이 천천히 부드럽게 따라옵니다.
+          </li>
+        </ul>
+      </section>
+
+      <!-- Section 3: Classroom Activity -->
+      <section class="space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">3. 교실 탐구 활동 (예측 → 자석 이동 → 관찰)</h3>
+        <div class="rounded-xl bg-amber-500/10 border border-amber-400/30 p-3.5 space-y-2 text-xs sm:text-sm">
+          <p><strong>1단계 [예측]:</strong> '자기장 보기'를 켠 상태에서 자석 A와 자석 B를 가까이 두었을 때, 자석 B의 극성을 반전하면 두 자석 사이의 화살표와 브리지 높이가 어떻게 변할지 예측해 보세요.</p>
+          <p><strong>2단계 [자석 이동 및 조작]:</strong> 하단 바에서 '자석 B'를 선택하고 '가까이' 버튼과 '극성 반전(N↔S)' 버튼을 눌러 보세요.</p>
+          <p><strong>3단계 [관찰]:</strong> 단독 자석일 때의 극성 반전과 두 자석 합성장일 때의 극성 반전이 왜 다르게 나타나는지 <span class="font-mono">|B₁ + B₂|²</span> 관점으로 설명해 보세요.</p>
+        </div>
+      </section>
+
+      <!-- Section 4: Live Mathematical & Physics Verification -->
+      <section class="space-y-2.5">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-300">4. 실시간 물리·수치 코드 검증</h3>
+          <button id="btn-run-verification" type="button" class="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/30 transition">
+            지금 재검증
+          </button>
+        </div>
+        <div class="rounded-xl bg-slate-950/80 border border-white/15 p-3.5 space-y-2.5 font-mono text-xs">
+          <div class="flex flex-col gap-0.5 border-b border-white/10 pb-2">
+            <span class="text-slate-400">① 쌍극자 B(r) 유한 좌표 검증 (r = r₁ 중심 및 근접점)</span>
+            <span id="verify-finite" class="text-emerald-300 font-bold">측정 중...</span>
+          </div>
+          <div class="flex flex-col gap-0.5 border-b border-white/10 pb-2">
+            <span class="text-slate-400">② 고정 축 거리 2배(r → 2r) 장 크기 비율 (이론 1/8 = 0.125, 정규화 ε=0.42 반영)</span>
+            <span id="verify-falloff" class="text-cyan-300 font-bold">측정 중...</span>
+          </div>
+          <div class="flex flex-col gap-0.5 border-b border-white/10 pb-2">
+            <span class="text-slate-400">③ 단독 자석 극성 반전(m → -m): 방향 반전 및 |B| 동일성</span>
+            <span id="verify-polarity" class="text-amber-300 font-bold">측정 중...</span>
+          </div>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-slate-400">④ 초기화(Reset) 상태 복원 오차 검증</span>
+            <span id="verify-reset" class="text-emerald-300 font-bold">측정 중...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Scientific Model Disclaimer & Safety Notice -->
+      <section class="rounded-xl bg-rose-500/10 border border-rose-400/30 p-3.5 text-xs text-slate-300 space-y-1.5">
+        <p class="font-bold text-rose-200">모형 안내 및 과학실 안전 유의사항</p>
+        <p>
+          실제 자성유체(Ferrofluid)는 산화철 나노입자가 분산된 <strong>검고 불투명한 액체</strong>입니다. 본 앱은 표면 곡률과 자기장 변형을 명확히 관찰할 수 있도록 <strong>거울 같은 크롬 금속 재질로 예술화한 교육용 근사 모형</strong>이며, 전체 Navier-Stokes 유체역학의 정밀 수치해가 아닙니다.
+        </p>
+        <p>
+          또한 화면의 조형물은 시각 시뮬레이션이며, 수은이나 실제 용융 금속처럼 학생이 맨손으로 취급할 수 있는 실제 액체 금속 재료가 아닙니다. 본 앱은 학생 개인정보, 카메라, 마이크, 로그인 데이터를 일체 수집하지 않습니다.
+        </p>
+      </section>
+
+    </div>
+  </aside>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ============================================================================
+       * 1. CANONICAL INITIAL STATE & SIMULATION PARAMETERS
+       * ============================================================================ */
+      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Regularization length epsilon to prevent 1/r^3 singularity when magnet approaches surface
+      const DIPOLE_EPSILON = 0.42;
+
+      const INITIAL_STATE = Object.freeze({
+        preset: 'spikes',          // 'lake' | 'spikes' | 'bridge' | 'wave'
+        finish: 0,                 // 0: Chrome, 1: Gold, 2: Aurora
+        fieldStrength: 1.35,
+        viscosity: 0.35,
+        waveAmp: 0.30,
+        showFieldLines: false,
+        paused: false,
+        selectedMagnet: 0,
+        // Magnet cylindrical/spherical coordinates around sculpture center
+        magnets: [
+          { radius: 2.30, angle: -0.62, y: 0.38, polarity: 1 },   // Magnet A (N pole up/inward)
+          { radius: 2.40, angle: 2.52,  y: -0.18, polarity: -1 }  // Magnet B (S pole)
+        ],
+        cameraYaw: 0.32,
+        cameraPitch: 0.28,
+        cameraZoom: 1.0
+      });
+
+      // Live mutable state
+      const state = {
+        preset: INITIAL_STATE.preset,
+        finish: INITIAL_STATE.finish,
+        fieldStrength: INITIAL_STATE.fieldStrength,
+        viscosity: INITIAL_STATE.viscosity,
+        waveAmp: INITIAL_STATE.waveAmp,
+        showFieldLines: INITIAL_STATE.showFieldLines,
+        paused: INITIAL_STATE.paused,
+        selectedMagnet: INITIAL_STATE.selectedMagnet,
+        magnets: [
+          { ...INITIAL_STATE.magnets[0] },
+          { ...INITIAL_STATE.magnets[1] }
+        ],
+        // Viscous-lagged physical state experienced by the fluid surface
+        fluidMagnets: [
+          { x: 0, y: 0, z: 0, mx: 0, my: 0, mz: 0 },
+          { x: 0, y: 0, z: 0, mx: 0, my: 0, mz: 0 }
+        ],
+        fluidFieldStrength: INITIAL_STATE.fieldStrength,
+        fluidWaveAmp: INITIAL_STATE.waveAmp,
+        // Preset morph weights [lake, spikes, bridge, wave] smoothly interpolated
+        morphWeights: { lake: 0.0, spikes: 1.0, bridge: 0.0, wave: 0.0 },
+        targetWeights: { lake: 0.0, spikes: 1.0, bridge: 0.0, wave: 0.0 },
+        // Shockwave state
+        shockwave: {
+          active: false,
+          time: 10.0,
+          intensity: 0.0,
+          dir: new THREE.Vector3(0, 1, 0)
+        },
+        // Time & Cinematic Show
+        simTime: 0.0,
+        cinematicActive: false,
+        cinematicElapsed: 0.0,
+        // Camera Orbit
+        cameraYaw: INITIAL_STATE.cameraYaw,
+        cameraPitch: INITIAL_STATE.cameraPitch,
+        cameraZoom: INITIAL_STATE.cameraZoom,
+        // Frame timing telemetry (genuine exponential moving average of observed dt)
+        frameTimeMs: 16.6,
+        maxObservedB: 0.0,
+        lastResetError: 0.0
+      };
+
+      /* ============================================================================
+       * 2. MAGNETIC DIPOLE PHYSICS ENGINE (CPU & GPU SHARED FORMULATION)
+       *    B_i(r) = k * [ 3 * r_hat * (m_i . r_hat) - m_i ] / (|d|^2 + eps^2)^(3/2)
+       * ============================================================================ */
+      function magnetSphericalToCartesian(mag) {
+        const x = mag.radius * Math.cos(mag.angle);
+        const z = mag.radius * Math.sin(mag.angle);
+        const y = mag.y;
+        // Dipole moment vector points radially inward toward origin * polarity
+        const len = Math.sqrt(x * x + y * y + z * z) || 1.0;
+        const dirX = (-x / len) * mag.polarity;
+        const dirY = (-y / len) * mag.polarity;
+        const dirZ = (-z / len) * mag.polarity;
+        return { x, y, z, mx: dirX, my: dirY, mz: dirZ };
+      }
+
+      // Initialize fluidMagnets immediately to match initial magnets
+      for (let i = 0; i < 2; i++) {
+        const c = magnetSphericalToCartesian(state.magnets[i]);
+        Object.assign(state.fluidMagnets[i], c);
+      }
+
+      /**
+       * Evaluates regularized 3D dipole magnetic field B(r) from a single dipole
+       * @param {number} px, py, pz - evaluation point r
+       * @param {number} mx0, my0, mz0 - dipole position r_0
+       * @param {number} mdx, mdy, mdz - dipole moment vector m
+       * @param {number} eps - regularization length
+       */
+      function computeSingleDipoleB(px, py, pz, mx0, my0, mz0, mdx, mdy, mdz, eps = DIPOLE_EPSILON) {
+        const dx = px - mx0;
+        const dy = py - my0;
+        const dz = pz - mz0;
+        const r2 = dx * dx + dy * dy + dz * dz;
+        const reg2 = r2 + eps * eps;
+        const invReg = 1.0 / Math.sqrt(reg2);
+        const invReg3 = invReg * invReg * invReg;
+
+        // Regularized unit vector r_hat = d / sqrt(|d|^2 + eps^2)
+        const rx = dx * invReg;
+        const ry = dy * invReg;
+        const rz = dz * invReg;
+
+        const mDotR = mdx * rx + mdy * ry + mdz * rz;
+        const bx = (3.0 * rx * mDotR - mdx) * invReg3;
+        const by = (3.0 * ry * mDotR - mdy) * invReg3;
+        const bz = (3.0 * rz * mDotR - mdz) * invReg3;
+        return { x: bx, y: by, z: bz };
+      }
+
+      /**
+       * Evaluates total magnetic field B(r) = B1(r) + B2(r) from both active magnets
+       */
+      function computeTotalFieldB(px, py, pz, useTargetMagnets = false) {
+        const scale = state.fieldStrength;
+        const mList = useTargetMagnets
+          ? [magnetSphericalToCartesian(state.magnets[0]), magnetSphericalToCartesian(state.magnets[1])]
+          : state.fluidMagnets;
+
+        const b1 = computeSingleDipoleB(
+          px, py, pz,
+          mList[0].x, mList[0].y, mList[0].z,
+          mList[0].mx * scale, mList[0].my * scale, mList[0].mz * scale,
+          DIPOLE_EPSILON
+        );
+        const b2 = computeSingleDipoleB(
+          px, py, pz,
+          mList[1].x, mList[1].y, mList[1].z,
+          mList[1].mx * scale, mList[1].my * scale, mList[1].mz * scale,
+          DIPOLE_EPSILON
+        );
+        return {
+          x: b1.x + b2.x,
+          y: b1.y + b2.y,
+          z: b1.z + b2.z
+        };
+      }
+
+      /* ============================================================================
+       * 3. THREE.JS SCENE & ASPECT-AWARE CAMERA SETUP
+       * ============================================================================ */
+      const container = document.getElementById('webgl-container');
+      let renderer, scene, camera;
+
+      try {
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          powerPreference: 'high-performance',
+          alpha: false
+        });
+        // Bounded DPR for consistent performance on classroom projectors & PCs
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+      } catch (err) {
+        const fb = document.getElementById('webgl-fallback');
+        const detail = document.getElementById('webgl-error-detail');
+        if (fb) fb.classList.remove('hidden');
+        if (detail) detail.textContent = String(err && err.message ? err.message : err);
+        return;
+      }
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 60);
+
+      /**
+       * Aspect-aware camera distance calculation so the central liquid chrome sculpture
+       * occupies 65%~80% of the screen width without clipping on portrait or landscape.
+       */
+      function updateCameraTransform() {
+        const aspect = Math.max(0.35, window.innerWidth / Math.max(1, window.innerHeight));
+        const vFovRad = THREE.MathUtils.degToRad(camera.fov);
+        const hFovRad = 2.0 * Math.atan(Math.tan(vFovRad * 0.5) * aspect);
+
+        // Target sculpture + magnet diameter span ~ 4.1 units to fill ~72% of viewport width
+        const targetSpan = 4.15;
+        const distForWidth = (targetSpan * 0.5) / Math.tan(hFovRad * 0.5);
+        const distForHeight = (3.45 * 0.5) / Math.tan(vFovRad * 0.5);
+        const baseDist = Math.max(distForWidth, distForHeight, 4.9);
+        const finalDist = baseDist * state.cameraZoom;
+
+        const cosP = Math.cos(state.cameraPitch);
+        const sinP = Math.sin(state.cameraPitch);
+        const cosY = Math.cos(state.cameraYaw);
+        const sinY = Math.sin(state.cameraYaw);
+
+        camera.position.set(
+          finalDist * cosP * sinY,
+          finalDist * sinP + 0.15,
+          finalDist * cosP * cosY
+        );
+        camera.lookAt(0, -0.06, 0);
+        camera.updateMatrixWorld();
+      }
+
+      updateCameraTransform();
+
+      /* ============================================================================
+       * 4. CONTINUOUS LIQUID CHROME SHADER (VERTEX + PER-PIXEL JACOBIAN FRAGMENT)
+       *    Evaluates the exact smooth mathematical surface P(u) and computes analytical
+       *    tangent-plane finite differences in the FRAGMENT shader so there are
+       *    ZERO triangle patches, ZERO faceting, and razor-sharp elongated reflections.
+       * ============================================================================ */
+      const sharedSurfaceGLSL = `
+        uniform float uTime;
+        uniform float uFieldStrength;
+        uniform float uWaveAmp;
+        uniform int uFinish;
+        uniform vec4 uMorphWeights; // x: lake, y: spikes, z: bridge, w: wave
+        uniform vec3 uMagPos1;
+        uniform vec3 uMagMom1;
+        uniform vec3 uMagPos2;
+        uniform vec3 uMagMom2;
+        uniform vec4 uShockwave;    // xyz: impact unit dir, w: shockwave elapsed time
+        uniform float uShockIntensity;
+
+        const float EPS_DIPOLE = 0.42;
+
+        // Regularized 3D magnetic dipole field B(r)
+        vec3 evalDipoleB(vec3 p, vec3 mPos, vec3 mMom) {
+          vec3 d = p - mPos;
+          float r2 = dot(d, d);
+          float reg2 = r2 + EPS_DIPOLE * EPS_DIPOLE;
+          float invReg = inversesqrt(reg2);
+          float invReg3 = invReg * invReg * invReg;
+          vec3 rHat = d * invReg;
+          float mDotR = dot(mMom, rHat);
+          return (3.0 * rHat * mDotR - mMom) * invReg3;
+        }
+
+        // Smooth spatial Rosensweig wave pattern driven by continuous trigonometric harmonics
+        float rosensweigPattern(vec3 u, vec3 bDir, float freq) {
+          // Orthonormal basis around local field direction or world axes
+          float p1 = sin(u.x * freq + u.y * (freq * 0.7)) * cos(u.z * freq - u.x * (freq * 0.5));
+          float p2 = sin((u.y * 0.8 + u.z * 0.6) * (freq * 1.25) + 0.4) * cos((u.x * 0.7 - u.y * 0.7) * freq);
+          float align = abs(dot(u, bDir));
+          float ring = cos(acos(clamp(align, -0.999, 0.999)) * (freq * 1.35));
+          return 0.55 * (p1 * 0.5 + p2 * 0.5) + 0.45 * ring;
+        }
+
+        // Master continuous 3D surface mapping P(u) from unit sphere direction u
+        vec3 evalSurfacePosition(vec3 uDir) {
+          vec3 u = normalize(uDir);
+
+          float wLake   = uMorphWeights.x;
+          float wSpikes = uMorphWeights.y;
+          float wBridge = uMorphWeights.z;
+          float wWave   = uMorphWeights.w;
+
+          // 1. Base sculptural proportion (Mirror Lake flattens vertically & widens horizontally)
+          vec3 baseScale = vec3(
+            1.28 + 0.42 * wLake + 0.16 * wBridge,
+            1.16 - 0.58 * wLake - 0.08 * wBridge,
+            1.28 + 0.42 * wLake - 0.08 * wBridge
+          );
+          vec3 p0 = u * baseScale;
+
+          // 2. Evaluate physical dipole fields B1(p0) and B2(p0)
+          vec3 B1 = evalDipoleB(p0, uMagPos1, uMagMom1 * uFieldStrength);
+          vec3 B2 = evalDipoleB(p0, uMagPos2, uMagMom2 * uFieldStrength);
+          vec3 Btotal = B1 + B2;
+
+          // Ferrofluid deformation depends on |B|^2 (educational approximation)
+          float Bsq = dot(Btotal, Btotal);
+          // Soft saturation via tanh-like rational function to prevent singularity blowup
+          float magEnergy = Bsq / (1.0 + 0.28 * Bsq);
+          vec3 bHat = Btotal * inversesqrt(max(Bsq, 1e-6));
+
+          // 3. Rosensweig-style magnetic spikes concentrated where |B|^2 is high
+          float spikeFreq = mix(9.0, 14.0, wSpikes);
+          float cell = rosensweigPattern(u, bHat, spikeFreq);
+          float positivePeak = smoothstep(-0.25, 0.85, cell);
+          float spikeFactor = (0.22 * wLake + 0.95 * wSpikes + 0.52 * wBridge + 0.45 * wWave);
+          float spikeDisp = magEnergy * spikeFactor * (0.34 + 0.68 * positivePeak * positivePeak);
+
+          // 4. Bulk magnetic dome attraction toward high |B|^2 regions
+          vec3 dirToMag1 = normalize(uMagPos1);
+          vec3 dirToMag2 = normalize(uMagPos2);
+          float lobe1 = pow(max(0.0, dot(u, dirToMag1)), 3.0);
+          float lobe2 = pow(max(0.0, dot(u, dirToMag2)), 3.0);
+          float b1Sq = dot(B1, B1);
+          float b2Sq = dot(B2, B2);
+          float bulkPull = (b1Sq / (1.2 + b1Sq)) * lobe1 * 0.34 + (b2Sq / (1.2 + b2Sq)) * lobe2 * 0.34;
+
+          // 5. Two-Magnet Flux Bridge deformation:
+          //    Depends on vector interference |B1 + B2|^2 vs individual poles and bridge axis alignment
+          vec3 bridgeAxis = normalize(uMagPos2 - uMagPos1);
+          vec3 midAxis = normalize(dirToMag1 + dirToMag2 + vec3(0.0, 0.15, 0.0));
+          // Cross-interference term 2 * (B1 . B2) changes sign when one magnet flips polarity!
+          float interference = dot(B1, B2);
+          float constructive = clamp(interference / (0.35 + abs(interference)), -0.85, 1.0);
+
+          float alongBridge = 1.0 - abs(dot(u, bridgeAxis));
+          float archBelt = pow(max(0.0, dot(u, midAxis)), 1.6) * smoothstep(0.1, 0.95, alongBridge);
+          float bridgeArch = (0.28 + 0.85 * wBridge) * clamp(uFieldStrength * 0.65, 0.0, 1.5) *
+                             (0.42 * (lobe1 + lobe2) + (0.36 + 0.28 * constructive) * archBelt);
+
+          // 6. Continuous Harmonic & Capillary Wave Sculpture motion
+          float waveSpeed = uTime * 1.85;
+          float harmonicWave =
+            sin(u.x * 5.0 + waveSpeed) * cos(u.y * 4.0 - waveSpeed * 0.8) * 0.45 +
+            sin(u.z * 6.0 - waveSpeed * 1.1 + u.x * 3.0) * 0.35 +
+            cos((u.y * 7.0 + u.z * 4.0) + waveSpeed * 0.7) * 0.20;
+
+          float lakeRipple = sin(length(p0.xz) * 7.5 - uTime * 2.1) * (1.0 - abs(u.y)) * 0.08;
+          float totalWave = (uWaveAmp * (0.24 + 0.55 * wWave) * harmonicWave) + (wLake * lakeRipple);
+
+          // 7. Calculated Radial Shockwave propagating across the surface & decaying to steady state
+          float shockDisp = 0.0;
+          if (uShockIntensity > 0.001) {
+            float geoAngle = acos(clamp(dot(u, normalize(uShockwave.xyz)), -0.9999, 0.9999));
+            float waveFront = geoAngle - uShockwave.w * 2.85;
+            float packet = exp(-waveFront * waveFront * 5.5) * cos(waveFront * 16.0);
+            shockDisp = uShockIntensity * packet * 0.36;
+          }
+
+          // Combine smooth radial displacement with soft upper bound
+          float rawRadial = spikeDisp + bulkPull + bridgeArch + totalWave + shockDisp;
+          float clampedRadial = 0.95 * tanh(rawRadial * 0.95);
+
+          // Tangential flux stretching toward the magnets and along the bridge
+          vec3 bridgeStretch = bridgeAxis * dot(u, bridgeAxis) * (0.38 * wBridge + 0.14 * magEnergy) * (1.0 + 0.3 * constructive);
+          vec3 pos = p0 + u * clampedRadial + bridgeStretch;
+
+          // Subtle gentle breathing motion in steady state
+          pos.y += sin(uTime * 1.15) * 0.025;
+          return pos;
+        }
+      `;
+
+      const fluidVertexShader = `
+        varying vec3 vUnitDir;
+        varying vec3 vWorldPos;
+        ${sharedSurfaceGLSL}
+
+        void main() {
+          vUnitDir = normalize(position);
+          vec3 displaced = evalSurfacePosition(vUnitDir);
+          vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
+          vWorldPos = worldPos.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `;
+
+      const fluidFragmentShader = `
+        varying vec3 vUnitDir;
+        varying vec3 vWorldPos;
+        ${sharedSurfaceGLSL}
+
+        // Analytic Studio Environment Reflection (Elongated gallery softboxes + Cyan/Magenta/Gold rim strips)
+        vec3 evaluateStudioEnvironment(vec3 R, int finishMode) {
+          vec3 d = normalize(R);
+
+          // 1. Deep Midnight Museum Space Base Gradient
+          float zenith = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 env = mix(vec3(0.015, 0.022, 0.045), vec3(0.05, 0.08, 0.16), pow(zenith, 1.6));
+
+          // 2. Main Overhead Elongated Studio Softbox Strip (creates signature liquid chrome band)
+          float topStripX = smoothstep(0.65, 0.12, abs(d.x - d.z * 0.25));
+          float topStripZ = smoothstep(0.85, 0.25, abs(d.z));
+          float topElevation = smoothstep(0.15, 0.72, d.y);
+          float mainSoftbox = topStripX * topStripZ * topElevation;
+          env += vec3(1.35, 1.40, 1.50) * pow(mainSoftbox, 1.4);
+
+          // Crisp Specular Core Ribbon inside Overhead Softbox
+          float ribbon = smoothstep(0.14, 0.01, abs(d.x - 0.18 * d.z)) * smoothstep(0.25, 0.85, d.y);
+          env += vec3(1.9, 1.95, 2.1) * ribbon;
+
+          // 3. Cyan Studio Rim Strip Light (Left-Front Horizon)
+          vec3 cyanDir = normalize(vec3(-0.82, 0.24, 0.52));
+          float cyanBand = smoothstep(0.55, 0.96, dot(d, cyanDir));
+          float cyanSlit = smoothstep(0.18, 0.02, abs(d.y - 0.22 - 0.25 * d.x)) * smoothstep(-0.1, 0.6, -d.x);
+          env += vec3(0.05, 0.92, 1.15) * (pow(cyanBand, 3.0) * 1.15 + cyanSlit * 1.45);
+
+          // 4. Magenta Studio Rim Strip Light (Right-Back Elevation)
+          vec3 magDir = normalize(vec3(0.84, 0.18, -0.50));
+          float magBand = smoothstep(0.52, 0.96, dot(d, magDir));
+          float magSlit = smoothstep(0.18, 0.02, abs(d.y - 0.15 + 0.28 * d.x)) * smoothstep(-0.1, 0.6, d.x);
+          env += vec3(1.18, 0.14, 0.58) * (pow(magBand, 3.0) * 1.1 + magSlit * 1.35);
+
+          // 5. Warm Studio Gold Key Arc (Upper Diagonal)
+          vec3 goldDir = normalize(vec3(0.42, 0.76, 0.48));
+          float goldArc = pow(max(0.0, dot(d, goldDir)), 10.0);
+          env += vec3(1.25, 0.86, 0.35) * goldArc * 1.25;
+
+          // 6. Dark Horizon Cut & Studio Plinth Bounce (creates liquid metal contour contrast)
+          float horizonCut = smoothstep(-0.18, -0.02, d.y) * smoothstep(0.16, 0.0, d.y);
+          env *= (1.0 - 0.68 * horizonCut);
+
+          if (d.y < 0.0) {
+            float floorBounce = smoothstep(-0.95, -0.05, d.y);
+            float radialGrid = 0.5 + 0.5 * cos(atan(d.z, d.x) * 6.0);
+            env += vec3(0.06, 0.14, 0.24) * floorBounce * (0.4 + 0.6 * radialGrid);
+          }
+
+          return env;
+        }
+
+        // Thin-film iridescent palette for Aurora finish
+        vec3 evalIridescence(float cosTheta) {
+          float phase = (1.0 - cosTheta) * 6.28318 * 1.35 + 0.6;
+          return 0.58 + 0.42 * cos(phase + vec3(0.0, 2.05, 4.10));
+        }
+
+        void main() {
+          // Per-pixel orthonormal tangent frame on the unit sphere u -> ZERO triangle faceting!
+          vec3 u = normalize(vUnitDir);
+          vec3 helper = abs(u.y) < 0.92 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+          vec3 t1 = normalize(cross(helper, u));
+          vec3 t2 = cross(u, t1);
+
+          // Evaluate continuous surface Jacobian per-pixel
+          float eps = 0.0045;
+          vec3 pCenter = evalSurfacePosition(u);
+          vec3 pT1     = evalSurfacePosition(normalize(u + eps * t1));
+          vec3 pT2     = evalSurfacePosition(normalize(u + eps * t2));
+
+          vec3 dP1 = pT1 - pCenter;
+          vec3 dP2 = pT2 - pCenter;
+          vec3 N = normalize(cross(dP2, dP1));
+          if (dot(N, u) < 0.0) N = -N;
+
+          vec3 V = normalize(cameraPosition - vWorldPos);
+          float NdotV = max(dot(N, V), 0.001);
+          vec3 R = reflect(-V, N);
+
+          // Evaluate studio reflection
+          vec3 envColor = evaluateStudioEnvironment(R, uFinish);
+
+          // Secondary micro-curvatures boost along high |B|^2 magnetic ridges
+          vec3 B1 = evalDipoleB(pCenter, uMagPos1, uMagMom1 * uFieldStrength);
+          vec3 B2 = evalDipoleB(pCenter, uMagPos2, uMagMom2 * uFieldStrength);
+          float bSq = dot(B1 + B2, B1 + B2);
+          float magGlow = clamp(bSq / (2.5 + bSq), 0.0, 1.0);
+
+          // Material Fresnel & Tint (0: Mirror Chrome, 1: 24K Liquid Gold, 2: Aurora Iridescent)
+          vec3 F0 = vec3(0.93, 0.95, 0.98);
+          if (uFinish == 1) {
+            F0 = vec3(1.00, 0.78, 0.32);
+          } else if (uFinish == 2) {
+            F0 = evalIridescence(NdotV);
+          }
+
+          // Schlick Fresnel for metallic conductor
+          vec3 F = F0 + (vec3(1.0) - F0) * pow(1.0 - NdotV, 4.5);
+          vec3 color = envColor * F;
+
+          if (uFinish == 1) {
+            // Rich warm metallic gold body reflection
+            color = mix(color, envColor * vec3(1.08, 0.82, 0.36), 0.65);
+          } else if (uFinish == 2) {
+            // Aurora holographic shift across curvatures
+            vec3 iri = evalIridescence(dot(N, normalize(V + vec3(0.0, 0.4, 0.0))));
+            color *= mix(vec3(1.0), iri * 1.35, 0.72);
+          }
+
+          // Grazing rim luminance & subtle magnetic flux sheen
+          float rim = pow(1.0 - NdotV, 3.2);
+          color += rim * mix(vec3(0.18, 0.65, 0.95), vec3(0.95, 0.35, 0.65), 0.5 + 0.5 * N.x) * (0.28 + 0.35 * magGlow);
+
+          // Filmic ACES-inspired tone mapping for rich highlights without harsh clipping
+          color = (color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14);
+          color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / 2.15));
+
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `;
+
+      /* ============================================================================
+       * 5. BUILDING THE 3D SCULPTURE, STUDIO FLOOR, AND 3D MAGNETS
+       * ============================================================================ */
+      const fluidUniforms = {
+        uTime: { value: 0.0 },
+        uFieldStrength: { value: state.fieldStrength },
+        uWaveAmp: { value: state.waveAmp },
+        uFinish: { value: state.finish },
+        uMorphWeights: { value: new THREE.Vector4(0, 1, 0, 0) },
+        uMagPos1: { value: new THREE.Vector3() },
+        uMagMom1: { value: new THREE.Vector3() },
+        uMagPos2: { value: new THREE.Vector3() },
+        uMagMom2: { value: new THREE.Vector3() },
+        uShockwave: { value: new THREE.Vector4(0, 1, 0, 10.0) },
+        uShockIntensity: { value: 0.0 }
+      };
+
+      // High-density icosahedron (detail 72 => ~103,680 triangles) paired with per-pixel Jacobian normal
+      const fluidGeometry = new THREE.IcosahedronGeometry(1.0, 72);
+      const fluidMaterial = new THREE.ShaderMaterial({
+        vertexShader: fluidVertexShader,
+        fragmentShader: fluidFragmentShader,
+        uniforms: fluidUniforms
+      });
+
+      const fluidMesh = new THREE.Mesh(fluidGeometry, fluidMaterial);
+      scene.add(fluidMesh);
+
+      // Studio Reflective Floor with Subtle Contact Shadow & Magnetic Caustic Glow
+      const floorVertexShader = `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        void main() {
+          vUv = uv;
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `;
+
+      const floorFragmentShader = `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform vec3 uMagPos1;
+        uniform vec3 uMagPos2;
+        uniform float uFieldStrength;
+        uniform int uFinish;
+
+        void main() {
+          vec2 p = vWorldPos.xz;
+          float r = length(p);
+
+          // Soft radial vignette fading into midnight gallery space
+          float radialMask = smoothstep(6.5, 0.8, r);
+
+          // Deep contact shadow directly beneath the liquid metal sculpture
+          float contactShadow = smoothstep(0.35, 2.05, r);
+
+          // Blurred studio reflection sheen on the floor directly beneath sculpture and magnets
+          float sheen = exp(-r * r * 0.35) * contactShadow;
+          vec3 tint = vec3(0.08, 0.22, 0.36);
+          if (uFinish == 1) tint = vec3(0.32, 0.22, 0.07);
+          if (uFinish == 2) tint = vec3(0.12, 0.30, 0.28);
+
+          // Subtle floor reflection rings under Magnet 1 and Magnet 2
+          float d1 = length(p - uMagPos1.xz);
+          float d2 = length(p - uMagPos2.xz);
+          float magAura1 = exp(-d1 * d1 * 1.4) * 0.18 * clamp(uFieldStrength, 0.2, 2.0);
+          float magAura2 = exp(-d2 * d2 * 1.4) * 0.18 * clamp(uFieldStrength, 0.2, 2.0);
+
+          // Subtle concentric gallery plinth rings
+          float ringLine = smoothstep(0.025, 0.0, abs(fract(r * 0.5) - 0.5)) * 0.045 * radialMask;
+
+          vec3 col = vec3(0.012, 0.018, 0.035) * radialMask;
+          col += tint * sheen * 0.75;
+          col += vec3(0.95, 0.25, 0.42) * magAura1;
+          col += vec3(0.15, 0.78, 0.98) * magAura2;
+          col += vec3(0.25, 0.45, 0.65) * ringLine;
+          col *= (0.28 + 0.72 * contactShadow);
+
+          float alpha = smoothstep(6.5, 1.2, r) * 0.92;
+          gl_FragColor = vec4(col, alpha);
+        }
+      `;
+
+      const floorUniforms = {
+        uMagPos1: { value: new THREE.Vector3() },
+        uMagPos2: { value: new THREE.Vector3() },
+        uFieldStrength: { value: state.fieldStrength },
+        uFinish: { value: state.finish }
+      };
+
+      const floorGeometry = new THREE.PlaneGeometry(14, 14, 1, 1);
+      floorGeometry.rotateX(-Math.PI * 0.5);
+      const floorMaterial = new THREE.ShaderMaterial({
+        vertexShader: floorVertexShader,
+        fragmentShader: floorFragmentShader,
+        uniforms: floorUniforms,
+        transparent: true,
+        depthWrite: false
+      });
+      const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+      floorMesh.position.y = -1.62;
+      scene.add(floorMesh);
+
+      /* ============================================================================
+       * 6. 3D INTERACTIVE MAGNET ASSEMBLIES (BIPOLAR N/S CAPSULES + SELECTION HALO)
+       * ============================================================================ */
+      const magnetGroups = [];
+      const magnetSelectionRings = [];
+      const matNorth = new THREE.MeshBasicMaterial({ color: 0xf43f5e }); // Rose/Crimson N Pole
+      const matSouth = new THREE.MeshBasicMaterial({ color: 0x0ea5e9 }); // Cyan/Cobalt S Pole
+      const matBand  = new THREE.MeshBasicMaterial({ color: 0xe2e8f0 }); // Metallic center collar
+
+      function createMagnet3D(index) {
+        const root = new THREE.Group();
+        const core = new THREE.Group(); // Flips 180 deg when polarity changes
+
+        // North half cylinder (+Z in local core space before rotation)
+        const geoHalf = new THREE.CylinderGeometry(0.16, 0.16, 0.26, 28);
+        geoHalf.rotateX(Math.PI * 0.5);
+
+        const meshN = new THREE.Mesh(geoHalf, matNorth);
+        meshN.position.z = 0.14;
+        core.add(meshN);
+
+        const meshS = new THREE.Mesh(geoHalf, matSouth);
+        meshS.position.z = -0.14;
+        core.add(meshS);
+
+        // Center silver divider band
+        const geoCollar = new THREE.CylinderGeometry(0.168, 0.168, 0.04, 28);
+        geoCollar.rotateX(Math.PI * 0.5);
+        const meshCollar = new THREE.Mesh(geoCollar, matBand);
+        core.add(meshCollar);
+
+        // Direction cone tip on the active inward pole
+        const geoTip = new THREE.ConeGeometry(0.09, 0.14, 20);
+        geoTip.rotateX(Math.PI * 0.5);
+        const meshTip = new THREE.Mesh(geoTip, matBand);
+        meshTip.position.z = 0.32;
+        core.add(meshTip);
+
+        root.add(core);
+
+        // Selection ring halo around active magnet
+        const ringGeo = new THREE.RingGeometry(0.28, 0.33, 36);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: index === 0 ? 0x22d3ee : 0xfbbf24,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: index === state.selectedMagnet ? 0.9 : 0.2
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        root.add(ringMesh);
+
+        scene.add(root);
+        magnetGroups.push({ root, core, ringMesh, ringMat });
+        magnetSelectionRings.push(ringMesh);
+      }
+
+      createMagnet3D(0);
+      createMagnet3D(1);
+
+      /* ============================================================================
+       * 7. 3D MAGNETIC FIELD VISUALIZATION ('자기장 보기' TOGGLE)
+       *    Renders both 3D dipole vector arrows AND continuous RK4 field lines
+       *    reflecting B(r) = B1(r) + B2(r) and polarity inversions in real time.
+       * ============================================================================ */
+      const fieldVizGroup = new THREE.Group();
+      fieldVizGroup.visible = state.showFieldLines;
+      scene.add(fieldVizGroup);
+
+      // 7A. 3D Vector Field Arrows on two orbital shells around the sculpture
+      const arrowAnchorPoints = [];
+      const arrowMeshes = [];
+
+      (function initFieldArrows() {
+        const arrowShaftGeo = new THREE.CylinderGeometry(0.014, 0.014, 0.18, 8);
+        arrowShaftGeo.rotateX(Math.PI * 0.5);
+        arrowShaftGeo.translate(0, 0, -0.04);
+
+        const arrowHeadGeo = new THREE.ConeGeometry(0.042, 0.11, 10);
+        arrowHeadGeo.rotateX(Math.PI * 0.5);
+        arrowHeadGeo.translate(0, 0, 0.09);
+
+        // Generate 44 well-spaced 3D sample locations around the sculpture and bridge zone
+        const rings = [
+          { y: -0.65, r: 1.95, count: 12 },
+          { y: 0.0,   r: 2.05, count: 16 },
+          { y: 0.65,  r: 1.95, count: 12 },
+          { y: 1.15,  r: 1.45, count: 6 }
+        ];
+
+        rings.forEach((ring) => {
+          for (let i = 0; i < ring.count; i++) {
+            const a = (i / ring.count) * Math.PI * 2;
+            const pt = new THREE.Vector3(ring.r * Math.cos(a), ring.y, ring.r * Math.sin(a));
+            arrowAnchorPoints.push(pt);
+
+            const holder = new THREE.Group();
+            const mat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.88 });
+            const shaft = new THREE.Mesh(arrowShaftGeo, mat);
+            const head = new THREE.Mesh(arrowHeadGeo, mat);
+            holder.add(shaft);
+            holder.add(head);
+            holder.position.copy(pt);
+            fieldVizGroup.add(holder);
+            arrowMeshes.push({ holder, mat, basePos: pt });
+          }
+        });
+      })();
+
+      // 7B. Continuous 3D Magnetic Field Lines traced via RK4 integration
+      const NUM_STREAMLINES = 24;
+      const STREAMLINE_STEPS = 36;
+      const streamlineObjects = [];
+
+      (function initStreamlines() {
+        for (let i = 0; i < NUM_STREAMLINES; i++) {
+          const positions = new Float32Array(STREAMLINE_STEPS * 3);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+          const mat = new THREE.LineBasicMaterial({
+            color: i < NUM_STREAMLINES / 2 ? 0x22d3ee : 0xf43f5e,
+            transparent: true,
+            opacity: 0.62
+          });
+          const line = new THREE.Line(geo, mat);
+          fieldVizGroup.add(line);
+          streamlineObjects.push({ line, geo, mat });
+        }
+      })();
+
+      /**
+       * Updates all 3D field arrows and RK4 magnetic field lines from live B(r) = B1(r) + B2(r)
+       */
+      function updateMagneticFieldVisualization() {
+        if (!state.showFieldLines) return;
+
+        const targetLook = new THREE.Vector3();
+        let maxB = 0.0;
+
+        // 1. Update 3D Vector Arrows
+        for (let i = 0; i < arrowMeshes.length; i++) {
+          const item = arrowMeshes[i];
+          const p = item.basePos;
+          const B = computeTotalFieldB(p.x, p.y, p.z, false);
+          const mag = Math.sqrt(B.x * B.x + B.y * B.y + B.z * B.z);
+          if (mag > maxB) maxB = mag;
+
+          if (mag > 1e-5) {
+            targetLook.set(p.x + B.x / mag, p.y + B.y / mag, p.z + B.z / mag);
+            item.holder.lookAt(targetLook);
+            const scale = THREE.MathUtils.clamp(0.65 + Math.pow(mag, 0.45) * 0.75, 0.6, 1.85);
+            item.holder.scale.setScalar(scale);
+
+            // Color shifts from cyan (moderate |B|) to warm gold/rose (intense |B|)
+            const t = THREE.MathUtils.clamp(mag * 0.55, 0.0, 1.0);
+            item.mat.color.setHSL(0.54 - t * 0.46, 0.92, 0.60);
+          }
+        }
+
+        // 2. Trace 3D Streamlines from seeds around Magnet 1 and Magnet 2
+        const stepSize = 0.14;
+        for (let i = 0; i < NUM_STREAMLINES; i++) {
+          const magIdx = i < NUM_STREAMLINES / 2 ? 0 : 1;
+          const localIdx = i % (NUM_STREAMLINES / 2);
+          const m = state.fluidMagnets[magIdx];
+
+          // Create an orthonormal ring of seed points around each magnet
+          const seedAngle = (localIdx / (NUM_STREAMLINES / 2)) * Math.PI * 2;
+          const ringRadius = 0.34;
+          const upX = Math.abs(m.my) < 0.9 ? 0 : 1;
+          const upY = Math.abs(m.my) < 0.9 ? 1 : 0;
+          // Cross product (m x up)
+          let tx = m.my * 0 - m.mz * upY;
+          let ty = m.mz * upX - m.mx * 0;
+          let tz = m.mx * upY - m.my * upX;
+          const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
+          tx /= tLen; ty /= tLen; tz /= tLen;
+
+          const bx = m.my * tz - m.mz * ty;
+          const by = m.mz * tx - m.mx * tz;
+          const bz = m.mx * ty - m.my * tx;
+
+          // Trace forward along B from the N side of the magnet
+          const traceSign = state.magnets[magIdx].polarity >= 0 ? 1.0 : -1.0;
+          let cx = m.x + (tx * Math.cos(seedAngle) + bx * Math.sin(seedAngle)) * ringRadius;
+          let cy = m.y + (ty * Math.cos(seedAngle) + by * Math.sin(seedAngle)) * ringRadius;
+          let cz = m.z + (tz * Math.cos(seedAngle) + bz * Math.sin(seedAngle)) * ringRadius;
+
+          const posAttr = streamlineObjects[i].geo.attributes.position;
+          const arr = posAttr.array;
+
+          for (let s = 0; s < STREAMLINE_STEPS; s++) {
+            arr[s * 3]     = cx;
+            arr[s * 3 + 1] = cy;
+            arr[s * 3 + 2] = cz;
+
+            // 2-stage midpoint integration along normalized B(r)
+            const bA = computeTotalFieldB(cx, cy, cz, false);
+            const lenA = Math.sqrt(bA.x * bA.x + bA.y * bA.y + bA.z * bA.z) || 1.0;
+            const mx = cx + (bA.x / lenA) * stepSize * 0.5 * traceSign;
+            const my = cy + (bA.y / lenA) * stepSize * 0.5 * traceSign;
+            const mz = cz + (bA.z / lenA) * stepSize * 0.5 * traceSign;
+
+            const bM = computeTotalFieldB(mx, my, mz, false);
+            const lenM = Math.sqrt(bM.x * bM.x + bM.y * bM.y + bM.z * bM.z) || 1.0;
+            cx += (bM.x / lenM) * stepSize * traceSign;
+            cy += (bM.y / lenM) * stepSize * traceSign;
+            cz += (bM.z / lenM) * stepSize * traceSign;
+          }
+          posAttr.needsUpdate = true;
+        }
+      }
+
+      /* ============================================================================
+       * 8. MAGNET 3D POSE & 2D ACCESSIBLE HANDLE SYNCHRONIZATION
+       * ============================================================================ */
+      const handleEls = [
+        document.getElementById('handle-mag-0'),
+        document.getElementById('handle-mag-1')
+      ];
+      const handlePoleEls = [
+        document.getElementById('handle-mag-0-pole'),
+        document.getElementById('handle-mag-1-pole')
+      ];
+      const statusPoleEls = [
+        document.getElementById('status-mag-0-pole'),
+        document.getElementById('status-mag-1-pole')
+      ];
+      const selectMagBtns = [
+        document.getElementById('btn-select-mag-0'),
+        document.getElementById('btn-select-mag-1')
+      ];
+
+      const tempProjVec = new THREE.Vector3();
+
+      function syncMagnetsAndHandles() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        for (let i = 0; i < 2; i++) {
+          const magState = state.magnets[i];
+          const cart = magnetSphericalToCartesian(magState);
+          const group = magnetGroups[i];
+
+          // Place 3D magnet at target coordinate
+          group.root.position.set(cart.x, cart.y, cart.z);
+          // Orient magnet axis toward sculpture origin
+          group.root.lookAt(0, 0, 0);
+          // Flip internal N/S core cylinder by 180 deg when polarity is S (-1)
+          group.core.rotation.y = magState.polarity >= 0 ? 0 : Math.PI;
+
+          // Billboard selection ring toward camera
+          group.ringMesh.lookAt(camera.position);
+          group.ringMat.opacity = i === state.selectedMagnet ? 0.92 : 0.22;
+
+          // Project 3D magnet position to 2D viewport for accessible handle button
+          tempProjVec.set(cart.x, cart.y, cart.z).project(camera);
+          const screenX = (tempProjVec.x * 0.5 + 0.5) * w;
+          const screenY = (-tempProjVec.y * 0.5 + 0.5) * h;
+
+          // Clamp within safe viewport margins so handles are never lost offscreen
+          const clampedX = THREE.MathUtils.clamp(screenX, 36, w - 36);
+          const clampedY = THREE.MathUtils.clamp(screenY, 64, h - 115);
+
+          const hEl = handleEls[i];
+          hEl.style.left = `${clampedX.toFixed(1)}px`;
+          hEl.style.top  = `${clampedY.toFixed(1)}px`;
+          hEl.classList.toggle('selected', i === state.selectedMagnet);
+
+          const isNorth = magState.polarity >= 0;
+          handlePoleEls[i].textContent = isNorth ? 'N극 ↑' : 'S극 ↑';
+          handlePoleEls[i].className = `text-xs font-extrabold ${isNorth ? 'pole-badge-n' : 'pole-badge-s'}`;
+          statusPoleEls[i].textContent = isNorth ? 'N극' : 'S극';
+        }
+
+        // Update bottom bar selected magnet button styling
+        for (let i = 0; i < 2; i++) {
+          const active = i === state.selectedMagnet;
+          selectMagBtns[i].className = active
+            ? 'rounded-lg px-2.5 py-1 font-bold border border-cyan-400 bg-cyan-500/20 text-white transition'
+            : 'rounded-lg px-2.5 py-1 font-bold border border-white/15 bg-white/5 text-slate-300 transition';
+        }
+
+        // Update HUD coordinate readouts for currently selected magnet
+        const selMag = state.magnets[state.selectedMagnet];
+        const distEl = document.getElementById('hud-mag-dist');
+        const angleEl = document.getElementById('hud-mag-angle');
+        if (distEl) distEl.textContent = selMag.radius.toFixed(2);
+        if (angleEl) {
+          const deg = Math.round(THREE.MathUtils.radToDeg(selMag.angle));
+          angleEl.textContent = `${deg}°`;
+        }
+      }
+
+      /* ============================================================================
+       * 9. PRESETS, SHOCKWAVE, AND DETERMINISTIC RESET
+       * ============================================================================ */
+      function applyPreset(presetName, updateMagnetsToo = true) {
+        state.preset = presetName;
+        state.targetWeights.lake   = presetName === 'lake'   ? 1.0 : 0.0;
+        state.targetWeights.spikes = presetName === 'spikes' ? 1.0 : 0.0;
+        state.targetWeights.bridge = presetName === 'bridge' ? 1.0 : 0.0;
+        state.targetWeights.wave   = presetName === 'wave'   ? 1.0 : 0.0;
+
+        if (updateMagnetsToo) {
+          if (presetName === 'lake') {
+            state.fieldStrength = 0.70;
+            state.viscosity = 0.55;
+            state.waveAmp = 0.15;
+            state.magnets[0].radius = 2.65;
+            state.magnets[0].angle  = -0.75;
+            state.magnets[0].y      = 0.55;
+            state.magnets[1].radius = 2.65;
+            state.magnets[1].angle  = 2.35;
+            state.magnets[1].y      = 0.50;
+          } else if (presetName === 'spikes') {
+            state.fieldStrength = 1.65;
+            state.viscosity = 0.30;
+            state.waveAmp = 0.25;
+            state.magnets[0].radius = 1.95;
+            state.magnets[0].angle  = -0.55;
+            state.magnets[0].y      = 0.35;
+            state.magnets[1].radius = 2.15;
+            state.magnets[1].angle  = 2.45;
+            state.magnets[1].y      = -0.25;
+          } else if (presetName === 'bridge') {
+            state.fieldStrength = 1.85;
+            state.viscosity = 0.40;
+            state.waveAmp = 0.18;
+            // Opposite horizontal poles creating an intense magnetic flux bridge across the sculpture
+            state.magnets[0].radius = 1.92;
+            state.magnets[0].angle  = -0.15;
+            state.magnets[0].y      = 0.12;
+            state.magnets[0].polarity = 1;
+            state.magnets[1].radius = 1.92;
+            state.magnets[1].angle  = Math.PI - 0.15;
+            state.magnets[1].y      = 0.12;
+            state.magnets[1].polarity = -1;
+          } else if (presetName === 'wave') {
+            state.fieldStrength = 1.15;
+            state.viscosity = 0.15;
+            state.waveAmp = 0.85;
+            state.magnets[0].radius = 2.25;
+            state.magnets[0].angle  = -0.90;
+            state.magnets[0].y      = 0.45;
+            state.magnets[1].radius = 2.25;
+            state.magnets[1].angle  = 2.10;
+            state.magnets[1].y      = -0.35;
+          }
+          syncUIFromState();
+        }
+
+        document.querySelectorAll('.preset-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-preset') === presetName);
+        });
+      }
+
+      function triggerShockwave(customDir) {
+        if (customDir) {
+          state.shockwave.dir.copy(customDir).normalize();
+        } else {
+          // Originate shockwave from the currently selected magnet's direction
+          const c = magnetSphericalToCartesian(state.magnets[state.selectedMagnet]);
+          state.shockwave.dir.set(c.x, c.y, c.z).normalize();
+        }
+        state.shockwave.time = 0.0;
+        state.shockwave.intensity = 1.0;
+        state.shockwave.active = true;
+      }
+
+      function resetToInitialState() {
+        stopCinematicShow();
+        state.preset = INITIAL_STATE.preset;
+        state.finish = INITIAL_STATE.finish;
+        state.fieldStrength = INITIAL_STATE.fieldStrength;
+        state.viscosity = INITIAL_STATE.viscosity;
+        state.waveAmp = INITIAL_STATE.waveAmp;
+        state.showFieldLines = INITIAL_STATE.showFieldLines;
+        state.paused = INITIAL_STATE.paused;
+        state.selectedMagnet = INITIAL_STATE.selectedMagnet;
+
+        for (let i = 0; i < 2; i++) {
+          state.magnets[i].radius   = INITIAL_STATE.magnets[i].radius;
+          state.magnets[i].angle    = INITIAL_STATE.magnets[i].angle;
+          state.magnets[i].y        = INITIAL_STATE.magnets[i].y;
+          state.magnets[i].polarity = INITIAL_STATE.magnets[i].polarity;
+          const c = magnetSphericalToCartesian(state.magnets[i]);
+          Object.assign(state.fluidMagnets[i], c);
+        }
+
+        state.fluidFieldStrength = INITIAL_STATE.fieldStrength;
+        state.fluidWaveAmp = INITIAL_STATE.waveAmp;
+        state.morphWeights = { lake: 0.0, spikes: 1.0, bridge: 0.0, wave: 0.0 };
+        state.targetWeights = { lake: 0.0, spikes: 1.0, bridge: 0.0, wave: 0.0 };
+
+        state.shockwave.active = false;
+        state.shockwave.time = 10.0;
+        state.shockwave.intensity = 0.0;
+
+        state.cameraYaw   = INITIAL_STATE.cameraYaw;
+        state.cameraPitch = INITIAL_STATE.cameraPitch;
+        state.cameraZoom  = INITIAL_STATE.cameraZoom;
+
+        fieldVizGroup.visible = state.showFieldLines;
+        updateCameraTransform();
+        syncUIFromState();
+        syncMagnetsAndHandles();
+        state.lastResetError = computeResetDeviation();
+        runLiveVerificationSuite();
+      }
+
+      function computeResetDeviation() {
+        let err = 0;
+        err += Math.abs(state.fieldStrength - INITIAL_STATE.fieldStrength);
+        err += Math.abs(state.viscosity - INITIAL_STATE.viscosity);
+        err += Math.abs(state.waveAmp - INITIAL_STATE.waveAmp);
+        for (let i = 0; i < 2; i++) {
+          err += Math.abs(state.magnets[i].radius - INITIAL_STATE.magnets[i].radius);
+          err += Math.abs(state.magnets[i].angle - INITIAL_STATE.magnets[i].angle);
+          err += Math.abs(state.magnets[i].y - INITIAL_STATE.magnets[i].y);
+          err += Math.abs(state.magnets[i].polarity - INITIAL_STATE.magnets[i].polarity);
+        }
+        return err;
+      }
+
+      /* ============================================================================
+       * 10. REAL-TIME MATHEMATICAL & PHYSICS VERIFICATION SUITE
+       *     Executes live numerical checks on computeSingleDipoleB and state reset.
+       * ============================================================================ */
+      function runLiveVerificationSuite() {
+        // Test 1: Finite coordinate check at r = r1 (zero distance) and surface points
+        const m0 = magnetSphericalToCartesian(state.magnets[0]);
+        const bAtCenter = computeSingleDipoleB(m0.x, m0.y, m0.z, m0.x, m0.y, m0.z, m0.mx, m0.my, m0.mz, DIPOLE_EPSILON);
+        const bAtOrigin = computeTotalFieldB(0.0, 0.5, 0.0, true);
+        const isFiniteAll =
+          Number.isFinite(bAtCenter.x) && Number.isFinite(bAtCenter.y) && Number.isFinite(bAtCenter.z) &&
+          Number.isFinite(bAtOrigin.x) && Number.isFinite(bAtOrigin.y) && Number.isFinite(bAtOrigin.z);
+        const centerMag = Math.sqrt(bAtCenter.x ** 2 + bAtCenter.y ** 2 + bAtCenter.z ** 2);
+
+        const elFinite = document.getElementById('verify-finite');
+        if (elFinite) {
+          elFinite.textContent = isFiniteAll
+            ? `유한성 확인 완료: |B(r₁)| = ${centerMag.toFixed(2)} (NaN/∞ 없음, ε=${DIPOLE_EPSILON})`
+            : '오류: 비유한 수치 감지';
+        }
+
+        // Test 2: Fixed axis distance doubling r -> 2r falloff ratio (~1/8 = 0.125)
+        const rTest = 1.80;
+        const bR1 = computeSingleDipoleB(rTest, 0, 0, 0, 0, 0, 1, 0, 0, DIPOLE_EPSILON);
+        const bR2 = computeSingleDipoleB(rTest * 2.0, 0, 0, 0, 0, 0, 1, 0, 0, DIPOLE_EPSILON);
+        const magR1 = Math.hypot(bR1.x, bR1.y, bR1.z);
+        const magR2 = Math.hypot(bR2.x, bR2.y, bR2.z);
+        const ratioReg = magR2 / magR1;
+
+        // Also compare with unregularized eps=0 exact dipole 1/8 = 0.125
+        const bPure1 = computeSingleDipoleB(rTest, 0, 0, 0, 0, 0, 1, 0, 0, 0.0);
+        const bPure2 = computeSingleDipoleB(rTest * 2.0, 0, 0, 0, 0, 0, 1, 0, 0, 0.0);
+        const ratioPure = Math.hypot(bPure2.x, bPure2.y, bPure2.z) / Math.hypot(bPure1.x, bPure1.y, bPure1.z);
+
+        const elFalloff = document.getElementById('verify-falloff');
+        if (elFalloff) {
+          elFalloff.textContent =
+            `|B(2r)|/|B(r)| = ${ratioReg.toFixed(4)} (정규화 ε=${DIPOLE_EPSILON} 포함) / 순수 쌍극자 = ${ratioPure.toFixed(4)} (1/8)`;
+        }
+
+        // Test 3: Single magnet polarity inversion (m -> -m): direction reversal & identical |B|
+        const samplePt = { x: 0.65, y: 0.42, z: -0.38 };
+        const bPos = computeSingleDipoleB(samplePt.x, samplePt.y, samplePt.z, m0.x, m0.y, m0.z, m0.mx, m0.my, m0.mz, DIPOLE_EPSILON);
+        const bNeg = computeSingleDipoleB(samplePt.x, samplePt.y, samplePt.z, m0.x, m0.y, m0.z, -m0.mx, -m0.my, -m0.mz, DIPOLE_EPSILON);
+        const magPos = Math.hypot(bPos.x, bPos.y, bPos.z);
+        const magNeg = Math.hypot(bNeg.x, bNeg.y, bNeg.z);
+        const sumVecErr = Math.hypot(bPos.x + bNeg.x, bPos.y + bNeg.y, bPos.z + bNeg.z);
+        const magDiffErr = Math.abs(magPos - magNeg);
+        const cosAngle = (bPos.x * bNeg.x + bPos.y * bNeg.y + bPos.z * bNeg.z) / Math.max(magPos * magNeg, 1e-12);
+
+        const elPolarity = document.getElementById('verify-polarity');
+        if (elPolarity) {
+          elPolarity.textContent =
+            `방향 반전 cos(θ)=${cosAngle.toFixed(4)}, |B+|=${magPos.toFixed(4)}, ||B+|-|B-||=${magDiffErr.toExponential(1)}, |B++B-|=${sumVecErr.toExponential(1)}`;
+        }
+
+        // Test 4: Reset state invariance check
+        const currentDiff = computeResetDeviation();
+        const elReset = document.getElementById('verify-reset');
+        if (elReset) {
+          elReset.textContent =
+            `최근 초기화 복원 오차 = ${state.lastResetError.toExponential(1)} (현재 초기상태 대비 변화량 Δ=${currentDiff.toFixed(2)})`;
+        }
+      }
+
+      /* ============================================================================
+       * 11. 10-SECOND CHOREOGRAPHED CINEMATIC SHOW ('시네마틱 쇼')
+       *     Smoothly animates actual magnetic field, wave amplitude, presets,
+       *     magnet orbits, polarity, and camera angles over 10.0 seconds.
+       * ============================================================================ */
+      const cinematicBanner = document.getElementById('cinematic-banner');
+      const cinematicProgress = document.getElementById('cinematic-progress');
+      const btnCinematic = document.getElementById('btn-cinematic');
+      const labelCinematic = document.getElementById('label-cinematic');
+
+      function startCinematicShow() {
+        state.cinematicActive = true;
+        state.cinematicElapsed = 0.0;
+        state.paused = false;
+        syncUIFromState();
+        if (cinematicBanner) cinematicBanner.classList.remove('hidden');
+        if (btnCinematic) btnCinematic.setAttribute('aria-pressed', 'true');
+        if (labelCinematic) labelCinematic.textContent = '쇼 중지';
+      }
+
+      function stopCinematicShow() {
+        if (!state.cinematicActive) return;
+        state.cinematicActive = false;
+        if (cinematicBanner) cinematicBanner.classList.add('hidden');
+        if (btnCinematic) btnCinematic.setAttribute('aria-pressed', 'false');
+        if (labelCinematic) labelCinematic.textContent = '시네마틱 쇼';
+      }
+
+      function updateCinematicShow(dt) {
+        if (!state.cinematicActive) return;
+        state.cinematicElapsed += dt;
+        const t = state.cinematicElapsed;
+        const duration = 10.0;
+
+        if (cinematicProgress) {
+          const pct = Math.min(100, (t / duration) * 100);
+          cinematicProgress.style.width = `${pct.toFixed(1)}%`;
+        }
+
+        // Phase 1 (0.0s - 2.5s): Mirror Lake awakens into Magnetic Spikes
+        if (t < 2.5) {
+          const p = t / 2.5;
+          state.targetWeights.lake   = 1.0 - p;
+          state.targetWeights.spikes = p;
+          state.targetWeights.bridge = 0.0;
+          state.targetWeights.wave   = 0.0;
+          state.fieldStrength = 0.75 + p * 1.15;
+          state.waveAmp = 0.18 + p * 0.15;
+          state.magnets[0].angle = -0.75 + p * 0.55;
+          state.magnets[0].radius = 2.50 - p * 0.62;
+          state.magnets[1].angle = 2.40 - p * 0.45;
+          state.magnets[1].radius = 2.45 - p * 0.45;
+        }
+        // Phase 2 (2.5s - 5.8s): Two-Magnet Bridge formation + Shockwave + Field Lines
+        else if (t < 5.8) {
+          const p = (t - 2.5) / 3.3;
+          if (t - dt <= 2.5) {
+            triggerShockwave(new THREE.Vector3(0, 1, 0));
+            state.showFieldLines = true;
+            fieldVizGroup.visible = true;
+          }
+          state.targetWeights.lake   = 0.0;
+          state.targetWeights.spikes = 1.0 - p * 0.65;
+          state.targetWeights.bridge = p;
+          state.targetWeights.wave   = 0.0;
+          state.fieldStrength = 1.95;
+          state.finish = p > 0.5 ? 2 : 0; // Shift from Chrome to Aurora
+          state.magnets[0].angle = -0.20 + Math.sin(p * Math.PI) * 0.25;
+          state.magnets[0].radius = 1.88;
+          state.magnets[1].angle = Math.PI - 0.20 - Math.sin(p * Math.PI) * 0.25;
+          state.magnets[1].radius = 1.88;
+        }
+        // Phase 3 (5.8s - 8.2s): Dynamic Wave Sculpture & Gold Finish
+        else if (t < 8.2) {
+          const p = (t - 5.8) / 2.4;
+          if (t - dt <= 5.8) {
+            state.magnets[1].polarity = -state.magnets[1].polarity;
+            triggerShockwave(new THREE.Vector3(1, 0.3, 0));
+          }
+          state.targetWeights.bridge = 1.0 - p;
+          state.targetWeights.wave   = p;
+          state.targetWeights.spikes = 0.35;
+          state.finish = 1; // Liquid Gold
+          state.waveAmp = 0.30 + p * 0.62;
+          state.magnets[0].angle += dt * 0.95;
+          state.magnets[1].angle -= dt * 0.85;
+        }
+        // Phase 4 (8.2s - 10.0s): Settle into Hero Chrome Composition
+        else if (t <= duration) {
+          const p = (t - 8.2) / 1.8;
+          state.finish = 0;
+          state.showFieldLines = false;
+          fieldVizGroup.visible = false;
+          state.targetWeights.wave   = 1.0 - p;
+          state.targetWeights.spikes = 0.35 + 0.65 * p;
+          state.fieldStrength = THREE.MathUtils.lerp(1.85, 1.45, p);
+          state.waveAmp = THREE.MathUtils.lerp(0.92, 0.30, p);
+        } else {
+          stopCinematicShow();
+          applyPreset('spikes', false);
+        }
+
+        // Smooth camera sweep during cinematic show
+        if (!prefersReducedMotion) {
+          state.cameraYaw += dt * 0.42;
+          state.cameraPitch = 0.24 + Math.sin(t * 0.7) * 0.14;
+          updateCameraTransform();
+        }
+        syncUIFromState();
+      }
+
+      /* ============================================================================
+       * 12. UI CONTROLS, POINTER DRAGGING, AND KEYBOARD ACCESSIBILITY
+       * ============================================================================ */
+      const sliderField = document.getElementById('slider-field');
+      const sliderViscosity = document.getElementById('slider-viscosity');
+      const sliderWave = document.getElementById('slider-wave');
+      const valField = document.getElementById('val-field');
+      const valViscosity = document.getElementById('val-viscosity');
+      const valWave = document.getElementById('val-wave');
+
+      function syncUIFromState() {
+        if (sliderField) sliderField.value = String(state.fieldStrength);
+        if (sliderViscosity) sliderViscosity.value = String(state.viscosity);
+        if (sliderWave) sliderWave.value = String(state.waveAmp);
+
+        if (valField) valField.textContent = state.fieldStrength.toFixed(2);
+        if (valViscosity) valViscosity.textContent = state.viscosity.toFixed(2);
+        if (valWave) valWave.textContent = state.waveAmp.toFixed(2);
+
+        // Finish chips
+        document.querySelectorAll('.finish-chip').forEach((chip) => {
+          const f = Number(chip.getAttribute('data-finish'));
+          chip.classList.toggle('active', f === state.finish);
+        });
+
+        // Field toggle button
+        const btnField = document.getElementById('btn-toggle-field');
+        if (btnField) {
+          btnField.setAttribute('aria-pressed', String(state.showFieldLines));
+          btnField.classList.toggle('border-cyan-400', state.showFieldLines);
+          btnField.classList.toggle('bg-cyan-500/20', state.showFieldLines);
+        }
+
+        // Play/Pause button
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const iconPause = document.getElementById('icon-pause');
+        const iconPlay = document.getElementById('icon-play');
+        const labelPlayPause = document.getElementById('label-play-pause');
+        if (btnPlayPause) btnPlayPause.setAttribute('aria-pressed', String(state.paused));
+        if (iconPause) iconPause.classList.toggle('hidden', state.paused);
+        if (iconPlay) iconPlay.classList.toggle('hidden', !state.paused);
+        if (labelPlayPause) labelPlayPause.textContent = state.paused ? '재생' : '일시정지';
+      }
+
+      // Preset buttons
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          stopCinematicShow();
+          const preset = btn.getAttribute('data-preset');
+          if (preset) applyPreset(preset, true);
+        });
+      });
+
+      // Material finish buttons
+      document.querySelectorAll('.finish-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          state.finish = Number(chip.getAttribute('data-finish')) || 0;
+          syncUIFromState();
+        });
+      });
+
+      // Field lines toggle
+      document.getElementById('btn-toggle-field').addEventListener('click', () => {
+        state.showFieldLines = !state.showFieldLines;
+        fieldVizGroup.visible = state.showFieldLines;
+        if (state.showFieldLines) updateMagneticFieldVisualization();
+        syncUIFromState();
+      });
+
+      // Cinematic show toggle
+      document.getElementById('btn-cinematic').addEventListener('click', () => {
+        if (state.cinematicActive) {
+          stopCinematicShow();
+        } else {
+          startCinematicShow();
+        }
+      });
+      document.getElementById('btn-stop-cinematic').addEventListener('click', stopCinematicShow);
+
+      // Drawer open/close
+      const drawerEl = document.getElementById('lesson-drawer');
+      const btnOpenDrawer = document.getElementById('btn-open-drawer');
+      const btnCloseDrawer = document.getElementById('btn-close-drawer');
+
+      function setDrawerOpen(isOpen) {
+        drawerEl.classList.toggle('drawer-open', isOpen);
+        drawerEl.classList.toggle('drawer-closed', !isOpen);
+        btnOpenDrawer.setAttribute('aria-expanded', String(isOpen));
+        if (isOpen) runLiveVerificationSuite();
+      }
+
+      btnOpenDrawer.addEventListener('click', () => {
+        const currentlyOpen = drawerEl.classList.contains('drawer-open');
+        setDrawerOpen(!currentlyOpen);
+      });
+      btnCloseDrawer.addEventListener('click', () => setDrawerOpen(false));
+      document.getElementById('btn-run-verification').addEventListener('click', runLiveVerificationSuite);
+
+      // Bottom Bar Action Buttons
+      document.getElementById('btn-shockwave').addEventListener('click', () => {
+        triggerShockwave();
+      });
+
+      document.getElementById('btn-play-pause').addEventListener('click', () => {
+        state.paused = !state.paused;
+        syncUIFromState();
+      });
+
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        resetToInitialState();
+      });
+
+      // Sliders
+      sliderField.addEventListener('input', (e) => {
+        state.fieldStrength = parseFloat(e.target.value);
+        if (valField) valField.textContent = state.fieldStrength.toFixed(2);
+      });
+
+      sliderViscosity.addEventListener('input', (e) => {
+        state.viscosity = parseFloat(e.target.value);
+        if (valViscosity) valViscosity.textContent = state.viscosity.toFixed(2);
+      });
+
+      sliderWave.addEventListener('input', (e) => {
+        state.waveAmp = parseFloat(e.target.value);
+        if (valWave) valWave.textContent = state.waveAmp.toFixed(2);
+      });
+
+      // Magnet Selection & Step Buttons (Mouse-free verification support)
+      selectMagBtns.forEach((btn, idx) => {
+        btn.addEventListener('click', () => {
+          state.selectedMagnet = idx;
+          syncMagnetsAndHandles();
+        });
+      });
+
+      function stepSelectedMagnet(dRadius, dAngle, dY) {
+        stopCinematicShow();
+        const m = state.magnets[state.selectedMagnet];
+        m.radius = THREE.MathUtils.clamp(m.radius + dRadius, 1.58, 3.25);
+        m.angle  = m.angle + dAngle;
+        m.y      = THREE.MathUtils.clamp(m.y + dY, -1.05, 1.15);
+        syncMagnetsAndHandles();
+        runLiveVerificationSuite();
+      }
+
+      document.getElementById('btn-mag-closer').addEventListener('click', () => stepSelectedMagnet(-0.18, 0, 0));
+      document.getElementById('btn-mag-further').addEventListener('click', () => stepSelectedMagnet(0.18, 0, 0));
+      document.getElementById('btn-mag-left').addEventListener('click', () => stepSelectedMagnet(0, -0.24, 0));
+      document.getElementById('btn-mag-right').addEventListener('click', () => stepSelectedMagnet(0, 0.24, 0));
+
+      document.getElementById('btn-mag-flip').addEventListener('click', () => {
+        stopCinematicShow();
+        const m = state.magnets[state.selectedMagnet];
+        m.polarity = m.polarity >= 0 ? -1 : 1;
+        syncMagnetsAndHandles();
+        runLiveVerificationSuite();
+      });
+
+      // Keyboard Arrow Key navigation for selected magnet
+      window.addEventListener('keydown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          stepSelectedMagnet(0, -0.18, 0);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          stepSelectedMagnet(0, 0.18, 0);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          stepSelectedMagnet(-0.14, 0, 0.06);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          stepSelectedMagnet(0.14, 0, -0.06);
+        } else if (e.key === ' ' && e.target === document.body) {
+          e.preventDefault();
+          triggerShockwave();
+        }
+      });
+
+      /* ============================================================================
+       * 13. POINTER DRAGGING FOR 2D MAGNET HANDLES, 3D MAGNETS, AND CAMERA ORBIT
+       * ============================================================================ */
+      let dragMode = null; // null | 'magnet-0' | 'magnet-1' | 'camera'
+      let lastPointerX = 0;
+      let lastPointerY = 0;
+      let activePinchDist = null;
+      const raycaster = new THREE.Raycaster();
+      const pointerNDC = new THREE.Vector2();
+
+      function startMagnetDrag(idx, clientX, clientY) {
+        stopCinematicShow();
+        state.selectedMagnet = idx;
+        dragMode = idx === 0 ? 'magnet-0' : 'magnet-1';
+        lastPointerX = clientX;
+        lastPointerY = clientY;
+        syncMagnetsAndHandles();
+      }
+
+      handleEls.forEach((el, idx) => {
+        el.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          el.setPointerCapture(e.pointerId);
+          startMagnetDrag(idx, e.clientX, e.clientY);
+        });
+      });
+
+      // Canvas pointer interaction (Raycast 3D magnets first; otherwise orbit camera)
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointerNDC, camera);
+
+        // Check if user clicked directly on one of the 3D magnets
+        for (let i = 0; i < 2; i++) {
+          const intersects = raycaster.intersectObject(magnetGroups[i].root, true);
+          if (intersects.length > 0) {
+            startMagnetDrag(i, e.clientX, e.clientY);
+            return;
+          }
+        }
+
+        // Otherwise start smooth camera orbit drag
+        dragMode = 'camera';
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!dragMode) return;
+        const dx = e.clientX - lastPointerX;
+        const dy = e.clientY - lastPointerY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+
+        if (dragMode === 'camera') {
+          state.cameraYaw   -= dx * 0.0065;
+          state.cameraPitch  = THREE.MathUtils.clamp(state.cameraPitch + dy * 0.0055, -0.25, 1.15);
+          updateCameraTransform();
+          syncMagnetsAndHandles();
+        } else if (dragMode === 'magnet-0' || dragMode === 'magnet-1') {
+          const idx = dragMode === 'magnet-0' ? 0 : 1;
+          const mag = state.magnets[idx];
+
+          // Project pointer onto a camera-relative 3D movement around the sculpture
+          const w = Math.max(320, window.innerWidth);
+          const h = Math.max(320, window.innerHeight);
+
+          // Horizontal drag orbits the magnet around the sculpture relative to camera yaw
+          mag.angle += (dx / w) * 4.2;
+
+          // Vertical drag adjusts both elevation y and radial proximity toward sculpture center
+          const centerOffsetX = (e.clientX - w * 0.5) / (w * 0.5);
+          const centerOffsetY = (e.clientY - h * 0.48) / (h * 0.48);
+          const radialNormalized = Math.hypot(centerOffsetX, centerOffsetY);
+          mag.radius = THREE.MathUtils.clamp(1.58 + radialNormalized * 1.45, 1.58, 3.25);
+          mag.y = THREE.MathUtils.clamp(mag.y - (dy / h) * 2.4, -1.0, 1.1);
+
+          syncMagnetsAndHandles();
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (dragMode === 'magnet-0' || dragMode === 'magnet-1') {
+          runLiveVerificationSuite();
+        }
+        dragMode = null;
+      });
+
+      // Mouse Wheel Zoom
+      renderer.domElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        state.cameraZoom = THREE.MathUtils.clamp(state.cameraZoom + e.deltaY * 0.0008, 0.72, 1.48);
+        updateCameraTransform();
+        syncMagnetsAndHandles();
+      }, { passive: false });
+
+      // Two-Finger Pinch Zoom for Touchscreens
+      renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          activePinchDist = Math.hypot(dx, dy);
+        }
+      }, { passive: true });
+
+      renderer.domElement.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && activePinchDist) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          const delta = activePinchDist - dist;
+          state.cameraZoom = THREE.MathUtils.clamp(state.cameraZoom + delta * 0.003, 0.72, 1.48);
+          activePinchDist = dist;
+          updateCameraTransform();
+          syncMagnetsAndHandles();
+        }
+      }, { passive: true });
+
+      renderer.domElement.addEventListener('touchend', () => {
+        activePinchDist = null;
+      }, { passive: true });
+
+      // Responsive Resize
+      window.addEventListener('resize', () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        camera.updateProjectionMatrix();
+        updateCameraTransform();
+        syncMagnetsAndHandles();
+      });
+
+      /* ============================================================================
+       * 14. SEPARATED PHYSICS STEP & RENDER LOOP (requestAnimationFrame)
+       * ============================================================================ */
+      let lastFrameTimestamp = performance.now();
+      let hudUpdateCounter = 0;
+
+      function stepPhysicsModel(dt) {
+        // 1. Viscosity-controlled relaxation rate:
+        //    Low viscosity (0.05) -> fast relaxation rate (~16/s)
+        //    High viscosity (0.95) -> slow syrupy relaxation rate (~1.4/s)
+        const relaxRate = THREE.MathUtils.lerp(16.0, 1.35, state.viscosity);
+        const alpha = 1.0 - Math.exp(-relaxRate * dt);
+
+        // Update fluid's viscous-lagged perception of magnet coordinates & moments
+        for (let i = 0; i < 2; i++) {
+          const target = magnetSphericalToCartesian(state.magnets[i]);
+          const fm = state.fluidMagnets[i];
+          fm.x  += (target.x  - fm.x)  * alpha;
+          fm.y  += (target.y  - fm.y)  * alpha;
+          fm.z  += (target.z  - fm.z)  * alpha;
+          fm.mx += (target.mx - fm.mx) * alpha;
+          fm.my += (target.my - fm.my) * alpha;
+          fm.mz += (target.mz - fm.mz) * alpha;
+        }
+
+        state.fluidFieldStrength += (state.fieldStrength - state.fluidFieldStrength) * alpha;
+        state.fluidWaveAmp       += (state.waveAmp       - state.fluidWaveAmp)       * alpha;
+
+        // Smoothly interpolate preset morph weights
+        const morphAlpha = 1.0 - Math.exp(-5.5 * dt);
+        state.morphWeights.lake   += (state.targetWeights.lake   - state.morphWeights.lake)   * morphAlpha;
+        state.morphWeights.spikes += (state.targetWeights.spikes - state.morphWeights.spikes) * morphAlpha;
+        state.morphWeights.bridge += (state.targetWeights.bridge - state.morphWeights.bridge) * morphAlpha;
+        state.morphWeights.wave   += (state.targetWeights.wave   - state.morphWeights.wave)   * morphAlpha;
+
+        // Advance simulation time and radial shockwave decay if not paused
+        if (!state.paused) {
+          const timeScale = prefersReducedMotion ? 0.35 : 1.0;
+          state.simTime += dt * timeScale;
+
+          if (state.shockwave.active) {
+            state.shockwave.time += dt;
+            // Higher viscosity damps out the radial shockwave faster
+            const damping = 0.85 + state.viscosity * 1.65;
+            state.shockwave.intensity = Math.exp(-damping * state.shockwave.time);
+            if (state.shockwave.intensity < 0.005 || state.shockwave.time > 4.5) {
+              state.shockwave.active = false;
+              state.shockwave.intensity = 0.0;
+            }
+          }
+        }
+
+        // Compute peak |B| on the sculpture surface for live HUD telemetry
+        const c0 = state.fluidMagnets[0];
+        const len0 = Math.hypot(c0.x, c0.y, c0.z) || 1.0;
+        const surfB = computeTotalFieldB((c0.x / len0) * 1.15, (c0.y / len0) * 1.15, (c0.z / len0) * 1.15, false);
+        state.maxObservedB = Math.hypot(surfB.x, surfB.y, surfB.z);
+      }
+
+      function syncShaderUniforms() {
+        fluidUniforms.uTime.value = state.simTime;
+        fluidUniforms.uFieldStrength.value = state.fluidFieldStrength;
+        fluidUniforms.uWaveAmp.value = state.fluidWaveAmp;
+        fluidUniforms.uFinish.value = state.finish;
+        fluidUniforms.uMorphWeights.value.set(
+          state.morphWeights.lake,
+          state.morphWeights.spikes,
+          state.morphWeights.bridge,
+          state.morphWeights.wave
+        );
+
+        const fm0 = state.fluidMagnets[0];
+        const fm1 = state.fluidMagnets[1];
+        fluidUniforms.uMagPos1.value.set(fm0.x, fm0.y, fm0.z);
+        fluidUniforms.uMagMom1.value.set(fm0.mx, fm0.my, fm0.mz);
+        fluidUniforms.uMagPos2.value.set(fm1.x, fm1.y, fm1.z);
+        fluidUniforms.uMagMom2.value.set(fm1.mx, fm1.my, fm1.mz);
+
+        fluidUniforms.uShockwave.value.set(
+          state.shockwave.dir.x,
+          state.shockwave.dir.y,
+          state.shockwave.dir.z,
+          state.shockwave.time
+        );
+        fluidUniforms.uShockIntensity.value = state.shockwave.intensity;
+
+        floorUniforms.uMagPos1.value.set(fm0.x, fm0.y, fm0.z);
+        floorUniforms.uMagPos2.value.set(fm1.x, fm1.y, fm1.z);
+        floorUniforms.uFieldStrength.value = state.fluidFieldStrength;
+        floorUniforms.uFinish.value = state.finish;
+      }
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+
+        const rawDtMs = Math.max(1.0, Math.min(100.0, now - lastFrameTimestamp));
+        lastFrameTimestamp = now;
+        // Genuine observed frame time exponential moving average
+        state.frameTimeMs = state.frameTimeMs * 0.90 + rawDtMs * 0.10;
+        const dt = Math.min(rawDtMs * 0.001, 0.05);
+
+        if (state.cinematicActive) {
+          updateCinematicShow(dt);
+        }
+
+        stepPhysicsModel(dt);
+        syncShaderUniforms();
+        syncMagnetsAndHandles();
+
+        if (state.showFieldLines) {
+          updateMagneticFieldVisualization();
+        }
+
+        renderer.render(scene, camera);
+
+        // Update top HUD telemetry every 12 frames
+        hudUpdateCounter++;
+        if (hudUpdateCounter % 12 === 0) {
+          const elB = document.getElementById('hud-bmax');
+          const elFt = document.getElementById('hud-frametime');
+          if (elB) elB.textContent = state.maxObservedB.toFixed(2);
+          if (elFt) elFt.textContent = state.frameTimeMs.toFixed(1);
+        }
+      }
+
+      window.onload = function () {
+        updateCameraTransform();
+        syncUIFromState();
+        syncMagnetsAndHandles();
+        runLiveVerificationSuite();
+        requestAnimationFrame(animate);
+      };
+    })();
+  </script>
+</body>
+</html>

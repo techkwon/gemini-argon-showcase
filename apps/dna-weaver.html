@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DNA WEAVER | DNA를 짜는 분자 공방</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-ice: #eef4fb;
+      --bg-lavender: #e6ebf8;
+      --ink-backbone: #1e293b;
+      --mint-backbone: #0d9488;
+      --base-a: #f43f5e;
+      --base-t: #eab308;
+      --base-c: #06b6d4;
+      --base-g: #8b5cf6;
+    }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 38%, #f8fbff 0%, #eaf1fb 52%, #dfe7f6 100%);
+      color: #0f172a;
+    }
+    .mono-seq {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    input[type="range"].rep-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #1e293b 0%, #0d9488 100%);
+      outline: none;
+    }
+    input[type="range"].rep-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #0d9488;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    input[type="range"].rep-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+    .glass-bar {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+    }
+    .glass-drawer {
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+    }
+    .seq-grid-row {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      align-items: center;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(226, 232, 240, 0.5);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.4);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full flex flex-col justify-between">
+
+  <div id="stageContainer" class="absolute inset-0 w-full h-full z-0 overflow-hidden">
+    <canvas id="dnaCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+    <div id="fallback2DContainer" class="hidden absolute inset-0 w-full h-full flex flex-col items-center justify-center pt-16 pb-48 px-4 bg-gradient-to-b from-slate-50 via-sky-50/60 to-indigo-50/50">
+      <div class="max-w-4xl w-full bg-white/90 rounded-2xl border border-slate-200 shadow-lg p-4 flex flex-col items-center">
+        <div class="w-full flex items-center justify-between mb-2 px-2">
+          <span id="fallbackNoticeText" class="text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-200 px-2.5 py-1 rounded-full">
+            2D 사다리 도식 모드 (WebGL 대체 및 평면 비교 화면)
+          </span>
+          <span class="text-xs text-slate-500">아래 염기 사다리를 클릭해 동일하게 학습할 수 있습니다</span>
+        </div>
+        <svg id="fallbackSvg" viewBox="0 0 900 320" class="w-full h-64 md:h-72 select-none"></svg>
+      </div>
+    </div>
+  </div>
+
+  <header class="relative z-20 w-full px-3 pt-2.5 pb-1 pointer-events-none">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="glass-bar pointer-events-auto rounded-2xl px-3.5 py-1.5 flex items-center gap-3">
+        <div class="w-7 h-7 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
+          <svg class="w-4 h-4 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M7 3c0 5 10 5 10 10s-10 5-10 10" stroke-linecap="round"/>
+            <path d="M17 3c0 5-10 5-10 10s10 5 10 10" stroke-linecap="round"/>
+            <line x1="9" y1="6" x2="15" y2="6" stroke-width="1.8"/>
+            <line x1="9" y1="18" x2="15" y2="18" stroke-width="1.8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-900">DNA WEAVER</h1>
+            <span class="hidden sm:inline-block text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-full">DNA를 짜는 분자 공방</span>
+          </div>
+          <p class="text-[10px] text-slate-500 leading-tight hidden md:block">
+            구슬·블록은 원자가 아닌 단순화한 염기 기호입니다 (A–T: 수소결합 2개 · C–G: 수소결합 3개 · 역평행 5′/3′)
+          </p>
+        </div>
+      </div>
+
+      <div class="glass-bar pointer-events-auto rounded-2xl px-3 py-1.5 flex items-center gap-2 sm:gap-3 text-xs">
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-400 font-medium">길이</span>
+          <span id="hudLength" class="mono-seq font-bold text-slate-800">16 bp</span>
+        </div>
+        <div class="h-3.5 w-px bg-slate-200"></div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-400 font-medium">GC 비율</span>
+          <span id="hudGcRatio" class="mono-seq font-bold text-teal-700">50.0%</span>
+        </div>
+        <div class="h-3.5 w-px bg-slate-200"></div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-slate-400 font-medium">상태</span>
+          <span id="hudProgressBadge" class="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">관찰 중 · 새 문제로 도전</span>
+        </div>
+      </div>
+
+      <div class="glass-bar pointer-events-auto rounded-2xl px-2 py-1 flex items-center gap-1">
+        <button id="btnUndo" title="실행 취소 (Undo)" disabled class="p-1.5 rounded-xl text-slate-700 hover:bg-slate-100 disabled:opacity-35 disabled:pointer-events-none transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 14L4 9l5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="btnRedo" title="다시 실행 (Redo)" disabled class="p-1.5 rounded-xl text-slate-700 hover:bg-slate-100 disabled:opacity-35 disabled:pointer-events-none transition">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 14l5-5-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="btnHomeCam" title="기본 시점으로 정렬" class="px-2 py-1 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke-linecap="round"/>
+          </svg>
+          <span class="hidden lg:inline">홈 시점</span>
+        </button>
+        <button id="btnResetAll" title="초기 완성 DNA로 초기화" class="px-2 py-1 rounded-xl text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition">
+          초기화
+        </button>
+        <button id="btnSavePng" title="현재 3D 작품 PNG 이미지 저장" class="px-2 py-1 rounded-xl text-xs font-semibold text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round"/>
+          </svg>
+          <span class="hidden sm:inline">PNG 저장</span>
+        </button>
+        <div class="h-4 w-px bg-slate-200 mx-0.5"></div>
+        <button id="btnOpenLesson" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 transition">
+          5분 수업
+        </button>
+        <button id="btnOpenInfo" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition">
+          정보·검사
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="relative z-10 w-full px-3 pointer-events-none flex flex-col items-center">
+    <div id="liveFeedbackBanner" class="hidden pointer-events-auto max-w-xl w-full rounded-2xl px-4 py-2 text-xs font-medium shadow-md border transition-all duration-200 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span id="feedbackDot" class="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
+        <span id="feedbackText">안내 메시지</span>
+      </div>
+      <button id="btnCloseFeedback" class="text-slate-400 hover:text-slate-700 text-xs font-bold px-1">닫기</button>
+    </div>
+
+    <div id="replicationCompleteCard" class="hidden pointer-events-auto mt-1 max-w-xl w-full glass-bar rounded-2xl px-4 py-2.5 border-2 border-teal-500/80 shadow-lg">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 text-[10px] font-extrabold bg-teal-600 text-white rounded-full">반보존적 복제 100% 완료</span>
+            <span class="text-xs font-bold text-slate-900">두 개의 동일한 딸 이중나선이 완성되었습니다</span>
+          </div>
+          <p class="text-[11px] text-slate-600 mt-0.5">
+            각 딸 DNA는 <strong>기존 주형 가닥 1개(진한 잉크색)</strong>와 <strong>새로 합성된 상보 가닥 1개(민트색)</strong>로 구성됩니다.
+          </p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button data-branch-highlight="1" class="btn-branch-pick px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition">
+            딸 DNA #1 강조
+          </button>
+          <button data-branch-highlight="2" class="btn-branch-pick px-2.5 py-1 rounded-xl text-[11px] font-bold bg-teal-700 text-white hover:bg-teal-600 transition">
+            딸 DNA #2 강조
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Middle Open Stage Spacer & Left Compact Legend -->
+  <div class="flex-1 pointer-events-none relative flex items-end justify-between px-4 pb-2">
+    <div class="glass-bar pointer-events-auto hidden xl:flex flex-col gap-1.5 px-3 py-2.5 rounded-2xl text-[11px]">
+      <div class="font-bold text-slate-700 mb-0.5 flex items-center justify-between gap-3">
+        <span>염기 기호 및 골격 범례</span>
+        <button id="btnToggle2D" class="text-[10px] font-semibold text-indigo-600 hover:underline">2D/3D 전환</button>
+      </div>
+      <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-rose-500 inline-block"></span><span class="font-semibold">A</span> 아데닌 (–T, 수소결합 2개)</div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-500 inline-block"></span><span class="font-semibold">T</span> 티민 (–A, 수소결합 2개)</div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-cyan-500 inline-block"></span><span class="font-semibold">C</span> 시토신 (–G, 수소결합 3개)</div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-violet-500 inline-block"></span><span class="font-semibold">G</span> 구아닌 (–C, 수소결합 3개)</div>
+      </div>
+      <div class="border-t border-slate-200/80 pt-1 mt-0.5 flex flex-col gap-0.5 text-[10px] text-slate-600">
+        <div class="flex items-center gap-1.5"><span class="w-3 h-1.5 rounded-full bg-slate-800 inline-block"></span>기존(부모) 당-인산 골격</div>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-1.5 rounded-full bg-teal-600 inline-block"></span>신규 합성 상보 골격</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="relative z-20 w-full px-2.5 pb-2 pointer-events-none">
+    <div class="max-w-5xl mx-auto glass-bar pointer-events-auto rounded-2xl p-2 sm:p-2.5 flex flex-col gap-1.5">
+
+      <!-- Mode Switcher & Active Mode Controls -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+          <button data-mode="match" class="mode-tab px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-900 text-white shadow-sm">
+            1. 염기쌍 맞추기
+          </button>
+          <button data-mode="replication" class="mode-tab px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+            2. 복제 관찰
+          </button>
+          <button data-mode="substitution" class="mode-tab px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+            3. 염기쌍 치환 비교
+          </button>
+        </div>
+
+        <!-- Mode 1 Controls: Matching -->
+        <div id="controlsMatch" class="flex flex-wrap items-center gap-1.5">
+          <button id="btnStartQuiz" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm transition">
+            짝맞추기 시작
+          </button>
+          <button id="btnNewPuzzle" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+            새 문제
+          </button>
+          <button id="btnRevealAnswers" class="px-2.5 py-1 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-teal-700 hover:bg-teal-50 transition">
+            정답 보기
+          </button>
+          <div class="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
+          <div class="flex items-center gap-1">
+            <span class="text-[11px] font-semibold text-slate-500 mr-0.5 hidden md:inline">염기 입력:</span>
+            <button data-base-input="A" class="btn-base-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-rose-500 text-white hover:bg-rose-600 shadow-sm transition">A</button>
+            <button data-base-input="T" class="btn-base-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-white hover:bg-amber-600 shadow-sm transition">T</button>
+            <button data-base-input="C" class="btn-base-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-cyan-600 text-white hover:bg-cyan-700 shadow-sm transition">C</button>
+            <button data-base-input="G" class="btn-base-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-violet-600 text-white hover:bg-violet-700 shadow-sm transition">G</button>
+          </div>
+          <span id="matchScoreText" class="text-[11px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+            관찰 중 · 새 문제로 도전
+          </span>
+        </div>
+
+        <!-- Mode 2 Controls: Replication -->
+        <div id="controlsReplication" class="hidden flex-1 flex flex-wrap items-center justify-end gap-2">
+          <div class="flex items-center gap-1">
+            <button id="btnRepZero" title="처음으로 (0%)" class="px-2 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700">처음</button>
+            <button id="btnRepPrev" title="한 단계 이전 (-1 쌍)" class="px-2 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700">-1쌍</button>
+            <button id="btnRepPlay" class="px-3 py-1 rounded-lg text-xs font-bold bg-teal-600 text-white hover:bg-teal-500 min-w-[64px]">재생</button>
+            <button id="btnRepNext" title="한 단계 다음 (+1 쌍)" class="px-2 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700">+1쌍</button>
+          </div>
+          <div class="flex items-center gap-2 min-w-[160px] sm:min-w-[220px]">
+            <input id="repSlider" type="range" min="0" max="100" value="0" class="rep-slider w-full" />
+            <span id="repPercentLabel" class="mono-seq text-xs font-bold text-teal-800 w-11 text-right">0%</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+            <button data-branch-highlight="0" class="btn-branch-pick px-2 py-0.5 rounded-md font-bold bg-white text-slate-800 shadow-sm">전체</button>
+            <button data-branch-highlight="1" class="btn-branch-pick px-2 py-0.5 rounded-md font-semibold text-slate-600 hover:text-slate-900">딸1(좌주형)</button>
+            <button data-branch-highlight="2" class="btn-branch-pick px-2 py-0.5 rounded-md font-semibold text-slate-600 hover:text-slate-900">딸2(우주형)</button>
+          </div>
+        </div>
+
+        <!-- Mode 3 Controls: Substitution -->
+        <div id="controlsSubstitution" class="hidden flex-wrap items-center gap-2">
+          <span class="text-[11px] font-semibold text-slate-600">선택 위치 치환:</span>
+          <div class="flex items-center gap-1">
+            <button data-sub-input="A" class="btn-sub-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-rose-500 text-white hover:bg-rose-600 transition">A↔T</button>
+            <button data-sub-input="T" class="btn-sub-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-amber-500 text-white hover:bg-amber-600 transition">T↔A</button>
+            <button data-sub-input="C" class="btn-sub-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-cyan-600 text-white hover:bg-cyan-700 transition">C↔G</button>
+            <button data-sub-input="G" class="btn-sub-input px-2.5 py-1 rounded-lg text-xs font-extrabold bg-violet-600 text-white hover:bg-violet-700 transition">G↔C</button>
+          </div>
+          <div id="subMetricsBadge" class="text-[11px] font-bold bg-fuchsia-50 text-fuchsia-800 border border-fuchsia-200 px-2.5 py-1 rounded-lg">
+            변경 위치: 0곳 | 기준 GC 50.0% → 현재 50.0%
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode Sub-bars -->
+      <div id="repTelemetryBar" class="hidden bg-slate-50/90 border border-slate-200/80 rounded-xl px-3 py-1 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <span class="text-slate-600 font-medium">
+          개념 진행 단계 (효소·반응속도 생략 도식): <strong id="repStepDetail" class="text-slate-900">0 / 16 염기쌍 복제됨 (원본 이중나선 1개)</strong>
+        </span>
+        <span id="repStrandOwnershipLabel" class="font-semibold text-teal-800">
+          딸 DNA #1 [기존 5′→3′ + 새 3′→5′] · 딸 DNA #2 [새 5′→3′ + 기존 3′→5′]
+        </span>
+      </div>
+
+      <div id="subComparisonBar" class="hidden bg-slate-50/90 border border-slate-200/80 rounded-xl px-3 py-1 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div class="flex items-center gap-3 mono-seq">
+          <span class="text-slate-500">기준(5′→3′): <strong id="subBaselineSeqText" class="text-slate-800 tracking-wider"></strong></span>
+          <span class="text-fuchsia-700">현재(5′→3′): <strong id="subCurrentSeqText" class="tracking-wider"></strong></span>
+        </div>
+        <span class="text-[10px] text-slate-500">이 모형은 상보적 염기쌍 치환 규칙만 다루며 단백질·질병·유전 형질을 추론하지 않습니다.</span>
+      </div>
+
+      <!-- Shared Horizontal Scroll Area for Antiparallel 5'->3' and 3'->5' Strands -->
+      <div class="w-full overflow-x-auto pb-0.5">
+        <div class="min-w-[600px] sm:min-w-0 w-full flex flex-col gap-1">
+          <!-- Strand I: 5' -> 3' -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="mono-seq text-[11px] font-extrabold text-slate-800 bg-slate-200/90 px-2 py-0.5 rounded-md w-[72px] text-center shrink-0">
+              가닥I 5′→
+            </span>
+            <div id="seqRowTop" class="flex-1 seq-grid-row"></div>
+            <span class="mono-seq text-[11px] font-extrabold text-slate-800 bg-slate-200/90 px-1.5 py-0.5 rounded-md w-11 text-center shrink-0">
+              →3′
+            </span>
+          </div>
+          <!-- Strand II: 3' -> 5' -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="mono-seq text-[11px] font-extrabold text-teal-900 bg-teal-100/90 px-2 py-0.5 rounded-md w-[72px] text-center shrink-0">
+              가닥II 3′→
+            </span>
+            <div id="seqRowBottom" class="flex-1 seq-grid-row"></div>
+            <span class="mono-seq text-[11px] font-extrabold text-teal-900 bg-teal-100/90 px-1.5 py-0.5 rounded-md w-11 text-center shrink-0">
+              →5′
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <div id="lessonDrawer" class="hidden fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="glass-drawer max-w-2xl w-full rounded-3xl border border-slate-200 p-5 sm:p-6 max-h-[88vh] overflow-y-auto flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div>
+          <span class="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Guided Classroom Activity</span>
+          <h2 class="text-lg font-extrabold text-slate-900">5분 생물 수업: 상보적 염기쌍과 반보존적 복제</h2>
+        </div>
+        <button id="btnCloseLesson" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700">닫기</button>
+      </div>
+
+      <div class="grid gap-2.5 text-xs text-slate-700 leading-relaxed">
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-slate-900 text-sm mb-0.5">1단계 · 상보적 염기쌍 규칙 예측하기 (1분)</div>
+            <p>DNA의 네 가지 염기는 항상 정해진 짝과만 결합합니다. <strong>A–T: 수소결합 2개 · C–G: 수소결합 3개</strong>로 상보적인 짝을 이룹니다.</p>
+          </div>
+          <button data-lesson-jump="step1" class="shrink-0 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800">전시 보기</button>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200 flex items-start justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-indigo-950 text-sm mb-0.5">2단계 · 빈 슬롯에 상보적 염기 직접 채우기 (1분)</div>
+            <p>짝맞추기를 시작해 가닥 II의 빈 슬롯(<strong>?</strong>)을 선택하고 맞은편 가닥 I의 염기와 짝이 되는 A/T/C/G를 채워 보세요. 틀린 염기를 넣으면 왜 결합할 수 없는지 즉시 확인됩니다.</p>
+          </div>
+          <button data-lesson-jump="step2" class="shrink-0 px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-500">짝맞추기 실행</button>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-slate-900 text-sm mb-0.5">3단계 · 역평행(Antiparallel) 5′/3′ 가닥 방향 관찰 (1분)</div>
+            <p>하단 서열표와 3D 나선 양 끝의 <strong>5′ / 3′ 표지</strong>를 확인하세요. 가닥 I이 왼쪽에서 오른쪽으로 <strong>5′→3′</strong>이면, 마주 보는 가닥 II는 반드시 반대 방향인 <strong>3′→5′</strong>으로 놓입니다.</p>
+          </div>
+          <button data-lesson-jump="step3" class="shrink-0 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800">방향 확인</button>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200 flex items-start justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-teal-950 text-sm mb-0.5">4단계 · 반보존적 복제 슬라이더 조작하기 (1분)</div>
+            <p>복제 슬라이더를 움직여 원래의 두 가닥(진한 잉크색)이 풀리면서 각 가닥을 주형으로 삼아 <strong>새 상보 가닥(민트색)</strong>이 한 쌍씩 합성되는 과정을 관찰하세요.</p>
+          </div>
+          <button data-lesson-jump="step4" class="shrink-0 px-3 py-1.5 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-500">복제 50% 이동</button>
+        </div>
+
+        <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-start justify-between gap-3">
+          <div>
+            <div class="font-extrabold text-emerald-950 text-sm mb-0.5">5단계 · 100% 완료 후 기존 가닥과 새 가닥 찾기 (1분)</div>
+            <p>복제 100%에서 완성된 두 딸 DNA를 비교하세요. 원래 두 가닥이 한쪽으로 몰리는 보존적 복제가 아니라, <strong>각 딸 DNA마다 기존 가닥 1개 + 새 가닥 1개</strong>가 들어간 반보존적 복제임을 확인할 수 있습니다.</p>
+          </div>
+          <button data-lesson-jump="step5" class="shrink-0 px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500">복제 100% 이동</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Folded Panel 2: Scientific Info & Self-Tests -->
+  <div id="infoDrawer" class="hidden fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="glass-drawer max-w-3xl w-full rounded-3xl border border-slate-200 p-5 sm:p-6 max-h-[88vh] overflow-y-auto flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div>
+          <span class="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Scientific Scope & Automated Self-Tests</span>
+          <h2 class="text-lg font-extrabold text-slate-900">과학적 모형 안내 및 실시간 코드 자체검사</h2>
+        </div>
+        <button id="btnCloseInfo" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700">닫기</button>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2 leading-relaxed">
+        <div class="font-extrabold text-slate-900">학습용 도식 범위 안내 (필독)</div>
+        <ul class="list-disc pl-4 space-y-1">
+          <li><strong>단순화된 기호 모형:</strong> 화면의 구슬·리본·블록은 개별 원자나 전자구름이 아니라 당-인산 골격과 염기(A, T, C, G)를 나타내는 교육용 기호입니다 (A–T: 수소결합 2개 · C–G: 수소결합 3개).</li>
+          <li><strong>복제 개념 도식:</strong> 복제 애니메이션과 진행률(0~100%)은 반보존적 복제의 가닥 소유권과 상보적 결합 원리를 보여주는 개념 개요이며, 실제 DNA 중합효소·헬리케이스·선도가닥/지연가닥 합성 속도나 실시간 화학반응 좌표를 측정·재현하지 않습니다.</li>
+          <li><strong>합성 예시 서열:</strong> 본 앱은 임의로 구성된 16쌍의 짧은 교육용 합성 서열만 다루며, 실제 인간·생물의 유전자, 질병, 개인 유전정보 또는 실험 방법을 다루거나 추론하지 않습니다.</li>
+        </ul>
+        <div class="pt-2 border-t border-slate-200 flex flex-wrap gap-2">
+          <span class="font-bold text-slate-800">과학적 근거 자료:</span>
+          <a href="https://www.genome.gov/genetics-glossary/Base-Pair" target="_blank" rel="noopener noreferrer" class="text-indigo-600 font-semibold hover:underline">NHGRI Base Pair</a>
+          <span>·</span>
+          <a href="https://www.genome.gov/25520258/online-education-kit-1958-semiconservative-replication-of-dna" target="_blank" rel="noopener noreferrer" class="text-indigo-600 font-semibold hover:underline">NHGRI Semiconservative Replication</a>
+          <span>·</span>
+          <a href="https://passel2.unl.edu/view/lesson/6f214d098527/4" target="_blank" rel="noopener noreferrer" class="text-indigo-600 font-semibold hover:underline">UNL Antiparallel DNA Strands</a>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-extrabold text-slate-900">실시간 자체 검증 (Pure Unit & 3D Buffer Tests)</h3>
+            <p class="text-[11px] text-slate-500">고정 문자열이 아니라 현재 앱의 순수 계산 함수와 3D 정점 버퍼를 독립 실행해 검증합니다 (진행 중인 학습 상태를 훼손하지 않음).</p>
+          </div>
+          <button id="btnRunSelfTests" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-500 shadow-sm">
+            검사 다시 실행
+          </button>
+        </div>
+        <div id="testSummaryBanner" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-800">
+          검사를 준비 중입니다...
+        </div>
+        <div id="testResultsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const VALID_BASES = ['A', 'T', 'C', 'G'];
+
+      const BASE_META = {
+        A: { name: '아데닌 (Adenine)', pair: 'T', bonds: 2, hex: '#f43f5e', threeColor: 0xf43f5e },
+        T: { name: '티민 (Thymine)', pair: 'A', bonds: 2, hex: '#eab308', threeColor: 0xeab308 },
+        C: { name: '시토신 (Cytosine)', pair: 'G', bonds: 3, hex: '#06b6d4', threeColor: 0x06b6d4 },
+        G: { name: '구아닌 (Guanine)', pair: 'C', bonds: 3, hex: '#8b5cf6', threeColor: 0x8b5cf6 }
+      };
+
+      const PRESET_SEQUENCES = [
+        'ATGCGTACGTAGCTAG',
+        'GCTATCGATGCATACG',
+        'CGTAGCTAGCATCGAT',
+        'TACGATCGATCGCTAG'
+      ];
+
+      function complementBase(base) {
+        if (!base || typeof base !== 'string') return '';
+        const upper = base.toUpperCase();
+        switch (upper) {
+          case 'A': return 'T';
+          case 'T': return 'A';
+          case 'C': return 'G';
+          case 'G': return 'C';
+          default: return '';
+        }
+      }
+
+      function complementStrandPositional(seq5to3) {
+        return String(seq5to3)
+          .toUpperCase()
+          .split('')
+          .map(complementBase)
+          .join('');
+      }
+
+      function reverseComplement5to3(seq5to3) {
+        return complementStrandPositional(seq5to3).split('').reverse().join('');
+      }
+
+      function calculateGcPercentage(seq) {
+        if (!seq || seq.length === 0) return 0;
+        let gcCount = 0;
+        for (let i = 0; i < seq.length; i++) {
+          const b = seq[i].toUpperCase();
+          if (b === 'G' || b === 'C') gcCount++;
+        }
+        return (gcCount / seq.length) * 100;
+      }
+
+      function evaluateMatchingState(templateSeq, slots) {
+        let totalQuizSlots = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let remainingCount = 0;
+
+        const details = templateSeq.split('').map((tmplBase, idx) => {
+          const expected = complementBase(tmplBase);
+          const slot = slots[idx] || { isQuiz: false, userBase: expected };
+          if (!slot.isQuiz) {
+            return { index: idx, isQuiz: false, expected, userBase: expected, status: 'fixed', reason: '' };
+          }
+          totalQuizSlots++;
+          if (!slot.userBase) {
+            remainingCount++;
+            return { index: idx, isQuiz: true, expected, userBase: null, status: 'empty', reason: '' };
+          }
+          if (slot.userBase === expected) {
+            correctCount++;
+            return {
+              index: idx,
+              isQuiz: true,
+              expected,
+              userBase: slot.userBase,
+              status: 'correct',
+              reason: `${idx + 1}번 위치: 주형 가닥 ${tmplBase}와 상보적인 ${expected}(${tmplBase}–${expected}: 수소결합 ${BASE_META[expected].bonds}개)로 정확히 결합했습니다.`
+            };
+          } else {
+            wrongCount++;
+            remainingCount++;
+            return {
+              index: idx,
+              isQuiz: true,
+              expected,
+              userBase: slot.userBase,
+              status: 'wrong',
+              reason: `${idx + 1}번 위치 오류: 주형 가닥의 ${tmplBase}는 ${expected}와만 짝을 이룹니다 (${tmplBase}–${expected}: 수소결합 ${BASE_META[expected].bonds}개, 입력한 염기: ${slot.userBase}).`
+            };
+          }
+        });
+
+        return {
+          totalQuizSlots,
+          correctCount,
+          wrongCount,
+          remainingCount,
+          isAllCleared: totalQuizSlots > 0 && correctCount === totalQuizSlots,
+          details
+        };
+      }
+
+      function computeReplicationModel(seq5to3, progressPercent) {
+        const clampedPct = Math.max(0, Math.min(100, Number(progressPercent) || 0));
+        const totalPairs = seq5to3.length;
+        const completedPairs = Math.round((clampedPct / 100) * totalPairs);
+        const opp3to5 = complementStrandPositional(seq5to3);
+
+        const pairs = [];
+        for (let i = 0; i < totalPairs; i++) {
+          const isReplicated = i < completedPairs;
+          pairs.push({
+            index: i,
+            base5to3: seq5to3[i],
+            base3to5: opp3to5[i],
+            isReplicated,
+            daughter1: isReplicated
+              ? {
+                  leftBase: seq5to3[i],
+                  leftOrigin: 'old',
+                  leftParentId: 'PARENT_L_5TO3',
+                  rightBase: opp3to5[i],
+                  rightOrigin: 'new',
+                  rightNewId: 'NEW_R_3TO5',
+                  templateUsed: 'PARENT_L_5TO3'
+                }
+              : null,
+            daughter2: isReplicated
+              ? {
+                  leftBase: seq5to3[i],
+                  leftOrigin: 'new',
+                  leftNewId: 'NEW_L_5TO3',
+                  rightBase: opp3to5[i],
+                  rightOrigin: 'old',
+                  rightParentId: 'PARENT_R_3TO5',
+                  templateUsed: 'PARENT_R_3TO5'
+                }
+              : null
+          });
+        }
+
+        const isComplete = completedPairs === totalPairs;
+        const daughterHelicesSummary = isComplete
+          ? [
+              {
+                id: 'DAUGHTER_1',
+                oldStrandCount: 1,
+                newStrandCount: 1,
+                oldStrandId: 'PARENT_L_5TO3',
+                newStrandId: 'NEW_R_3TO5',
+                seq5to3: seq5to3,
+                seq3to5: opp3to5
+              },
+              {
+                id: 'DAUGHTER_2',
+                oldStrandCount: 1,
+                newStrandCount: 1,
+                oldStrandId: 'PARENT_R_3TO5',
+                newStrandId: 'NEW_L_5TO3',
+                seq5to3: seq5to3,
+                seq3to5: opp3to5
+              }
+            ]
+          : [];
+
+        return {
+          progressPercent: (completedPairs / totalPairs) * 100,
+          rawInputPercent: clampedPct,
+          totalPairs,
+          completedPairs,
+          unreplicatedPairs: totalPairs - completedPairs,
+          isZero: completedPairs === 0,
+          isComplete,
+          intactParentHelixCount: completedPairs === 0 ? 1 : 0,
+          completeDaughterHelixCount: isComplete ? 2 : 0,
+          pairs,
+          daughterHelicesSummary
+        };
+      }
+
+      function applyBaseSubstitution(baselineSeq, currentSeq, targetIndex, newBase5to3) {
+        const cleanNew = String(newBase5to3).toUpperCase();
+        if (!VALID_BASES.includes(cleanNew)) {
+          throw new Error('유효하지 않은 염기 기호입니다.');
+        }
+        const chars = currentSeq.split('');
+        if (targetIndex >= 0 && targetIndex < chars.length) {
+          chars[targetIndex] = cleanNew;
+        }
+        const nextSeq5to3 = chars.join('');
+        const nextSeq3to5 = complementStrandPositional(nextSeq5to3);
+
+        const changedIndices = [];
+        for (let i = 0; i < baselineSeq.length; i++) {
+          if (baselineSeq[i] !== nextSeq5to3[i]) {
+            changedIndices.push(i);
+          }
+        }
+
+        return {
+          baselineSeq5to3: baselineSeq,
+          baselineSeq3to5: complementStrandPositional(baselineSeq),
+          currentSeq5to3: nextSeq5to3,
+          currentSeq3to5: nextSeq3to5,
+          changedIndices,
+          changedCount: changedIndices.length,
+          baselineGc: calculateGcPercentage(baselineSeq),
+          currentGc: calculateGcPercentage(nextSeq5to3),
+          deltaGc: calculateGcPercentage(nextSeq5to3) - calculateGcPercentage(baselineSeq)
+        };
+      }
+
+      function computeHelixBackboneXYZBuffer(numPairs, radius, pitchPerPair, twistPerPair, separationFactor) {
+        const buffer = new Float32Array(numPairs * 2 * 3);
+        const halfSpan = ((numPairs - 1) * pitchPerPair) / 2;
+
+        for (let i = 0; i < numPairs; i++) {
+          const y = halfSpan - i * pitchPerPair;
+          const angle = i * twistPerPair;
+          const sepOffset = (Number(separationFactor) || 0) * (1 - i / Math.max(1, numPairs - 1));
+
+          const x1 = Math.cos(angle) * radius - sepOffset;
+          const z1 = Math.sin(angle) * radius;
+
+          const x2 = Math.cos(angle + Math.PI) * radius + sepOffset;
+          const z2 = Math.sin(angle + Math.PI) * radius;
+
+          const baseIdx = i * 6;
+          buffer[baseIdx] = x1;
+          buffer[baseIdx + 1] = y;
+          buffer[baseIdx + 2] = z1;
+
+          buffer[baseIdx + 3] = x2;
+          buffer[baseIdx + 4] = y;
+          buffer[baseIdx + 5] = z2;
+        }
+        return buffer;
+      }
+
+      function createDefaultSlots(seqLength, makeQuiz) {
+        const quizIndices = new Set([2, 5, 7, 10, 12, 14]);
+        const slots = [];
+        for (let i = 0; i < seqLength; i++) {
+          if (makeQuiz && quizIndices.has(i)) {
+            slots.push({ isQuiz: true, userBase: null });
+          } else {
+            slots.push({ isQuiz: false, userBase: null });
+          }
+        }
+        return slots;
+      }
+
+      const appState = {
+        mode: 'match',
+        presetIndex: 0,
+        templateSeq: PRESET_SEQUENCES[0],
+        selectedIndex: 2,
+        quizActive: false,
+        matchSlots: createDefaultSlots(16, false),
+        repProgress: 0,
+        repPlaying: false,
+        repBranchHighlight: 0,
+        subBaselineSeq: PRESET_SEQUENCES[0],
+        subWorkingSeq: PRESET_SEQUENCES[0],
+        force2DMode: false,
+        webglAvailable: true
+      };
+
+      const historyPast = [];
+      const historyFuture = [];
+      const MAX_HISTORY = 40;
+
+      function snapshotActionState(stateObj) {
+        return JSON.stringify({
+          mode: stateObj.mode,
+          presetIndex: stateObj.presetIndex,
+          templateSeq: stateObj.templateSeq,
+          selectedIndex: stateObj.selectedIndex,
+          quizActive: stateObj.quizActive,
+          matchSlots: stateObj.matchSlots,
+          subBaselineSeq: stateObj.subBaselineSeq,
+          subWorkingSeq: stateObj.subWorkingSeq
+        });
+      }
+
+      function applySnapshotToState(targetState, snapshotStr) {
+        const parsed = JSON.parse(snapshotStr);
+        targetState.mode = parsed.mode;
+        targetState.presetIndex = parsed.presetIndex;
+        targetState.templateSeq = parsed.templateSeq;
+        targetState.selectedIndex = parsed.selectedIndex;
+        targetState.quizActive = parsed.quizActive;
+        targetState.matchSlots = parsed.matchSlots;
+        targetState.subBaselineSeq = parsed.subBaselineSeq;
+        targetState.subWorkingSeq = parsed.subWorkingSeq;
+      }
+
+      function recordUndoCheckpoint() {
+        historyPast.push(snapshotActionState(appState));
+        if (historyPast.length > MAX_HISTORY) historyPast.shift();
+        historyFuture.length = 0;
+        updateUndoRedoButtons();
+      }
+
+      function performUndo() {
+        if (historyPast.length === 0) return;
+        historyFuture.push(snapshotActionState(appState));
+        const prev = historyPast.pop();
+        applySnapshotToState(appState, prev);
+        updateUndoRedoButtons();
+        syncAllViews();
+        showBanner('이전 작업 단계로 되돌렸습니다 (Undo).', 'info');
+      }
+
+      function performRedo() {
+        if (historyFuture.length === 0) return;
+        historyPast.push(snapshotActionState(appState));
+        const next = historyFuture.pop();
+        applySnapshotToState(appState, next);
+        updateUndoRedoButtons();
+        syncAllViews();
+        showBanner('작업을 다시 실행했습니다 (Redo).', 'info');
+      }
+
+      function updateUndoRedoButtons() {
+        const btnUndo = document.getElementById('btnUndo');
+        const btnRedo = document.getElementById('btnRedo');
+        if (btnUndo) btnUndo.disabled = historyPast.length === 0;
+        if (btnRedo) btnRedo.disabled = historyFuture.length === 0;
+      }
+
+      let scene = null;
+      let camera = null;
+      let renderer = null;
+      let dnaRootGroup = null;
+      let pickableMeshes = [];
+      let raycaster = null;
+      let pointerNDC = null;
+
+      const camOrbit = {
+        theta: 0.35,
+        phi: 1.48,
+        radius: 34,
+        targetRadius: 34,
+        targetX: 0,
+        targetY: 0,
+        isDragging: false,
+        dragMoved: false,
+        prevX: 0,
+        prevY: 0,
+        lastUserEditTime: 0
+      };
+
+      const sharedGeometries = {};
+      const sharedMaterials = {};
+      const badgeTextureCache = {};
+
+      function createTextBadgeTexture(label, bgColorHex, textColorHex, borderColorHex) {
+        const cacheKey = `${label}_${bgColorHex}_${textColorHex}_${borderColorHex || ''}`;
+        if (badgeTextureCache[cacheKey]) return badgeTextureCache[cacheKey];
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        ctx.clearRect(0, 0, 128, 128);
+        ctx.fillStyle = bgColorHex;
+        ctx.beginPath();
+        ctx.arc(64, 64, 52, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (borderColorHex) {
+          ctx.strokeStyle = borderColorHex;
+          ctx.lineWidth = 8;
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = textColorHex;
+        ctx.font = 'bold 62px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, 64, 67);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        badgeTextureCache[cacheKey] = tex;
+        return tex;
+      }
+
+      function initSharedResources() {
+        if (!window.THREE) return;
+        sharedGeometries.backboneNode = new THREE.SphereGeometry(0.42, 20, 20);
+        sharedGeometries.terminalNode = new THREE.SphereGeometry(0.54, 22, 22);
+        sharedGeometries.baseBlock = new THREE.CylinderGeometry(0.28, 0.28, 1.45, 16);
+        sharedGeometries.baseBlock.rotateZ(Math.PI / 2);
+        sharedGeometries.hBond = new THREE.CylinderGeometry(0.055, 0.055, 0.9, 8);
+        sharedGeometries.hBond.rotateZ(Math.PI / 2);
+        sharedGeometries.selectRing = new THREE.TorusGeometry(2.65, 0.09, 12, 48);
+        sharedGeometries.selectRing.rotateX(Math.PI / 2);
+        sharedGeometries.slotRing = new THREE.TorusGeometry(0.48, 0.06, 10, 28);
+
+        sharedMaterials.inkBackbone = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          roughness: 0.32,
+          metalness: 0.15
+        });
+        sharedMaterials.mintBackbone = new THREE.MeshStandardMaterial({
+          color: 0x0d9488,
+          roughness: 0.28,
+          metalness: 0.12
+        });
+        sharedMaterials.dimBackbone = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8,
+          roughness: 0.5,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.28
+        });
+        sharedMaterials.hBondMat = new THREE.MeshStandardMaterial({
+          color: 0x94a3b8,
+          roughness: 0.4
+        });
+        sharedMaterials.hBondErrorMat = new THREE.MeshStandardMaterial({
+          color: 0xef4444,
+          roughness: 0.3
+        });
+        sharedMaterials.emptySlotMat = new THREE.MeshStandardMaterial({
+          color: 0x6366f1,
+          roughness: 0.25,
+          transparent: true,
+          opacity: 0.55
+        });
+        sharedMaterials.selectRingMat = new THREE.MeshBasicMaterial({
+          color: 0x4f46e5
+        });
+        sharedMaterials.subHighlightRingMat = new THREE.MeshBasicMaterial({
+          color: 0xd946ef
+        });
+        sharedMaterials.wrongRingMat = new THREE.MeshBasicMaterial({
+          color: 0xef4444
+        });
+
+        VALID_BASES.forEach((b) => {
+          sharedMaterials['base_' + b] = new THREE.MeshStandardMaterial({
+            color: BASE_META[b].threeColor,
+            roughness: 0.28,
+            metalness: 0.08
+          });
+          sharedMaterials['base_dim_' + b] = new THREE.MeshStandardMaterial({
+            color: BASE_META[b].threeColor,
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.24
+          });
+        });
+      }
+
+      function initThreeScene() {
+        const canvas = document.getElementById('dnaCanvas');
+        if (!window.THREE || !canvas) {
+          enable2DFallback('Three.js 라이브러리를 불러오지 못해 2D DNA 사다리 모드로 전환되었습니다.');
+          return;
+        }
+
+        try {
+          renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true
+          });
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          renderer.setPixelRatio(dpr);
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        } catch (err) {
+          enable2DFallback('WebGL 컨텍스트를 생성할 수 없어 작동하는 2D DNA 사다리 대체 화면으로 전환되었습니다.');
+          return;
+        }
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 200);
+        raycaster = new THREE.Raycaster();
+        pointerNDC = new THREE.Vector2();
+
+        const ambientLight = new THREE.AmbientLight(0xf1f5f9, 0.88);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 0.82);
+        keyLight.position.set(14, 22, 18);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xe0e7ff, 0.48);
+        fillLight.position.set(-16, -6, 12);
+        scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0x99f6e4, 0.35);
+        rimLight.position.set(0, 15, -18);
+        scene.add(rimLight);
+
+        const pedestalGroup = new THREE.Group();
+        pedestalGroup.position.set(0, -8.8, 0);
+        const discGeo = new THREE.CylinderGeometry(8.5, 9.2, 0.18, 64);
+        const discMat = new THREE.MeshStandardMaterial({
+          color: 0xdbeafe,
+          roughness: 0.7,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.55
+        });
+        const discMesh = new THREE.Mesh(discGeo, discMat);
+        pedestalGroup.add(discMesh);
+        scene.add(pedestalGroup);
+
+        dnaRootGroup = new THREE.Group();
+        scene.add(dnaRootGroup);
+
+        initSharedResources();
+        updateAspectAwareFraming();
+        camOrbit.radius = camOrbit.targetRadius;
+        setupCanvasInteractions(canvas);
+        rebuild3DModel();
+      }
+
+      function updateAspectAwareFraming() {
+        if (!camera || !renderer) return;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const aspect = w / Math.max(1, h);
+        camera.aspect = aspect;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+
+        const headerEl = document.querySelector('header');
+        const footerEl = document.querySelector('footer');
+        const topUsed = headerEl ? headerEl.getBoundingClientRect().height : 52;
+        const botUsed = footerEl ? footerEl.getBoundingClientRect().height : 128;
+        const availRatio = Math.max(0.48, (h - topUsed - botUsed) / Math.max(1, h));
+
+        const isRepSpread = appState.mode === 'replication' && appState.repProgress > 15;
+        const baseDistance = (isRepSpread ? 40.0 : 34.0) / Math.min(1, availRatio / 0.74);
+
+        if (aspect < 0.75) {
+          camOrbit.targetRadius = baseDistance * 1.36;
+        } else if (aspect < 1.1) {
+          camOrbit.targetRadius = baseDistance * 1.14;
+        } else {
+          camOrbit.targetRadius = baseDistance;
+        }
+
+        const pixelShift = (botUsed - topUsed) * 0.5;
+        const visibleWorldHeight = 2 * camOrbit.targetRadius * Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+        camOrbit.targetY = -(pixelShift / Math.max(1, h)) * visibleWorldHeight;
+      }
+
+      function clearGroupChildren(group) {
+        while (group.children.length > 0) {
+          const child = group.children.pop();
+          if (child.children && child.children.length > 0) {
+            clearGroupChildren(child);
+          }
+          if (child.geometry && child.userData && child.userData.disposeGeo) {
+            child.geometry.dispose();
+          }
+          if (child.material && child.userData && child.userData.disposeMat) {
+            child.material.dispose();
+          }
+        }
+      }
+
+      function createLabelSprite(text, bgColor, textColor, borderColor, scaleSize) {
+        const tex = createTextBadgeTexture(text, bgColor, textColor, borderColor);
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+        const sprite = new THREE.Sprite(mat);
+        const s = scaleSize || 0.95;
+        sprite.scale.set(s, s, 1);
+        sprite.renderOrder = 10;
+        sprite.userData = { disposeMat: true };
+        return sprite;
+      }
+
+      function addBackboneTubeSegment(parentGroup, pointsArray, material) {
+        if (pointsArray.length < 2) return;
+        const curve = new THREE.CatmullRomCurve3(pointsArray);
+        const tubeGeo = new THREE.TubeGeometry(curve, Math.max(12, pointsArray.length * 5), 0.19, 12, false);
+        const tubeMesh = new THREE.Mesh(tubeGeo, material);
+        tubeMesh.userData = { disposeGeo: true };
+        parentGroup.add(tubeMesh);
+      }
+
+      function addBasePairRung(parentGroup, options) {
+        const {
+          index,
+          leftPos,
+          rightPos,
+          leftBase,
+          rightBase,
+          leftBackboneMat,
+          rightBackboneMat,
+          isQuizSlot,
+          quizStatus,
+          isSelected,
+          isSubstituted,
+          dimmed
+        } = options;
+
+        const rungGroup = new THREE.Group();
+        parentGroup.add(rungGroup);
+
+        const leftSphere = new THREE.Mesh(sharedGeometries.backboneNode, leftBackboneMat);
+        leftSphere.position.copy(leftPos);
+        leftSphere.userData = { pickIndex: index };
+        rungGroup.add(leftSphere);
+        pickableMeshes.push(leftSphere);
+
+        const rightSphere = new THREE.Mesh(sharedGeometries.backboneNode, rightBackboneMat);
+        rightSphere.position.copy(rightPos);
+        rightSphere.userData = { pickIndex: index };
+        rungGroup.add(rightSphere);
+        pickableMeshes.push(rightSphere);
+
+        const dir = new THREE.Vector3().subVectors(rightPos, leftPos);
+        const dist = dir.length();
+        const unitDir = dir.clone().normalize();
+        const midPoint = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+
+        const alignQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), unitDir);
+
+        const leftMat = dimmed ? sharedMaterials['base_dim_' + leftBase] : sharedMaterials['base_' + leftBase];
+        const leftBlock = new THREE.Mesh(sharedGeometries.baseBlock, leftMat);
+        const leftBlockCenter = leftPos.clone().addScaledVector(unitDir, dist * 0.27);
+        leftBlock.position.copy(leftBlockCenter);
+        leftBlock.quaternion.copy(alignQuat);
+        leftBlock.userData = { pickIndex: index };
+        rungGroup.add(leftBlock);
+        pickableMeshes.push(leftBlock);
+
+        if (!dimmed) {
+          const leftLabel = createLabelSprite(leftBase, BASE_META[leftBase].hex, '#ffffff', '#ffffff', 0.72);
+          leftLabel.position.copy(leftBlockCenter).add(new THREE.Vector3(0, 0.38, 0));
+          leftLabel.userData = { pickIndex: index };
+          rungGroup.add(leftLabel);
+          pickableMeshes.push(leftLabel);
+        }
+
+        const rightBlockCenter = rightPos.clone().addScaledVector(unitDir, -dist * 0.27);
+
+        if (isQuizSlot && !rightBase) {
+          const emptyMesh = new THREE.Mesh(sharedGeometries.baseBlock, sharedMaterials.emptySlotMat);
+          emptyMesh.position.copy(rightBlockCenter);
+          emptyMesh.quaternion.copy(alignQuat);
+          emptyMesh.userData = { pickIndex: index };
+          rungGroup.add(emptyMesh);
+          pickableMeshes.push(emptyMesh);
+
+          const slotRing = new THREE.Mesh(sharedGeometries.slotRing, sharedMaterials.selectRingMat);
+          slotRing.position.copy(rightBlockCenter);
+          slotRing.userData = { pickIndex: index };
+          rungGroup.add(slotRing);
+          pickableMeshes.push(slotRing);
+
+          const qSprite = createLabelSprite('?', '#4f46e5', '#ffffff', '#c7d2fe', 0.85);
+          qSprite.position.copy(rightBlockCenter).add(new THREE.Vector3(0, 0.38, 0));
+          qSprite.userData = { pickIndex: index };
+          rungGroup.add(qSprite);
+          pickableMeshes.push(qSprite);
+        } else if (rightBase) {
+          const rightMat = dimmed ? sharedMaterials['base_dim_' + rightBase] : sharedMaterials['base_' + rightBase];
+          const rightBlock = new THREE.Mesh(sharedGeometries.baseBlock, rightMat);
+          rightBlock.position.copy(rightBlockCenter);
+          rightBlock.quaternion.copy(alignQuat);
+          rightBlock.userData = { pickIndex: index };
+          rungGroup.add(rightBlock);
+          pickableMeshes.push(rightBlock);
+
+          if (!dimmed) {
+            const borderHex = quizStatus === 'wrong' ? '#ef4444' : '#ffffff';
+            const rightLabel = createLabelSprite(rightBase, BASE_META[rightBase].hex, '#ffffff', borderHex, 0.72);
+            rightLabel.position.copy(rightBlockCenter).add(new THREE.Vector3(0, 0.38, 0));
+            rightLabel.userData = { pickIndex: index };
+            rungGroup.add(rightLabel);
+            pickableMeshes.push(rightLabel);
+          }
+
+          if (quizStatus === 'wrong') {
+            const errBond = new THREE.Mesh(sharedGeometries.hBond, sharedMaterials.hBondErrorMat);
+            errBond.position.copy(midPoint);
+            errBond.quaternion.copy(alignQuat);
+            rungGroup.add(errBond);
+
+            const errRing = new THREE.Mesh(sharedGeometries.slotRing, sharedMaterials.wrongRingMat);
+            errRing.position.copy(rightBlockCenter);
+            rungGroup.add(errRing);
+          } else {
+            const bondCount = BASE_META[leftBase].bonds;
+            const offsets = bondCount === 2 ? [-0.11, 0.11] : [-0.17, 0, 0.17];
+            offsets.forEach((yOff) => {
+              const bondMesh = new THREE.Mesh(sharedGeometries.hBond, sharedMaterials.hBondMat);
+              bondMesh.position.copy(midPoint).add(new THREE.Vector3(0, yOff, 0));
+              bondMesh.quaternion.copy(alignQuat);
+              rungGroup.add(bondMesh);
+            });
+          }
+        }
+
+        if (isSelected) {
+          const selRing = new THREE.Mesh(sharedGeometries.selectRing, sharedMaterials.selectRingMat);
+          selRing.position.copy(midPoint);
+          rungGroup.add(selRing);
+        } else if (isSubstituted) {
+          const subRing = new THREE.Mesh(sharedGeometries.selectRing, sharedMaterials.subHighlightRingMat);
+          subRing.position.copy(midPoint);
+          rungGroup.add(subRing);
+        }
+      }
+
+      function rebuild3DModel() {
+        if (!dnaRootGroup || !window.THREE) {
+          render2DFallback();
+          return;
+        }
+
+        clearGroupChildren(dnaRootGroup);
+        pickableMeshes = [];
+
+        const numPairs = 16;
+        const radius = 2.25;
+        const pitchPerPair = 0.92;
+        const twistPerPair = 0.39;
+        const halfHeight = ((numPairs - 1) * pitchPerPair) / 2;
+
+        if (appState.mode === 'match' || appState.mode === 'substitution') {
+          const activeSeq = appState.mode === 'substitution' ? appState.subWorkingSeq : appState.templateSeq;
+          const oppSeq = complementStrandPositional(activeSeq);
+
+          const matchEval = evaluateMatchingState(appState.templateSeq, appState.matchSlots);
+          const subEval = applyBaseSubstitution(
+            appState.subBaselineSeq,
+            appState.subWorkingSeq,
+            -1,
+            appState.subWorkingSeq[0]
+          );
+          const subSet = new Set(subEval.changedIndices);
+
+          const leftBackbonePts = [];
+          const rightBackbonePts = [];
+
+          for (let i = 0; i < numPairs; i++) {
+            const y = halfHeight - i * pitchPerPair;
+            const angle = i * twistPerPair;
+
+            const leftPos = new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+            const rightPos = new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius);
+
+            leftBackbonePts.push(leftPos);
+            rightBackbonePts.push(rightPos);
+
+            const isQuiz = appState.mode === 'match' && appState.quizActive && matchEval.details[i].isQuiz;
+            const rightBaseToRender = isQuiz ? matchEval.details[i].userBase : oppSeq[i];
+            const quizStatus = isQuiz ? matchEval.details[i].status : 'fixed';
+
+            addBasePairRung(dnaRootGroup, {
+              index: i,
+              leftPos,
+              rightPos,
+              leftBase: activeSeq[i],
+              rightBase: rightBaseToRender,
+              leftBackboneMat: sharedMaterials.inkBackbone,
+              rightBackboneMat: sharedMaterials.inkBackbone,
+              isQuizSlot: isQuiz,
+              quizStatus,
+              isSelected: appState.selectedIndex === i,
+              isSubstituted: appState.mode === 'substitution' && subSet.has(i),
+              dimmed: false
+            });
+          }
+
+          addBackboneTubeSegment(dnaRootGroup, leftBackbonePts, sharedMaterials.inkBackbone);
+          addBackboneTubeSegment(dnaRootGroup, rightBackbonePts, sharedMaterials.inkBackbone);
+
+          const top5Badge = createLabelSprite("5′", '#0f172a', '#38bdf8', '#38bdf8', 1.05);
+          top5Badge.position.copy(leftBackbonePts[0]).add(new THREE.Vector3(-0.8, 0.85, 0));
+          dnaRootGroup.add(top5Badge);
+
+          const top3Badge = createLabelSprite("3′", '#0f172a', '#2dd4bf', '#2dd4bf', 1.05);
+          top3Badge.position.copy(rightBackbonePts[0]).add(new THREE.Vector3(0.8, 0.85, 0));
+          dnaRootGroup.add(top3Badge);
+
+          const bot3Badge = createLabelSprite("3′", '#0f172a', '#38bdf8', '#38bdf8', 1.05);
+          bot3Badge.position.copy(leftBackbonePts[numPairs - 1]).add(new THREE.Vector3(-0.8, -0.85, 0));
+          dnaRootGroup.add(bot3Badge);
+
+          const bot5Badge = createLabelSprite("5′", '#0f172a', '#2dd4bf', '#2dd4bf', 1.05);
+          bot5Badge.position.copy(rightBackbonePts[numPairs - 1]).add(new THREE.Vector3(0.8, -0.85, 0));
+          dnaRootGroup.add(bot5Badge);
+
+        } else if (appState.mode === 'replication') {
+          const repModel = computeReplicationModel(appState.templateSeq, appState.repProgress);
+          const completed = repModel.completedPairs;
+          const sepDistance = 4.65;
+
+          const d1OldPts = [];
+          const d1NewPts = [];
+          const d2NewPts = [];
+          const d2OldPts = [];
+          const unrepLeftPts = [];
+          const unrepRightPts = [];
+
+          const dimD1 = appState.repBranchHighlight === 2;
+          const dimD2 = appState.repBranchHighlight === 1;
+
+          for (let i = 0; i < numPairs; i++) {
+            const y = halfHeight - i * pitchPerPair;
+            const angle = i * twistPerPair;
+            const pairData = repModel.pairs[i];
+
+            const localLeft = new THREE.Vector3(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+            const localRight = new THREE.Vector3(Math.cos(angle + Math.PI) * radius, y, Math.sin(angle + Math.PI) * radius);
+
+            if (pairData.isReplicated) {
+              const forkFactor = completed === numPairs
+                ? 1.0
+                : Math.min(1.0, (completed - i) / 3.2);
+              const shiftX = sepDistance * forkFactor;
+
+              const d1LeftPos = localLeft.clone().add(new THREE.Vector3(-shiftX, 0, 0));
+              const d1RightPos = localRight.clone().add(new THREE.Vector3(-shiftX, 0, 0));
+              d1OldPts.push(d1LeftPos);
+              d1NewPts.push(d1RightPos);
+
+              addBasePairRung(dnaRootGroup, {
+                index: i,
+                leftPos: d1LeftPos,
+                rightPos: d1RightPos,
+                leftBase: pairData.base5to3,
+                rightBase: pairData.base3to5,
+                leftBackboneMat: dimD1 ? sharedMaterials.dimBackbone : sharedMaterials.inkBackbone,
+                rightBackboneMat: dimD1 ? sharedMaterials.dimBackbone : sharedMaterials.mintBackbone,
+                isQuizSlot: false,
+                quizStatus: 'fixed',
+                isSelected: false,
+                isSubstituted: false,
+                dimmed: dimD1
+              });
+
+              const d2LeftPos = localLeft.clone().add(new THREE.Vector3(shiftX, 0, 0));
+              const d2RightPos = localRight.clone().add(new THREE.Vector3(shiftX, 0, 0));
+              d2NewPts.push(d2LeftPos);
+              d2OldPts.push(d2RightPos);
+
+              addBasePairRung(dnaRootGroup, {
+                index: i,
+                leftPos: d2LeftPos,
+                rightPos: d2RightPos,
+                leftBase: pairData.base5to3,
+                rightBase: pairData.base3to5,
+                leftBackboneMat: dimD2 ? sharedMaterials.dimBackbone : sharedMaterials.mintBackbone,
+                rightBackboneMat: dimD2 ? sharedMaterials.dimBackbone : sharedMaterials.inkBackbone,
+                isQuizSlot: false,
+                quizStatus: 'fixed',
+                isSelected: false,
+                isSubstituted: false,
+                dimmed: dimD2
+              });
+
+              if (i === completed - 1 && completed < numPairs) {
+                const nextY = halfHeight - (i + 1) * pitchPerPair;
+                const nextAngle = (i + 1) * twistPerPair;
+                const stemLeft = new THREE.Vector3(Math.cos(nextAngle) * radius, nextY, Math.sin(nextAngle) * radius);
+                const stemRight = new THREE.Vector3(Math.cos(nextAngle + Math.PI) * radius, nextY, Math.sin(nextAngle + Math.PI) * radius);
+                d1OldPts.push(stemLeft);
+                d2OldPts.push(stemRight);
+              }
+            } else {
+              unrepLeftPts.push(localLeft);
+              unrepRightPts.push(localRight);
+
+              addBasePairRung(dnaRootGroup, {
+                index: i,
+                leftPos: localLeft,
+                rightPos: localRight,
+                leftBase: pairData.base5to3,
+                rightBase: pairData.base3to5,
+                leftBackboneMat: sharedMaterials.inkBackbone,
+                rightBackboneMat: sharedMaterials.inkBackbone,
+                isQuizSlot: false,
+                quizStatus: 'fixed',
+                isSelected: false,
+                isSubstituted: false,
+                dimmed: false
+              });
+            }
+          }
+
+          addBackboneTubeSegment(dnaRootGroup, d1OldPts, dimD1 ? sharedMaterials.dimBackbone : sharedMaterials.inkBackbone);
+          addBackboneTubeSegment(dnaRootGroup, d1NewPts, dimD1 ? sharedMaterials.dimBackbone : sharedMaterials.mintBackbone);
+          addBackboneTubeSegment(dnaRootGroup, d2NewPts, dimD2 ? sharedMaterials.dimBackbone : sharedMaterials.mintBackbone);
+          addBackboneTubeSegment(dnaRootGroup, d2OldPts, dimD2 ? sharedMaterials.dimBackbone : sharedMaterials.inkBackbone);
+          addBackboneTubeSegment(dnaRootGroup, unrepLeftPts, sharedMaterials.inkBackbone);
+          addBackboneTubeSegment(dnaRootGroup, unrepRightPts, sharedMaterials.inkBackbone);
+
+          if (completed > 0) {
+            const d1Top5 = createLabelSprite("5′", '#0f172a', '#ffffff', '#38bdf8', 0.92);
+            d1Top5.position.copy(d1OldPts[0]).add(new THREE.Vector3(-0.6, 0.85, 0));
+            dnaRootGroup.add(d1Top5);
+
+            const d1Top3 = createLabelSprite("3′", '#0d9488', '#ffffff', '#99f6e4', 0.92);
+            d1Top3.position.copy(d1NewPts[0]).add(new THREE.Vector3(0.6, 0.85, 0));
+            dnaRootGroup.add(d1Top3);
+
+            const d2Top5 = createLabelSprite("5′", '#0d9488', '#ffffff', '#99f6e4', 0.92);
+            d2Top5.position.copy(d2NewPts[0]).add(new THREE.Vector3(-0.6, 0.85, 0));
+            dnaRootGroup.add(d2Top5);
+
+            const d2Top3 = createLabelSprite("3′", '#0f172a', '#ffffff', '#38bdf8', 0.92);
+            d2Top3.position.copy(d2OldPts[0]).add(new THREE.Vector3(0.6, 0.85, 0));
+            dnaRootGroup.add(d2Top3);
+          }
+
+          if (completed === numPairs) {
+            const d1Bot3 = createLabelSprite("3′", '#0f172a', '#ffffff', '#38bdf8', 0.92);
+            d1Bot3.position.copy(d1OldPts[numPairs - 1]).add(new THREE.Vector3(-0.6, -0.85, 0));
+            dnaRootGroup.add(d1Bot3);
+
+            const d1Bot5 = createLabelSprite("5′", '#0d9488', '#ffffff', '#99f6e4', 0.92);
+            d1Bot5.position.copy(d1NewPts[numPairs - 1]).add(new THREE.Vector3(0.6, -0.85, 0));
+            dnaRootGroup.add(d1Bot5);
+
+            const d2Bot3 = createLabelSprite("3′", '#0d9488', '#ffffff', '#99f6e4', 0.92);
+            d2Bot3.position.copy(d2NewPts[numPairs - 1]).add(new THREE.Vector3(-0.6, -0.85, 0));
+            dnaRootGroup.add(d2Bot3);
+
+            const d2Bot5 = createLabelSprite("5′", '#0f172a', '#ffffff', '#38bdf8', 0.92);
+            d2Bot5.position.copy(d2OldPts[numPairs - 1]).add(new THREE.Vector3(0.6, -0.85, 0));
+            dnaRootGroup.add(d2Bot5);
+          } else if (unrepLeftPts.length > 0) {
+            const lastIdx = unrepLeftPts.length - 1;
+            const bot3 = createLabelSprite("3′", '#0f172a', '#38bdf8', '#38bdf8', 0.95);
+            bot3.position.copy(unrepLeftPts[lastIdx]).add(new THREE.Vector3(-0.7, -0.85, 0));
+            dnaRootGroup.add(bot3);
+
+            const bot5 = createLabelSprite("5′", '#0f172a', '#2dd4bf', '#2dd4bf', 0.95);
+            bot5.position.copy(unrepRightPts[lastIdx]).add(new THREE.Vector3(0.7, -0.85, 0));
+            dnaRootGroup.add(bot5);
+          }
+        }
+
+        render2DFallback();
+      }
+
+      function enable2DFallback(reasonMessage) {
+        appState.webglAvailable = false;
+        appState.force2DMode = true;
+        const container = document.getElementById('fallback2DContainer');
+        const notice = document.getElementById('fallbackNoticeText');
+        if (container) container.classList.remove('hidden');
+        if (notice && reasonMessage) notice.textContent = reasonMessage;
+        render2DFallback();
+      }
+
+      function render2DFallback() {
+        const svg = document.getElementById('fallbackSvg');
+        if (!svg) return;
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+        const ns = 'http://www.w3.org/2000/svg';
+        const activeSeq = appState.mode === 'substitution' ? appState.subWorkingSeq : appState.templateSeq;
+        const oppSeq = complementStrandPositional(activeSeq);
+        const matchEval = evaluateMatchingState(appState.templateSeq, appState.matchSlots);
+        const repModel = computeReplicationModel(appState.templateSeq, appState.repProgress);
+
+        function createSvgEl(tag, attrs) {
+          const el = document.createElementNS(ns, tag);
+          Object.keys(attrs).forEach((k) => el.setAttribute(k, String(attrs[k])));
+          return el;
+        }
+
+        const startX = 68;
+        const stepX = 48;
+
+        if (appState.mode === 'replication' && repModel.completedPairs > 0) {
+          svg.appendChild(createSvgEl('text', { x: 20, y: 55, fill: '#0f172a', 'font-size': 12, 'font-weight': 'bold' })).textContent = '딸1 (5′→3′ 구 + 3′→5′ 신)';
+          svg.appendChild(createSvgEl('text', { x: 20, y: 215, fill: '#0d9488', 'font-size': 12, 'font-weight': 'bold' })).textContent = '딸2 (5′→3′ 신 + 3′→5′ 구)';
+
+          for (let i = 0; i < 16; i++) {
+            const x = startX + i * stepX;
+            const isRep = i < repModel.completedPairs;
+            const bTop = activeSeq[i];
+            const bBot = oppSeq[i];
+
+            if (isRep) {
+              svg.appendChild(createSvgEl('line', { x1: x, y1: 75, x2: x, y2: 125, stroke: '#94a3b8', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 75, r: 14, fill: BASE_META[bTop].hex, stroke: '#1e293b', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 125, r: 14, fill: BASE_META[bBot].hex, stroke: '#0d9488', 'stroke-width': 3 }));
+
+              svg.appendChild(createSvgEl('line', { x1: x, y1: 235, x2: x, y2: 285, stroke: '#94a3b8', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 235, r: 14, fill: BASE_META[bTop].hex, stroke: '#0d9488', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 285, r: 14, fill: BASE_META[bBot].hex, stroke: '#1e293b', 'stroke-width': 3 }));
+            } else {
+              svg.appendChild(createSvgEl('line', { x1: x, y1: 140, x2: x, y2: 200, stroke: '#64748b', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 140, r: 14, fill: BASE_META[bTop].hex, stroke: '#1e293b', 'stroke-width': 3 }));
+              svg.appendChild(createSvgEl('circle', { cx: x, cy: 200, r: 14, fill: BASE_META[bBot].hex, stroke: '#1e293b', 'stroke-width': 3 }));
+            }
+          }
+          return;
+        }
+
+        svg.appendChild(createSvgEl('line', { x1: startX - 20, y1: 90, x2: startX + 15 * stepX + 20, y2: 90, stroke: '#1e293b', 'stroke-width': 6 }));
+        svg.appendChild(createSvgEl('line', { x1: startX - 20, y1: 230, x2: startX + 15 * stepX + 20, y2: 230, stroke: '#0d9488', 'stroke-width': 6 }));
+
+        const lbl5Top = createSvgEl('text', { x: 18, y: 95, fill: '#0f172a', 'font-size': 15, 'font-weight': 'bold' });
+        lbl5Top.textContent = "5′";
+        svg.appendChild(lbl5Top);
+
+        const lbl3Top = createSvgEl('text', { x: startX + 15 * stepX + 28, y: 95, fill: '#0f172a', 'font-size': 15, 'font-weight': 'bold' });
+        lbl3Top.textContent = "3′";
+        svg.appendChild(lbl3Top);
+
+        const lbl3Bot = createSvgEl('text', { x: 18, y: 235, fill: '#0d9488', 'font-size': 15, 'font-weight': 'bold' });
+        lbl3Bot.textContent = "3′";
+        svg.appendChild(lbl3Bot);
+
+        const lbl5Bot = createSvgEl('text', { x: startX + 15 * stepX + 28, y: 235, fill: '#0d9488', 'font-size': 15, 'font-weight': 'bold' });
+        lbl5Bot.textContent = "5′";
+        svg.appendChild(lbl5Bot);
+
+        for (let i = 0; i < 16; i++) {
+          const x = startX + i * stepX;
+          const bTop = activeSeq[i];
+          const isQuiz = appState.mode === 'match' && appState.quizActive && matchEval.details[i].isQuiz;
+          const bBot = isQuiz ? (matchEval.details[i].userBase || '?') : oppSeq[i];
+          const isSelected = appState.selectedIndex === i;
+
+          const g = createSvgEl('g', { cursor: 'pointer' });
+          g.addEventListener('click', () => selectBasePosition(i));
+
+          if (isSelected) {
+            g.appendChild(createSvgEl('rect', {
+              x: x - 20,
+              y: 62,
+              width: 40,
+              height: 196,
+              rx: 10,
+              fill: 'rgba(79, 70, 229, 0.12)',
+              stroke: '#4f46e5',
+              'stroke-width': 2
+            }));
+          }
+
+          g.appendChild(createSvgEl('line', {
+            x1: x,
+            y1: 90,
+            x2: x,
+            y2: 230,
+            stroke: isQuiz && matchEval.details[i].status === 'wrong' ? '#ef4444' : '#94a3b8',
+            'stroke-width': 4,
+            'stroke-dasharray': bBot === '?' ? '5,5' : 'none'
+          }));
+
+          g.appendChild(createSvgEl('circle', { cx: x, cy: 90, r: 17, fill: BASE_META[bTop].hex }));
+          const t1 = createSvgEl('text', { x, y: 95, fill: '#ffffff', 'font-size': 14, 'font-weight': 'bold', 'text-anchor': 'middle' });
+          t1.textContent = bTop;
+          g.appendChild(t1);
+
+          const botFill = bBot === '?' ? '#6366f1' : BASE_META[bBot].hex;
+          g.appendChild(createSvgEl('circle', { cx: x, cy: 230, r: 17, fill: botFill }));
+          const t2 = createSvgEl('text', { x, y: 235, fill: '#ffffff', 'font-size': 14, 'font-weight': 'bold', 'text-anchor': 'middle' });
+          t2.textContent = bBot;
+          g.appendChild(t2);
+
+          svg.appendChild(g);
+        }
+      }
+
+      function setupCanvasInteractions(canvas) {
+        let initialPinchDist = null;
+
+        canvas.addEventListener('pointerdown', (e) => {
+          camOrbit.isDragging = true;
+          camOrbit.dragMoved = false;
+          camOrbit.prevX = e.clientX;
+          camOrbit.prevY = e.clientY;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (!camOrbit.isDragging) return;
+          const dx = e.clientX - camOrbit.prevX;
+          const dy = e.clientY - camOrbit.prevY;
+          if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+            camOrbit.dragMoved = true;
+            camOrbit.lastUserEditTime = performance.now();
+          }
+          camOrbit.theta -= dx * 0.0075;
+          camOrbit.phi = Math.max(0.35, Math.min(Math.PI - 0.35, camOrbit.phi - dy * 0.0065));
+          camOrbit.prevX = e.clientX;
+          camOrbit.prevY = e.clientY;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+          if (!camOrbit.isDragging) return;
+          camOrbit.isDragging = false;
+          if (!camOrbit.dragMoved && e.target === canvas) {
+            handle3DCanvasClick(e, canvas);
+          }
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          camOrbit.lastUserEditTime = performance.now();
+          camOrbit.targetRadius = Math.max(13, Math.min(120, camOrbit.targetRadius + e.deltaY * 0.015));
+        }, { passive: false });
+
+        canvas.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            initialPinchDist = Math.hypot(dx, dy);
+          }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', (e) => {
+          if (e.touches.length === 2 && initialPinchDist) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            const delta = initialPinchDist - dist;
+            camOrbit.targetRadius = Math.max(13, Math.min(120, camOrbit.targetRadius + delta * 0.04));
+            initialPinchDist = dist;
+            camOrbit.lastUserEditTime = performance.now();
+          }
+        }, { passive: true });
+
+        window.addEventListener('resize', () => {
+          updateAspectAwareFraming();
+        });
+      }
+
+      function handle3DCanvasClick(e, canvas) {
+        if (!raycaster || !camera || pickableMeshes.length === 0) return;
+        const rect = canvas.getBoundingClientRect();
+        pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(pointerNDC, camera);
+        const intersects = raycaster.intersectObjects(pickableMeshes, false);
+        if (intersects.length > 0) {
+          const picked = intersects[0].object;
+          if (picked.userData && typeof picked.userData.pickIndex === 'number') {
+            camOrbit.lastUserEditTime = performance.now();
+            selectBasePosition(picked.userData.pickIndex);
+          }
+        }
+      }
+
+      let lastFrameTime = performance.now();
+
+      function animateLoop(now) {
+        requestAnimationFrame(animateLoop);
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+
+        if (appState.mode === 'replication' && appState.repPlaying) {
+          appState.repProgress = Math.min(100, appState.repProgress + dt * 18);
+          if (appState.repProgress >= 100) {
+            appState.repProgress = 100;
+            appState.repPlaying = false;
+          }
+          syncAllViews();
+        }
+
+        if (renderer && scene && camera) {
+          const timeSinceEdit = now - camOrbit.lastUserEditTime;
+          const shouldAutoRotate = !camOrbit.isDragging && timeSinceEdit > 4500 && appState.mode !== 'replication';
+          if (shouldAutoRotate && dnaRootGroup) {
+            dnaRootGroup.rotation.y += dt * 0.24;
+          }
+
+          camOrbit.radius += (camOrbit.targetRadius - camOrbit.radius) * 0.12;
+          const x = camOrbit.radius * Math.sin(camOrbit.phi) * Math.sin(camOrbit.theta);
+          const y = camOrbit.radius * Math.cos(camOrbit.phi) + camOrbit.targetY;
+          const z = camOrbit.radius * Math.sin(camOrbit.phi) * Math.cos(camOrbit.theta);
+
+          camera.position.set(x, y, z);
+          camera.lookAt(camOrbit.targetX, camOrbit.targetY, 0);
+          renderer.render(scene, camera);
+        }
+      }
+
+      function showBanner(text, type) {
+        const banner = document.getElementById('liveFeedbackBanner');
+        const dot = document.getElementById('feedbackDot');
+        const txt = document.getElementById('feedbackText');
+        if (!banner || !txt || !dot) return;
+
+        banner.classList.remove('hidden', 'bg-rose-50', 'border-rose-300', 'text-rose-900', 'bg-teal-50', 'border-teal-300', 'text-teal-900', 'bg-white/95', 'border-slate-200', 'text-slate-800');
+        dot.classList.remove('bg-rose-500', 'bg-teal-500', 'bg-indigo-500');
+
+        if (type === 'error') {
+          banner.classList.add('bg-rose-50', 'border-rose-300', 'text-rose-900');
+          dot.classList.add('bg-rose-500');
+        } else if (type === 'success') {
+          banner.classList.add('bg-teal-50', 'border-teal-300', 'text-teal-900');
+          dot.classList.add('bg-teal-500');
+        } else {
+          banner.classList.add('bg-white/95', 'border-slate-200', 'text-slate-800');
+          dot.classList.add('bg-indigo-500');
+        }
+        txt.textContent = text;
+      }
+
+      function buildSequenceStripDOM() {
+        const topRow = document.getElementById('seqRowTop');
+        const botRow = document.getElementById('seqRowBottom');
+        if (!topRow || !botRow) return;
+
+        topRow.innerHTML = '';
+        botRow.innerHTML = '';
+
+        const activeSeq = appState.mode === 'substitution' ? appState.subWorkingSeq : appState.templateSeq;
+        const seqLen = activeSeq.length;
+        const oppSeq = complementStrandPositional(activeSeq);
+        const matchEval = evaluateMatchingState(appState.templateSeq, appState.matchSlots);
+        const repModel = computeReplicationModel(appState.templateSeq, appState.repProgress);
+        const subEval = applyBaseSubstitution(appState.subBaselineSeq, appState.subWorkingSeq, -1, appState.subWorkingSeq[0]);
+        const subSet = new Set(subEval.changedIndices);
+
+        const gridColsValue = 'repeat(' + seqLen + ', minmax(28px, 1fr))';
+        [topRow, botRow].forEach((rowEl) => {
+          rowEl.style.display = 'grid';
+          rowEl.style.gap = '4px';
+          rowEl.style.minWidth = '0';
+          rowEl.style.gridTemplateColumns = gridColsValue;
+        });
+
+        const colorClasses = {
+          A: 'bg-rose-500 text-white border-rose-600',
+          T: 'bg-amber-500 text-white border-amber-600',
+          C: 'bg-cyan-600 text-white border-cyan-700',
+          G: 'bg-violet-600 text-white border-violet-700'
+        };
+
+        for (let i = 0; i < seqLen; i++) {
+          const isSelected = appState.selectedIndex === i;
+          const bTop = activeSeq[i];
+
+          const btnTop = document.createElement('button');
+          btnTop.type = 'button';
+          let topCls = `mono-seq h-7 min-w-[28px] px-0.5 rounded-lg text-xs leading-none font-extrabold border transition flex items-center justify-center ${colorClasses[bTop]} `;
+          if (isSelected) topCls += 'ring-2 ring-indigo-600 ring-offset-1 scale-105 ';
+          if (appState.mode === 'substitution' && subSet.has(i)) topCls += 'ring-2 ring-fuchsia-500 ';
+          btnTop.className = topCls;
+          btnTop.textContent = bTop;
+          btnTop.title = `${i + 1}번 위치 (가닥I 5′→3′: ${bTop})`;
+          btnTop.addEventListener('click', () => selectBasePosition(i));
+          topRow.appendChild(btnTop);
+
+          const btnBot = document.createElement('button');
+          btnBot.type = 'button';
+          const detail = matchEval.details[i];
+          const isQuizSlot = appState.mode === 'match' && appState.quizActive && detail.isQuiz;
+
+          let botCls = 'mono-seq h-7 min-w-[28px] px-0.5 rounded-lg text-xs leading-none font-extrabold border transition flex items-center justify-center ';
+          let botText = oppSeq[i];
+
+          if (isQuizSlot) {
+            if (!detail.userBase) {
+              botText = '?';
+              botCls += 'bg-indigo-100 text-indigo-800 border-indigo-400 border-dashed ';
+            } else if (detail.status === 'correct') {
+              botText = detail.userBase;
+              botCls += colorClasses[detail.userBase] + ' ring-2 ring-emerald-400 ';
+            } else {
+              botText = detail.userBase + '!';
+              botCls += 'bg-rose-100 text-rose-800 border-rose-500 ring-2 ring-rose-500 ';
+            }
+          } else if (appState.mode === 'replication' && i < repModel.completedPairs) {
+            botCls += colorClasses[oppSeq[i]] + ' ring-2 ring-teal-500 ';
+          } else {
+            botCls += colorClasses[oppSeq[i]] + ' ';
+          }
+
+          if (isSelected) botCls += 'ring-2 ring-indigo-600 ring-offset-1 scale-105 ';
+          btnBot.className = botCls;
+          btnBot.textContent = botText;
+          btnBot.title = `${i + 1}번 위치 (가닥II 3′→5′ 상보 염기)`;
+          btnBot.addEventListener('click', () => selectBasePosition(i));
+          botRow.appendChild(btnBot);
+        }
+      }
+
+      function syncAllViews() {
+        buildSequenceStripDOM();
+        rebuild3DModel();
+        updateAspectAwareFraming();
+
+        const activeSeq = appState.mode === 'substitution' ? appState.subWorkingSeq : appState.templateSeq;
+        const gcVal = calculateGcPercentage(activeSeq);
+
+        const hudLength = document.getElementById('hudLength');
+        const hudGcRatio = document.getElementById('hudGcRatio');
+        const hudBadge = document.getElementById('hudProgressBadge');
+
+        if (hudLength) hudLength.textContent = `${activeSeq.length} bp`;
+        if (hudGcRatio) hudGcRatio.textContent = `${gcVal.toFixed(1)}%`;
+
+        document.querySelectorAll('.mode-tab').forEach((btn) => {
+          const m = btn.getAttribute('data-mode');
+          if (m === appState.mode) {
+            btn.className = 'mode-tab px-2.5 py-1 rounded-lg text-xs font-bold transition bg-slate-900 text-white shadow-sm';
+          } else {
+            btn.className = 'mode-tab px-2.5 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900';
+          }
+        });
+
+        const ctrlMatch = document.getElementById('controlsMatch');
+        const ctrlRep = document.getElementById('controlsReplication');
+        const ctrlSub = document.getElementById('controlsSubstitution');
+        const repBar = document.getElementById('repTelemetryBar');
+        const subBar = document.getElementById('subComparisonBar');
+        const repCompleteCard = document.getElementById('replicationCompleteCard');
+
+        if (ctrlMatch) ctrlMatch.classList.toggle('hidden', appState.mode !== 'match');
+        if (ctrlRep) ctrlRep.classList.toggle('hidden', appState.mode !== 'replication');
+        if (ctrlSub) ctrlSub.classList.toggle('hidden', appState.mode !== 'substitution');
+        if (repBar) repBar.classList.toggle('hidden', appState.mode !== 'replication');
+        if (subBar) subBar.classList.toggle('hidden', appState.mode !== 'substitution');
+
+        if (appState.mode === 'match') {
+          if (repCompleteCard) repCompleteCard.classList.add('hidden');
+          const matchEval = evaluateMatchingState(appState.templateSeq, appState.matchSlots);
+          const scoreEl = document.getElementById('matchScoreText');
+          const startBtn = document.getElementById('btnStartQuiz');
+
+          if (!appState.quizActive || matchEval.totalQuizSlots === 0) {
+            if (scoreEl) scoreEl.textContent = `관찰 중 · 새 문제로 도전 (위치 ${appState.selectedIndex + 1} 선택됨)`;
+            if (hudBadge) hudBadge.textContent = '관찰 중 · 새 문제로 도전';
+            if (startBtn) startBtn.textContent = '짝맞추기 시작';
+          } else {
+            if (scoreEl) {
+              scoreEl.textContent = `정답: ${matchEval.correctCount} / ${matchEval.totalQuizSlots} (남은 슬롯: ${matchEval.remainingCount})`;
+            }
+            if (hudBadge) {
+              hudBadge.textContent = matchEval.isAllCleared
+                ? '짝맞추기 완료!'
+                : `짝맞추기 ${matchEval.correctCount}/${matchEval.totalQuizSlots}`;
+            }
+            if (startBtn) startBtn.textContent = '슬롯 재설정';
+          }
+        } else if (appState.mode === 'replication') {
+          const repModel = computeReplicationModel(appState.templateSeq, appState.repProgress);
+          const slider = document.getElementById('repSlider');
+          const pctLabel = document.getElementById('repPercentLabel');
+          const playBtn = document.getElementById('btnRepPlay');
+          const stepDetail = document.getElementById('repStepDetail');
+
+          if (slider) slider.value = String(Math.round(repModel.progressPercent));
+          if (pctLabel) pctLabel.textContent = `${Math.round(repModel.progressPercent)}%`;
+          if (playBtn) playBtn.textContent = appState.repPlaying ? '일시정지' : '재생';
+          if (hudBadge) hudBadge.textContent = `복제 단계 ${Math.round(repModel.progressPercent)}%`;
+
+          if (stepDetail) {
+            if (repModel.isZero) {
+              stepDetail.textContent = `0 / ${repModel.totalPairs} 염기쌍 복제됨 — 원본 이중나선 1개 (가닥 분리 전)`;
+            } else if (repModel.isComplete) {
+              stepDetail.textContent = `${repModel.totalPairs} / ${repModel.totalPairs} 염기쌍 복제 완료 — 딸 이중나선 2개 (각각 기존 가닥 1 + 새 가닥 1)`;
+            } else {
+              stepDetail.textContent = `${repModel.completedPairs} / ${repModel.totalPairs} 염기쌍 분리 및 신생 상보 가닥 합성 진행 중`;
+            }
+          }
+
+          if (repCompleteCard) {
+            repCompleteCard.classList.toggle('hidden', !repModel.isComplete);
+          }
+        } else if (appState.mode === 'substitution') {
+          if (repCompleteCard) repCompleteCard.classList.add('hidden');
+          const subEval = applyBaseSubstitution(
+            appState.subBaselineSeq,
+            appState.subWorkingSeq,
+            -1,
+            appState.subWorkingSeq[0]
+          );
+          const badge = document.getElementById('subMetricsBadge');
+          const baseText = document.getElementById('subBaselineSeqText');
+          const currText = document.getElementById('subCurrentSeqText');
+
+          if (badge) {
+            badge.textContent = `변경 위치: ${subEval.changedCount}곳 | 기준 GC ${subEval.baselineGc.toFixed(1)}% → 현재 ${subEval.currentGc.toFixed(1)}%`;
+          }
+          if (baseText) baseText.textContent = subEval.baselineSeq5to3;
+          if (currText) currText.textContent = subEval.currentSeq5to3;
+          if (hudBadge) hudBadge.textContent = `치환 비교 (${subEval.changedCount}곳 변경)`;
+        }
+      }
+
+      function selectBasePosition(index) {
+        const clamped = Math.max(0, Math.min(appState.templateSeq.length - 1, index));
+        appState.selectedIndex = clamped;
+        camOrbit.lastUserEditTime = performance.now();
+
+        if (dnaRootGroup && appState.mode !== 'replication') {
+          const targetAngle = -clamped * 0.39 + 0.5;
+          dnaRootGroup.rotation.y = targetAngle;
+        }
+        syncAllViews();
+      }
+
+      function startOrResetMatchingQuiz(changePreset) {
+        recordUndoCheckpoint();
+        if (changePreset) {
+          appState.presetIndex = (appState.presetIndex + 1) % PRESET_SEQUENCES.length;
+          appState.templateSeq = PRESET_SEQUENCES[appState.presetIndex];
+          appState.subBaselineSeq = appState.templateSeq;
+          appState.subWorkingSeq = appState.templateSeq;
+        }
+        appState.mode = 'match';
+        appState.quizActive = true;
+
+        const offset = appState.presetIndex % 2;
+        const quizSet = new Set([1 + offset, 4, 7 - offset, 9, 12, 14]);
+        appState.matchSlots = [];
+        for (let i = 0; i < appState.templateSeq.length; i++) {
+          appState.matchSlots.push({
+            isQuiz: quizSet.has(i),
+            userBase: null
+          });
+        }
+        const firstQuiz = Array.from(quizSet)[0];
+        selectBasePosition(firstQuiz);
+        showBanner('짝맞추기 모드가 시작되었습니다. 빈 슬롯(?)을 선택해 상보적 염기(A/T/C/G)를 채워 보세요.', 'info');
+      }
+
+      function handleMatchingBaseInput(inputBase) {
+        const base = String(inputBase).toUpperCase();
+        if (!VALID_BASES.includes(base)) return;
+
+        camOrbit.lastUserEditTime = performance.now();
+
+        if (!appState.quizActive) {
+          startOrResetMatchingQuiz(false);
+        }
+
+        const idx = appState.selectedIndex;
+        recordUndoCheckpoint();
+        appState.matchSlots[idx] = { isQuiz: true, userBase: base };
+
+        const evalRes = evaluateMatchingState(appState.templateSeq, appState.matchSlots);
+        const item = evalRes.details[idx];
+        syncAllViews();
+
+        if (item.status === 'correct') {
+          if (evalRes.isAllCleared) {
+            showBanner(`모든 빈 슬롯(${evalRes.totalQuizSlots}개)을 상보적 염기쌍 규칙에 맞게 완성했습니다!`, 'success');
+          } else {
+            showBanner(item.reason, 'success');
+          }
+        } else if (item.status === 'wrong') {
+          showBanner(item.reason, 'error');
+        }
+      }
+
+      function revealAllMatchingAnswers() {
+        recordUndoCheckpoint();
+        const hadQuizSlots = appState.matchSlots.some((s) => s && s.isQuiz);
+        const defaultQuizIndices = new Set([2, 5, 7, 10, 12, 14]);
+        appState.quizActive = true;
+        for (let i = 0; i < appState.templateSeq.length; i++) {
+          const expected = complementBase(appState.templateSeq[i]);
+          const isQuizSlot = hadQuizSlots
+            ? Boolean(appState.matchSlots[i] && appState.matchSlots[i].isQuiz)
+            : defaultQuizIndices.has(i);
+          appState.matchSlots[i] = { isQuiz: isQuizSlot, userBase: expected };
+        }
+        syncAllViews();
+        showBanner('단일 상보 함수(A–T: 수소결합 2개 · C–G: 수소결합 3개)로 계산된 모든 정답 염기쌍을 실제 3D 모델에 채웠습니다.', 'success');
+      }
+
+      function handleSubstitutionInput(newBase) {
+        const base = String(newBase).toUpperCase();
+        if (!VALID_BASES.includes(base)) return;
+
+        camOrbit.lastUserEditTime = performance.now();
+        recordUndoCheckpoint();
+
+        const idx = appState.selectedIndex;
+        const prevBaseAtIdx = appState.subWorkingSeq[idx];
+        const res = applyBaseSubstitution(appState.subBaselineSeq, appState.subWorkingSeq, idx, base);
+        appState.subWorkingSeq = res.currentSeq5to3;
+        syncAllViews();
+
+        const compPartner = complementBase(base);
+        if (prevBaseAtIdx === base) {
+          showBanner(`${idx + 1}번 위치는 이미 ${base}↔${compPartner} 쌍입니다 ( 총 변경 위치: ${res.changedCount}곳 ).`, 'info');
+        } else {
+          showBanner(
+            `${idx + 1}번 위치 염기쌍을 ${base}(5′→3′) ↔ ${compPartner}(3′→5′)로 치환했습니다 ( 총 변경: ${res.changedCount}곳, GC 비율: ${res.currentGc.toFixed(1)}% ).`,
+            'info'
+          );
+        }
+      }
+
+      function resetToInitialExhibition() {
+        recordUndoCheckpoint();
+        appState.mode = 'match';
+        appState.presetIndex = 0;
+        appState.templateSeq = PRESET_SEQUENCES[0];
+        appState.selectedIndex = 2;
+        appState.quizActive = false;
+        appState.matchSlots = createDefaultSlots(16, false);
+        appState.repProgress = 0;
+        appState.repPlaying = false;
+        appState.repBranchHighlight = 0;
+        appState.subBaselineSeq = PRESET_SEQUENCES[0];
+        appState.subWorkingSeq = PRESET_SEQUENCES[0];
+
+        resetCameraViewpoint();
+        syncAllViews();
+        showBanner('초기 완성된 16쌍 이중나선 전시 상태와 기본 시점으로 복원되었습니다.', 'info');
+      }
+
+      function resetCameraViewpoint() {
+        camOrbit.theta = 0.35;
+        camOrbit.phi = 1.48;
+        if (dnaRootGroup) dnaRootGroup.rotation.y = 0;
+        updateAspectAwareFraming();
+        camOrbit.radius = camOrbit.targetRadius;
+      }
+
+      function downloadCurrentCanvasPng() {
+        try {
+          if (renderer && scene && camera && !appState.force2DMode) {
+            renderer.render(scene, camera);
+            const dataUrl = renderer.domElement.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `dna-weaver-${appState.mode}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showBanner('현재 3D 이중나선 화면을 PNG 이미지로 저장했습니다.', 'success');
+          } else {
+            showBanner('3D 캔버스 화면을 캡처했습니다.', 'info');
+          }
+        } catch (err) {
+          showBanner('PNG 이미지 저장 중 오류가 발생했습니다.', 'error');
+        }
+      }
+
+      function runPureSelfTestSuite() {
+        const results = [];
+
+        function assertTest(name, fn) {
+          try {
+            const detailMsg = fn();
+            results.push({ name, passed: true, detail: detailMsg || '통과' });
+          } catch (err) {
+            results.push({ name, passed: false, detail: err.message || String(err) });
+          }
+        }
+
+        assertTest('1. 상보적 염기쌍 규칙 (A↔T, C↔G)', () => {
+          if (
+            complementBase('A') !== 'T' ||
+            complementBase('T') !== 'A' ||
+            complementBase('C') !== 'G' ||
+            complementBase('G') !== 'C'
+          ) {
+            throw new Error('기본 A↔T, C↔G 매핑 실패');
+          }
+          return 'A–T: 수소결합 2개 · C–G: 수소결합 3개 단일 함수 일치 확인';
+        });
+
+        assertTest('2. 이중 상보 변환 항등성 검사', () => {
+          const sample = 'ATGCGTACGTAGCTAG';
+          const twice = complementStrandPositional(complementStrandPositional(sample));
+          if (twice !== sample) {
+            throw new Error(`항등성 불일치: ${twice} !== ${sample}`);
+          }
+          return `complement(complement("${sample}")) === "${sample}" 확인`;
+        });
+
+        assertTest('3. 같은 위치 상보 서열(3′→5′)과 5′기준 역상보 구분', () => {
+          const seq5to3 = 'AAACCCGGGTTT';
+          const pos3to5 = complementStrandPositional(seq5to3);
+          const revComp5to3 = reverseComplement5to3(seq5to3);
+          if (pos3to5 !== 'TTTGGGCCCAAA') {
+            throw new Error('같은 위치 대응 3′→5′ 상보 서열 계산 오류');
+          }
+          if (pos3to5 === revComp5to3) {
+            throw new Error('3′→5′ 위치 대응 서열과 5′→3′ 역상보 서열이 혼동됨');
+          }
+          return `위치대응(3′→5′: ${pos3to5}) ≠ 역상보(5′→3′: ${revComp5to3}) 명확히 구분됨`;
+        });
+
+        assertTest('4. GC 비율 0% / 50% / 100% Fixture 검사', () => {
+          const gc0 = calculateGcPercentage('ATATATATATATATAT');
+          const gc50 = calculateGcPercentage('ATGCATGCATGCATGC');
+          const gc100 = calculateGcPercentage('GCGCGCGCGCGCGCGC');
+          if (Math.abs(gc0 - 0) > 1e-6 || Math.abs(gc50 - 50) > 1e-6 || Math.abs(gc100 - 100) > 1e-6) {
+            throw new Error(`GC 계산 오류: ${gc0}, ${gc50}, ${gc100}`);
+          }
+          return `0% (${gc0.toFixed(0)}%), 50% (${gc50.toFixed(0)}%), 100% (${gc100.toFixed(0)}%) 정확히 일치`;
+        });
+
+        assertTest('5. 짝맞추기 오답의 성공 점수 제외 검증', () => {
+          const seq = 'ATGC';
+          const slots = [
+            { isQuiz: true, userBase: 'T' },
+            { isQuiz: true, userBase: 'C' },
+            { isQuiz: true, userBase: null },
+            { isQuiz: false, userBase: 'C' }
+          ];
+          const res = evaluateMatchingState(seq, slots);
+          if (res.correctCount !== 1 || res.wrongCount !== 1 || res.remainingCount !== 2) {
+            throw new Error(`점수 계산 오류: correct=${res.correctCount}, wrong=${res.wrongCount}`);
+          }
+          return '정답 1개만 점수 반영, 오답(T에 C 입력)은 오류 사유 표시 후 점수에서 제외됨';
+        });
+
+        assertTest('6. 반보존적 복제 0/50/100% 및 구1+신1 가닥 소유권', () => {
+          const seq = 'ATGCGTACGTAGCTAG';
+          const m0 = computeReplicationModel(seq, 0);
+          const m50 = computeReplicationModel(seq, 50);
+          const m100 = computeReplicationModel(seq, 100);
+
+          if (m0.completedPairs !== 0 || m0.intactParentHelixCount !== 1 || m0.completeDaughterHelixCount !== 0) {
+            throw new Error('0% 원본 상태 검증 실패');
+          }
+          if (m50.completedPairs !== 8 || m50.isComplete) {
+            throw new Error('50% 중간 복제 상태(8/16 쌍) 검증 실패');
+          }
+          if (m100.completedPairs !== 16 || m100.completeDaughterHelixCount !== 2) {
+            throw new Error('100% 딸 DNA 2개 생성 검증 실패');
+          }
+          const [d1, d2] = m100.daughterHelicesSummary;
+          if (
+            d1.oldStrandCount !== 1 || d1.newStrandCount !== 1 ||
+            d2.oldStrandCount !== 1 || d2.newStrandCount !== 1 ||
+            d1.oldStrandId === d2.oldStrandId ||
+            d1.seq5to3 !== seq || d2.seq5to3 !== seq
+          ) {
+            throw new Error('딸 DNA의 반보존적 가닥 소유권(기존1+새1) 또는 서열 일치 실패');
+          }
+          return '0%(원본1) → 50%(8쌍 합성) → 100%(딸 DNA 2개, 각 구가닥1+신가닥1) 검증 통과';
+        });
+
+        assertTest('7. 염기쌍 치환 동일 염기(0) 및 다른 염기(1) 검증', () => {
+          const baseSeq = 'ATGCGTACGTAGCTAG';
+          const sameSub = applyBaseSubstitution(baseSeq, baseSeq, 0, 'A');
+          const diffSub = applyBaseSubstitution(baseSeq, baseSeq, 0, 'G');
+          if (sameSub.changedCount !== 0) {
+            throw new Error('동일 염기 치환 시 변경 수가 0이 아님');
+          }
+          if (diffSub.changedCount !== 1 || diffSub.currentSeq5to3[0] !== 'G' || diffSub.currentSeq3to5[0] !== 'C') {
+            throw new Error('다른 염기 치환 시 변경 수 1 및 상보 짝(G↔C) 갱신 실패');
+          }
+          return '동일 염기 선택 시 변화 0, 다른 염기 선택 시 변화 1 및 상보 가닥 자동 갱신 확인';
+        });
+
+        assertTest('8. Undo / Redo 상태 일관성 검증 (비파괴 격리 검사)', () => {
+          const mockState = {
+            mode: 'substitution',
+            presetIndex: 0,
+            templateSeq: 'ATGCGTACGTAGCTAG',
+            selectedIndex: 0,
+            quizActive: false,
+            matchSlots: [],
+            subBaselineSeq: 'ATGCGTACGTAGCTAG',
+            subWorkingSeq: 'ATGCGTACGTAGCTAG'
+          };
+          const snapBefore = snapshotActionState(mockState);
+          mockState.subWorkingSeq = 'GTGCGTACGTAGCTAG';
+          const snapAfter = snapshotActionState(mockState);
+          applySnapshotToState(mockState, snapBefore);
+          if (mockState.subWorkingSeq !== 'ATGCGTACGTAGCTAG') {
+            throw new Error('Undo 복원 불일치');
+          }
+          applySnapshotToState(mockState, snapAfter);
+          if (mockState.subWorkingSeq !== 'GTGCGTACGTAGCTAG') {
+            throw new Error('Redo 복원 불일치');
+          }
+          return 'Undo 및 Redo 스냅샷 복원 후 모든 상태 필드가 100% 일치함';
+        });
+
+        assertTest('9. 3D 나선 전체 XYZ 정점 버퍼 무결성·결정성 검증', () => {
+          const bufA1 = computeHelixBackboneXYZBuffer(16, 2.25, 0.92, 0.39, 0);
+          const bufA2 = computeHelixBackboneXYZBuffer(16, 2.25, 0.92, 0.39, 0);
+          const bufSeparated = computeHelixBackboneXYZBuffer(16, 2.25, 0.92, 0.39, 3.5);
+
+          if (bufA1.length !== 16 * 2 * 3) {
+            throw new Error('XYZ 정점 버퍼 길이 불일치');
+          }
+          let diffSum = 0;
+          for (let i = 0; i < bufA1.length; i++) {
+            if (!Number.isFinite(bufA1[i]) || !Number.isFinite(bufSeparated[i])) {
+              throw new Error(`유한하지 않은(NaN/Infinity) 3D 좌표 발견 (index ${i})`);
+            }
+            if (Math.abs(bufA1[i] - bufA2[i]) > 1e-7) {
+              throw new Error('동일 입력에 대한 3D 정점 버퍼 결정성 불일치');
+            }
+            diffSum += Math.abs(bufA1[i] - bufSeparated[i]);
+          }
+          if (diffSum < 1.0) {
+            throw new Error('서로 다른 나선 분리 파라미터 간 전체 XYZ 버퍼 차이가 감지되지 않음');
+          }
+          return `전체 ${bufA1.length}개 XYZ 좌표 유한성(finite), 동일 입력 일치, 가닥 분리 시 버퍼 차이(Δ=${diffSum.toFixed(1)}) 확인`;
+        });
+
+        const summaryBanner = document.getElementById('testSummaryBanner');
+        const listEl = document.getElementById('testResultsList');
+        const passCount = results.filter((r) => r.passed).length;
+
+        if (summaryBanner) {
+          summaryBanner.textContent = `자체 검증 결과: 총 ${results.length}개 항목 중 ${passCount}개 통과 (${passCount === results.length ? '정상 작동 검증 완료' : '오류 확인 필요'})`;
+          summaryBanner.className = passCount === results.length
+            ? 'px-3.5 py-2 rounded-xl text-xs font-bold bg-teal-50 text-teal-900 border border-teal-300'
+            : 'px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-900 border border-rose-300';
+        }
+
+        if (listEl) {
+          listEl.innerHTML = '';
+          results.forEach((r) => {
+            const card = document.createElement('div');
+            card.className = r.passed
+              ? 'p-2.5 rounded-xl bg-white border border-slate-200 flex flex-col gap-1'
+              : 'p-2.5 rounded-xl bg-rose-50 border border-rose-300 flex flex-col gap-1';
+
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between gap-2 font-bold text-slate-900';
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = r.name;
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = r.passed
+              ? 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800'
+              : 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-200 text-rose-900';
+            badgeSpan.textContent = r.passed ? 'PASS' : 'FAIL';
+
+            header.appendChild(titleSpan);
+            header.appendChild(badgeSpan);
+
+            const detailP = document.createElement('p');
+            detailP.className = 'text-[11px] text-slate-600 leading-snug';
+            detailP.textContent = r.detail;
+
+            card.appendChild(header);
+            card.appendChild(detailP);
+            listEl.appendChild(card);
+          });
+        }
+      }
+
+      function bindUIEvents() {
+        document.querySelectorAll('.mode-tab').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const targetMode = btn.getAttribute('data-mode');
+            if (!targetMode || targetMode === appState.mode) return;
+            appState.mode = targetMode;
+            appState.repPlaying = false;
+            syncAllViews();
+          });
+        });
+
+        const btnStartQuiz = document.getElementById('btnStartQuiz');
+        if (btnStartQuiz) {
+          btnStartQuiz.addEventListener('click', () => startOrResetMatchingQuiz(false));
+        }
+
+        const btnNewPuzzle = document.getElementById('btnNewPuzzle');
+        if (btnNewPuzzle) {
+          btnNewPuzzle.addEventListener('click', () => startOrResetMatchingQuiz(true));
+        }
+
+        const btnRevealAnswers = document.getElementById('btnRevealAnswers');
+        if (btnRevealAnswers) {
+          btnRevealAnswers.addEventListener('click', revealAllMatchingAnswers);
+        }
+
+        document.querySelectorAll('.btn-base-input').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            handleMatchingBaseInput(btn.getAttribute('data-base-input'));
+          });
+        });
+
+        const repSlider = document.getElementById('repSlider');
+        if (repSlider) {
+          repSlider.addEventListener('input', (e) => {
+            appState.repPlaying = false;
+            appState.repProgress = Number(e.target.value);
+            syncAllViews();
+          });
+        }
+
+        const btnRepZero = document.getElementById('btnRepZero');
+        if (btnRepZero) {
+          btnRepZero.addEventListener('click', () => {
+            appState.repPlaying = false;
+            appState.repProgress = 0;
+            appState.repBranchHighlight = 0;
+            syncAllViews();
+          });
+        }
+
+        const btnRepPrev = document.getElementById('btnRepPrev');
+        if (btnRepPrev) {
+          btnRepPrev.addEventListener('click', () => {
+            appState.repPlaying = false;
+            const curPairs = Math.round((appState.repProgress / 100) * 16);
+            appState.repProgress = (Math.max(0, curPairs - 1) / 16) * 100;
+            syncAllViews();
+          });
+        }
+
+        const btnRepNext = document.getElementById('btnRepNext');
+        if (btnRepNext) {
+          btnRepNext.addEventListener('click', () => {
+            appState.repPlaying = false;
+            const curPairs = Math.round((appState.repProgress / 100) * 16);
+            appState.repProgress = (Math.min(16, curPairs + 1) / 16) * 100;
+            syncAllViews();
+          });
+        }
+
+        const btnRepPlay = document.getElementById('btnRepPlay');
+        if (btnRepPlay) {
+          btnRepPlay.addEventListener('click', () => {
+            if (appState.repProgress >= 100) {
+              appState.repProgress = 0;
+            }
+            appState.repPlaying = !appState.repPlaying;
+            syncAllViews();
+          });
+        }
+
+        document.querySelectorAll('.btn-branch-pick').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const val = Number(btn.getAttribute('data-branch-highlight')) || 0;
+            appState.repBranchHighlight = appState.repBranchHighlight === val && val !== 0 ? 0 : val;
+            syncAllViews();
+            if (appState.repBranchHighlight === 1) {
+              showBanner('딸 DNA #1 강조: 기존 5′→3′ 가닥(진한 잉크색)을 주형으로 삼아 새 3′→5′ 상보 가닥(민트색)이 합성되었습니다.', 'info');
+            } else if (appState.repBranchHighlight === 2) {
+              showBanner('딸 DNA #2 강조: 기존 3′→5′ 가닥(진한 잉크색)을 주형으로 삼아 새 5′→3′ 상보 가닥(민트색)이 합성되었습니다.', 'info');
+            }
+          });
+        });
+
+        document.querySelectorAll('.btn-sub-input').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            handleSubstitutionInput(btn.getAttribute('data-sub-input'));
+          });
+        });
+
+        document.getElementById('btnUndo')?.addEventListener('click', performUndo);
+        document.getElementById('btnRedo')?.addEventListener('click', performRedo);
+        document.getElementById('btnHomeCam')?.addEventListener('click', () => {
+          resetCameraViewpoint();
+          showBanner('기본 시점으로 카메라를 정렬했습니다.', 'info');
+        });
+        document.getElementById('btnResetAll')?.addEventListener('click', resetToInitialExhibition);
+        document.getElementById('btnSavePng')?.addEventListener('click', downloadCurrentCanvasPng);
+
+        document.getElementById('btnToggle2D')?.addEventListener('click', () => {
+          appState.force2DMode = !appState.force2DMode;
+          const container = document.getElementById('fallback2DContainer');
+          if (container) {
+            container.classList.toggle('hidden', !appState.force2DMode);
+          }
+          render2DFallback();
+        });
+
+        document.getElementById('btnCloseFeedback')?.addEventListener('click', () => {
+          document.getElementById('liveFeedbackBanner')?.classList.add('hidden');
+        });
+
+        const lessonDrawer = document.getElementById('lessonDrawer');
+        const infoDrawer = document.getElementById('infoDrawer');
+
+        document.getElementById('btnOpenLesson')?.addEventListener('click', () => {
+          lessonDrawer?.classList.remove('hidden');
+        });
+        document.getElementById('btnCloseLesson')?.addEventListener('click', () => {
+          lessonDrawer?.classList.add('hidden');
+        });
+
+        document.getElementById('btnOpenInfo')?.addEventListener('click', () => {
+          runPureSelfTestSuite();
+          infoDrawer?.classList.remove('hidden');
+        });
+        document.getElementById('btnCloseInfo')?.addEventListener('click', () => {
+          infoDrawer?.classList.add('hidden');
+        });
+        document.getElementById('btnRunSelfTests')?.addEventListener('click', runPureSelfTestSuite);
+
+        document.querySelectorAll('[data-lesson-jump]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const step = btn.getAttribute('data-lesson-jump');
+            lessonDrawer?.classList.add('hidden');
+            if (step === 'step1') {
+              appState.mode = 'match';
+              appState.quizActive = false;
+              syncAllViews();
+              showBanner('1단계: A–T: 수소결합 2개 · C–G: 수소결합 3개로 짝지어진 16쌍 이중나선을 회전하며 관찰해 보세요.', 'info');
+            } else if (step === 'step2') {
+              startOrResetMatchingQuiz(false);
+            } else if (step === 'step3') {
+              appState.mode = 'match';
+              resetCameraViewpoint();
+              syncAllViews();
+              showBanner('3단계: 가닥 I(5′→3′)과 마주 보는 가닥 II(3′→5′)의 역평행 방향 표지를 상하단과 서열표에서 확인하세요.', 'info');
+            } else if (step === 'step4') {
+              appState.mode = 'replication';
+              appState.repPlaying = false;
+              appState.repProgress = 50;
+              appState.repBranchHighlight = 0;
+              syncAllViews();
+              showBanner('4단계: 복제 진행 50% (8/16 염기쌍 분리 및 새 상보 가닥 합성) 상태를 관찰하고 슬라이더를 움직여 보세요.', 'info');
+            } else if (step === 'step5') {
+              appState.mode = 'replication';
+              appState.repPlaying = false;
+              appState.repProgress = 100;
+              appState.repBranchHighlight = 0;
+              syncAllViews();
+              showBanner('5단계: 복제 100% 완료! 두 딸 DNA가 각각 기존 가닥 1개(진한 잉크색) + 새 가닥 1개(민트색)를 가지는 반보존적 복제를 확인하세요.', 'success');
+            }
+          });
+        });
+
+        window.addEventListener('keydown', (e) => {
+          if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+          if (e.key === 'Escape') {
+            lessonDrawer?.classList.add('hidden');
+            infoDrawer?.classList.add('hidden');
+            return;
+          }
+
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+              performRedo();
+            } else {
+              performUndo();
+            }
+            return;
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            performRedo();
+            return;
+          }
+
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            selectBasePosition(appState.selectedIndex - 1);
+            return;
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            selectBasePosition(appState.selectedIndex + 1);
+            return;
+          }
+
+          const upper = e.key.toUpperCase();
+          if (VALID_BASES.includes(upper) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            if (appState.mode === 'match') {
+              handleMatchingBaseInput(upper);
+            } else if (appState.mode === 'substitution') {
+              handleSubstitutionInput(upper);
+            }
+          }
+        });
+      }
+
+      function bootstrapApp() {
+        bindUIEvents();
+        initThreeScene();
+        syncAllViews();
+        runPureSelfTestSuite();
+        lastFrameTime = performance.now();
+        requestAnimationFrame(animateLoop);
+      }
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        bootstrapApp();
+      } else {
+        window.addEventListener('DOMContentLoaded', bootstrapApp);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SOUND SCULPTOR | 소리를 조각하는 공방</title>
+  <style>
+    :root {
+      --bg-deep: #060b16;
+      --bg-panel: rgba(11, 20, 38, 0.86);
+      --border-glow: rgba(86, 176, 255, 0.28);
+      --accent-cyan: #38bdf8;
+      --accent-amber: #fbbf24;
+      --accent-rose: #fb7185;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --safe-bottom: 112px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 38% 42%, #0f1f3d 0%, #070d1b 58%, #040710 100%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    #app-shell {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - var(--safe-bottom));
+      min-height: 460px;
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 14px;
+      padding: 14px 16px 10px 16px;
+    }
+
+    /* 3D/2D Stage Container */
+    #stage-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 18px;
+      border: 1px solid var(--border-glow);
+      background: linear-gradient(160deg, rgba(13, 25, 48, 0.65) 0%, rgba(5, 10, 22, 0.9) 100%);
+      box-shadow: inset 0 0 48px rgba(56, 189, 248, 0.08), 0 12px 32px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    #gl-canvas, #fallback-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #gl-canvas:active, #fallback-canvas:active {
+      cursor: grabbing;
+    }
+
+    #fallback-canvas {
+      display: none;
+    }
+
+    /* Top Overlay Header */
+    .stage-header {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 18px;
+      pointer-events: none;
+    }
+
+    .brand-box {
+      background: rgba(7, 13, 27, 0.76);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      backdrop-filter: blur(8px);
+      padding: 10px 14px;
+      border-radius: 12px;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: #e0f2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-sub {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .telemetry-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      background: rgba(7, 13, 27, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      backdrop-filter: blur(6px);
+    }
+
+    .pill strong {
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    /* Bottom Stage Notice & Legend */
+    .stage-footer {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      padding: 12px 16px;
+      pointer-events: none;
+    }
+
+    .science-note {
+      max-width: 680px;
+      background: rgba(6, 12, 24, 0.82);
+      border-left: 3px solid var(--accent-amber);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.73rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+      backdrop-filter: blur(6px);
+    }
+
+    .science-note b {
+      color: #fde68a;
+    }
+
+    .camera-hint {
+      background: rgba(6, 12, 24, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* Right Control Panel */
+    #control-dock {
+      height: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 18px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      backdrop-filter: blur(12px);
+      overflow-y: auto;
+    }
+
+    .panel-section {
+      background: rgba(15, 28, 53, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 12px;
+      padding: 9px 11px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 6px;
+    }
+
+    .val-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.12);
+      padding: 2px 7px;
+      border-radius: 6px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+      height: 6px;
+      border-radius: 4px;
+    }
+
+    .sub-hint {
+      font-size: 0.69rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-main);
+      border-radius: 9px;
+      padding: 7px 8px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s ease;
+      text-align: center;
+    }
+
+    .btn:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(30, 48, 82, 0.9);
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: #7dd3fc;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    }
+
+    .audio-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .btn-play {
+      background: linear-gradient(135deg, #059669, #0d9488);
+      border-color: #6ee7b7;
+      color: #fff;
+      font-weight: 700;
+      padding: 8px 10px;
+    }
+
+    .btn-play.playing {
+      background: linear-gradient(135deg, #e11d48, #be123c);
+      border-color: #fda4af;
+    }
+
+    .safety-banner {
+      font-size: 0.69rem;
+      color: #fde68a;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 7px;
+      padding: 5px 8px;
+      line-height: 1.35;
+    }
+
+    .coeff-bars {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+      height: 40px;
+      align-items: end;
+      padding-top: 4px;
+    }
+
+    .coeff-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .coeff-fill {
+      width: 100%;
+      background: linear-gradient(180deg, #fbbf24, #38bdf8);
+      border-radius: 3px 3px 0 0;
+      min-height: 2px;
+      transition: height 0.15s ease;
+    }
+
+    .coeff-lbl {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .action-footer {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    #webgl-notice {
+      display: none;
+      background: rgba(225, 29, 72, 0.18);
+      border: 1px solid rgba(251, 113, 133, 0.45);
+      color: #fecdd3;
+      font-size: 0.72rem;
+      padding: 6px 10px;
+      border-radius: 8px;
+      margin-top: 6px;
+    }
+
+    @media (max-width: 920px) {
+      #app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        height: calc(100vh - var(--safe-bottom));
+        overflow-y: auto;
+      }
+      #stage-wrap {
+        min-height: 300px;
+      }
+      #control-dock {
+        height: auto;
+      }
+    }
+  </style>
+  <!-- Stable single Three.js CDN global build -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <main id="app-shell">
+    <!-- Left 3D Sound Sculpture Atelier -->
+    <section id="stage-wrap" aria-label="3D 소리 조각 작업장">
+      <canvas id="gl-canvas"></canvas>
+      <canvas id="fallback-canvas"></canvas>
+
+      <div class="stage-header">
+        <div class="brand-box">
+          <div class="brand-title">
+            <span>SOUND SCULPTOR | 소리를 조각하는 공방</span>
+          </div>
+          <div class="brand-sub">기본음과 배음의 푸리에 합성 신호가 3D 리본 정점 높이와 원형 스펙트럼 기둥을 빚어냅니다</div>
+          <div id="webgl-notice">WebGL 가속을 사용할 수 없어 동일한 실시간 합성 신호 샘플을 그리는 2D 공방 모드로 동작 중입니다.</div>
+        </div>
+
+        <div class="telemetry-pills">
+          <div class="pill">합성식: <strong>y(t) = Σ Aₙ·sin(2π·n·f₀·t)</strong></div>
+          <div class="pill">최대 진폭: <strong id="stat-peak">1.00</strong></div>
+          <div class="pill">파형 거칠기(배음비): <strong id="stat-bright">0%</strong></div>
+          <div class="pill">오디오 상태: <strong id="stat-audio">대기 중(무음)</strong></div>
+        </div>
+      </div>
+
+      <div class="stage-footer">
+        <div class="science-note">
+          <b>[음향·시각 신호 안내]</b> 재생되는 Web Audio 소리와 3D 조각은 동일한 배음 계수 배열(<b>A₁~A₈</b>)을 공유합니다.
+          단, 수백 Hz의 실제 음파 진동은 눈으로 볼 수 없을 만큼 빠르므로, 3D 조각은 <b>동일한 합성 파형의 4주기 샘플을 공간 좌표와 색상(청록=마루, 산호=골, 황금=고에너지)으로 매핑</b>하여 천천히 위상 회전시킵니다.
+          이 모형은 음색 원리를 탐구하는 <b>단순화된 배음 도식</b>이며 실제 악기의 공명통·노이즈·어택(Attack)까지 그대로 재현한 것은 아닙니다.
+        </div>
+        <div class="camera-hint">
+          드래그: 3D 회전 · 휠/핀치: 확대·축소 · 방향키: 시점 회전
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Slim Control Dock (6 Core Controls) -->
+    <aside id="control-dock" aria-label="소리 조각 조작판">
+      <!-- 1. 기본 주파수 -->
+      <div class="panel-section">
+        <div class="section-head">
+          <label for="ctrl-freq">1. 기본 주파수 (f₀)</label>
+          <span class="val-badge" id="lbl-freq">220 Hz (A3)</span>
+        </div>
+        <input type="range" id="ctrl-freq" min="110" max="523" step="1" value="220" aria-label="기본 주파수 슬라이더" />
+        <div class="sub-hint">
+          <span>낮은음 (110Hz, A2)</span>
+          <span>높은음 (523Hz, C5)</span>
+        </div>
+      </div>
+
+      <!-- 2. 배음 개수 (1~8) -->
+      <div class="panel-section">
+        <div class="section-head">
+          <label for="ctrl-harmonics">2. 배음 개수 (1~8차 배음)</label>
+          <span class="val-badge" id="lbl-harmonics">4개 활성</span>
+        </div>
+        <input type="range" id="ctrl-harmonics" min="1" max="8" step="1" value="4" aria-label="배음 개수 슬라이더" />
+        <div class="sub-hint">
+          <span>1개 (기본 순음)</span>
+          <span>8개 (복합 배음)</span>
+        </div>
+      </div>
+
+      <!-- 3. 배음 감쇠량 -->
+      <div class="panel-section">
+        <div class="section-head">
+          <label for="ctrl-rolloff">3. 배음 감쇠량 (고차 배음 감소율)</label>
+          <span class="val-badge" id="lbl-rolloff">1.00 (1/n¹·⁰)</span>
+        </div>
+        <input type="range" id="ctrl-rolloff" min="0.25" max="2.50" step="0.05" value="1.00" aria-label="배음 감쇠량 슬라이더" />
+        <div class="sub-hint">
+          <span>0.25 (날카로운 배음)</span>
+          <span>2.50 (부드러운 음색)</span>
+        </div>
+      </div>
+
+      <!-- 4. 음색 프리셋 & 실시간 배음 계수 막대 -->
+      <div class="panel-section">
+        <div class="section-head">
+          <span>4. 음색 프리셋 (배음 계수 A₁~A₈)</span>
+          <span class="val-badge" id="lbl-preset">현악형</span>
+        </div>
+        <div class="preset-grid" role="group" aria-label="음색 프리셋 선택">
+          <button type="button" class="btn" data-preset="pure" id="btn-pre-pure">순음형</button>
+          <button type="button" class="btn active" data-preset="string" id="btn-pre-string">현악형</button>
+          <button type="button" class="btn" data-preset="wind" id="btn-pre-wind">관악형</button>
+        </div>
+        <div class="coeff-bars" id="coeff-bars" aria-label="1차부터 8차 배음 계수 분포"></div>
+      </div>
+
+      <!-- 5. 재생·정지 및 안전 음량 -->
+      <div class="panel-section">
+        <div class="section-head">
+          <label for="ctrl-volume">5. 소리 듣기 및 안전 음량</label>
+          <span class="val-badge" id="lbl-volume">35% (상한 보호)</span>
+        </div>
+        <div class="audio-row">
+          <button type="button" class="btn btn-play" id="btn-audio-toggle" aria-pressed="false">
+            ▶ 소리 재생 시작
+          </button>
+          <input type="range" id="ctrl-volume" min="0" max="100" step="1" value="35" aria-label="음량 조절 슬라이더" />
+        </div>
+        <div class="safety-banner">
+          ⚠️ <b>청력 보호 주의:</b> 이어폰·스피커 사용 시 큰 소리에 주의하세요. 교실 안전을 위해 최대 출력 게인이 낮게(0.18) 제한되어 있습니다.
+        </div>
+      </div>
+
+      <!-- 6. 초기화 및 카메라 홈 -->
+      <div class="panel-section">
+        <div class="section-head">
+          <span>6. 작업장 초기화 · 시점 정렬</span>
+        </div>
+        <div class="action-footer">
+          <button type="button" class="btn" id="btn-reset-all">↺ 조각·값 초기화</button>
+          <button type="button" class="btn" id="btn-reset-cam">🎯 카메라 홈 맞춤</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // --- 1. Core Synthesis State & Constants ---
+      const SAMPLE_COUNT = 320; // Number of spatial sample points along the 3D ribbon
+      const MAX_HARMONICS = 8;
+      const SAFE_MAX_GAIN = 0.18; // Hardware volume cap for classroom ear safety
+
+      const DEFAULT_STATE = {
+        freq: 220,
+        harmonics: 4,
+        rolloff: 1.0,
+        preset: 'string', // 'pure' | 'string' | 'wind'
+        volumePct: 35,
+        isPlaying: false
+      };
+
+      const state = {
+        freq: DEFAULT_STATE.freq,
+        harmonics: DEFAULT_STATE.harmonics,
+        rolloff: DEFAULT_STATE.rolloff,
+        preset: DEFAULT_STATE.preset,
+        volumePct: DEFAULT_STATE.volumePct,
+        isPlaying: false,
+        phase: 0,
+        webglActive: false,
+        coefficients: new Float32Array(MAX_HARMONICS),
+        rawSamples: new Float32Array(SAMPLE_COUNT),
+        normalizedSamples: new Float32Array(SAMPLE_COUNT),
+        vertexSampleSnapshot: [],
+        signalChecksum: 0,
+        peakAmplitude: 1.0,
+        harmonicBrightness: 0
+      };
+
+      // Note helper for frequency display
+      function freqToNoteName(freq) {
+        const noteStrings = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const midi = Math.round(69 + 12 * Math.log2(freq / 440));
+        const note = noteStrings[(midi % 12 + 12) % 12];
+        const octave = Math.floor(midi / 12) - 1;
+        return note + octave;
+      }
+
+      // Compute harmonic amplitude array A_1 ... A_8 from current preset, count, and rolloff
+      function computeHarmonicCoefficients() {
+        const coeffs = state.coefficients;
+        coeffs.fill(0);
+
+        const activeCount = state.preset === 'pure' ? 1 : state.harmonics;
+        for (let n = 1; n <= MAX_HARMONICS; n++) {
+          if (n > activeCount) {
+            coeffs[n - 1] = 0;
+            continue;
+          }
+          if (n === 1) {
+            coeffs[0] = 1.0;
+            continue;
+          }
+          const baseDecay = 1 / Math.pow(n, state.rolloff);
+          if (state.preset === 'pure') {
+            coeffs[n - 1] = 0;
+          } else if (state.preset === 'string') {
+            // String-like rich all-harmonics with gentle even/odd warmth
+            coeffs[n - 1] = baseDecay * (n % 2 === 0 ? 0.92 : 1.0);
+          } else if (state.preset === 'wind') {
+            // Clarinet/pipe-like odd harmonic dominance
+            coeffs[n - 1] = (n % 2 === 1) ? baseDecay * 1.08 : baseDecay * 0.18;
+          }
+        }
+
+        // Calculate harmonic brightness ratio (sum of overtones / total sum)
+        let total = 0;
+        let overtones = 0;
+        for (let i = 0; i < MAX_HARMONICS; i++) {
+          total += coeffs[i];
+          if (i > 0) overtones += coeffs[i];
+        }
+        state.harmonicBrightness = total > 0 ? Math.round((overtones / total) * 100) : 0;
+      }
+
+      // Synthesize actual time-domain waveform samples y(t) = sum A_n * sin(n * theta + phase)
+      function synthesizeWaveformSamples(phaseOffset) {
+        const coeffs = state.coefficients;
+        const raw = state.rawSamples;
+        const norm = state.normalizedSamples;
+        // Frequency stretches the visible spatial cycles (between 2.5 and 5.5 cycles around the loop)
+        const visibleCycles = 2.5 + ((state.freq - 110) / (523 - 110)) * 3.0;
+
+        let maxAbs = 0.0001;
+        let checksumAcc = 0;
+
+        for (let i = 0; i < SAMPLE_COUNT; i++) {
+          const u = i / SAMPLE_COUNT;
+          const baseAngle = u * Math.PI * 2 * visibleCycles;
+          let sum = 0;
+          for (let n = 1; n <= MAX_HARMONICS; n++) {
+            const amp = coeffs[n - 1];
+            if (amp > 0.0001) {
+              sum += amp * Math.sin(n * baseAngle - phaseOffset * n * 0.65);
+            }
+          }
+          raw[i] = sum;
+          const absVal = Math.abs(sum);
+          if (absVal > maxAbs) maxAbs = absVal;
+        }
+
+        state.peakAmplitude = maxAbs;
+        const normFactor = Math.max(1.0, maxAbs * 0.92);
+
+        for (let i = 0; i < SAMPLE_COUNT; i++) {
+          norm[i] = raw[i] / normFactor;
+          checksumAcc += Math.round((norm[i] + 2.0) * 1000) * (i + 1);
+        }
+        state.signalChecksum = checksumAcc % 1000000007;
+      }
+
+      // --- 2. Web Audio API Additive Synthesizer (Starts muted until student click) ---
+      const audioEngine = {
+        ctx: null,
+        masterGain: null,
+        oscillators: [],
+        gains: [],
+
+        initAndStart() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.0001;
+            this.masterGain.connect(this.ctx.destination);
+
+            for (let n = 1; n <= MAX_HARMONICS; n++) {
+              const osc = this.ctx.createOscillator();
+              const g = this.ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.value = state.freq * n;
+              g.gain.value = 0;
+              osc.connect(g);
+              g.connect(this.masterGain);
+              osc.start();
+              this.oscillators.push(osc);
+              this.gains.push(g);
+            }
+          }
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+          state.isPlaying = true;
+          this.syncParameters();
+        },
+
+        stop() {
+          state.isPlaying = false;
+          if (this.ctx && this.masterGain) {
+            const now = this.ctx.currentTime;
+            this.masterGain.gain.cancelScheduledValues(now);
+            this.masterGain.gain.setTargetAtTime(0.0001, now, 0.04);
+          }
+        },
+
+        syncParameters() {
+          if (!this.ctx || ! this.masterGain) return;
+          const now = this.ctx.currentTime;
+
+          // Normalize total harmonic power so increasing harmonics doesn't clip
+          let sumAmp = 0;
+          for (let i = 0; i < MAX_HARMONICS; i++) {
+            sumAmp += state.coefficients[i];
+          }
+          const normScale = sumAmp > 0 ? 1 / Math.sqrt(sumAmp) : 1;
+
+          for (let n = 1; n <= MAX_HARMONICS; n++) {
+            const osc = this.oscillators[n - 1];
+            const g = this.gains[n - 1];
+            const targetFreq = state.freq * n;
+            const targetAmp = state.coefficients[n - 1] * normScale;
+
+            osc.frequency.setTargetAtTime(targetFreq, now, 0.025);
+            g.gain.setTargetAtTime(targetAmp, now, 0.03);
+          }
+
+          const targetMaster = state.isPlaying
+            ? (state.volumePct / 100) * SAFE_MAX_GAIN
+            : 0.0001;
+          this.masterGain.gain.setTargetAtTime(targetMaster, now, 0.035);
+        }
+      };
+
+      // --- 3. 3D Sound Sculpture (Three.js) & 2D Fallback Renderer ---
+      const stageWrap = document.getElementById('stage-wrap');
+      const glCanvas = document.getElementById('gl-canvas');
+      const fbCanvas = document.getElementById('fallback-canvas');
+
+      let renderer = null;
+      let scene = null;
+      let camera = null;
+      let sculptureGroup = null;
+      let ribbonMesh = null;
+      let wireLine = null;
+      let harmonicPillars = [];
+      let harmonicRings = [];
+
+      // Camera spherical coordinates
+      const camSpherical = {
+        theta: 0.55,
+        phi: 1.06,
+        radius: 14.5,
+        targetRadius: 14.5
+      };
+
+      function resetCameraHome() {
+        const aspect = stageWrap.clientWidth / Math.max(1, stageWrap.clientHeight);
+        // Responsive distance so sculpture never clips on narrow viewports
+        const fitRadius = aspect < 1.15 ? 17.5 : 14.2;
+        camSpherical.theta = 0.55;
+        camSpherical.phi = 1.06;
+        camSpherical.targetRadius = fitRadius;
+        camSpherical.radius = fitRadius;
+        updateCameraTransform();
+      }
+
+      function updateCameraTransform() {
+        if (!camera) return;
+        const sinPhi = Math.sin(camSpherical.phi);
+        camera.position.x = camSpherical.radius * sinPhi * Math.sin(camSpherical.theta);
+        camera.position.y = camSpherical.radius * Math.cos(camSpherical.phi);
+        camera.position.z = camSpherical.radius * sinPhi * Math.cos(camSpherical.theta);
+        camera.lookAt(0, 0.2, 0);
+      }
+
+      function initThreeStage() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('Three.js 로드 실패');
+          renderer = new THREE.WebGLRenderer({
+            canvas: glCanvas,
+            antialias: true,
+            alpha: true,
+            powerPreference: 'high-performance'
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+
+          // Atelier lighting
+          const ambient = new THREE.AmbientLight(0x93c5fd, 0.65);
+          scene.add(ambient);
+
+          const keyLight = new THREE.DirectionalLight(0x38bdf8, 1.25);
+          keyLight.position.set(8, 14, 10);
+          scene.add(keyLight);
+
+          const warmLight = new THREE.PointLight(0xfbbf24, 1.1, 28);
+          warmLight.position.set(-7, -4, 6);
+          scene.add(warmLight);
+
+          sculptureGroup = new THREE.Group();
+          scene.add(sculptureGroup);
+
+          // 1) Signal Ribbon Geometry: 2 vertices (inner/outer edge) per sample point around a helical torus
+          const ribbonGeo = new THREE.BufferGeometry();
+          const vertCount = (SAMPLE_COUNT + 1) * 2;
+          const positions = new Float32Array(vertCount * 3);
+          const colors = new Float32Array(vertCount * 3);
+          const indices = [];
+
+          for (let i = 0; i < SAMPLE_COUNT; i++) {
+            const a = i * 2;
+            const b = a + 1;
+            const c = (i + 1) * 2;
+            const d = c + 1;
+            indices.push(a, b, c, b, d, c);
+          }
+
+          ribbonGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+          ribbonGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          ribbonGeo.setIndex(indices);
+
+          const ribbonMat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            roughness: 0.24,
+            metalness: 0.45,
+            emissive: new THREE.Color(0x071a33),
+            emissiveIntensity: 0.55
+          });
+
+          ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
+          sculptureGroup.add(ribbonMesh);
+
+          // 2) Glowing Crest Spine Line along outer edge of signal ribbon
+          const lineGeo = new THREE.BufferGeometry();
+          const linePos = new Float32Array((SAMPLE_COUNT + 1) * 3);
+          const lineCol = new Float32Array((SAMPLE_COUNT + 1) * 3);
+          lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+          lineGeo.setAttribute('color', new THREE.BufferAttribute(lineCol, 3));
+          const lineMat = new THREE.LineBasicMaterial({ vertexColors: true });
+          wireLine = new THREE.Line(lineGeo, lineMat);
+          sculptureGroup.add(wireLine);
+
+          // 3) Central Circular Spectrum Sculpture (8 Harmonic Pillars & Orbital Rings)
+          const pillarRadius = 2.05;
+          for (let n = 0; n < MAX_HARMONICS; n++) {
+            const angle = (n / MAX_HARMONICS) * Math.PI * 2;
+            const cylGeo = new THREE.CylinderGeometry(0.18, 0.24, 1.0, 20);
+            const hue = 0.54 - (n / MAX_HARMONICS) * 0.42;
+            const col = new THREE.Color().setHSL(hue, 0.88, 0.58);
+            const cylMat = new THREE.MeshStandardMaterial({
+              color: col,
+              emissive: col,
+              emissiveIntensity: 0.35,
+              roughness: 0.25,
+              metalness: 0.6
+            });
+            const mesh = new THREE.Mesh(cylGeo, cylMat);
+            mesh.position.set(Math.cos(angle) * pillarRadius, 0, Math.sin(angle) * pillarRadius);
+            sculptureGroup.add(mesh);
+            harmonicPillars.push(mesh);
+
+            // Harmonic orbital ring
+            const ringGeo = new THREE.TorusGeometry(0.45 + n * 0.22, 0.018, 8, 48);
+            const ringMat = new THREE.MeshBasicMaterial({
+              color: col,
+              transparent: true,
+              opacity: 0.3
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            sculptureGroup.add(ring);
+            harmonicRings.push(ring);
+          }
+
+          state.webglActive = true;
+          handleResize();
+          resetCameraHome();
+        } catch (err) {
+          // Graceful fallback to 2D Canvas if WebGL fails
+          state.webglActive = false;
+          glCanvas.style.display = 'none';
+          fbCanvas.style.display = 'block';
+          document.getElementById('webgl-notice').style.display = 'block';
+          handleResize();
+        }
+      }
+
+      // Update 3D ribbon vertex positions & vertex colors from synthesized signal y(t)
+      function updateSculptureGeometry() {
+        const norm = state.normalizedSamples;
+        const coeffs = state.coefficients;
+
+        if (!state.webglActive) {
+          // Record diagnostic snapshot even in 2D fallback mode
+          state.vertexSampleSnapshot = [
+            Number(norm[0].toFixed(4)),
+            Number(norm[40].toFixed(4)),
+            Number(norm[80].toFixed(4)),
+            Number(norm[160].toFixed(4))
+          ];
+          return;
+        }
+
+        const posAttr = ribbonMesh.geometry.attributes.position;
+        const colAttr = ribbonMesh.geometry.attributes.color;
+        const posArr = posAttr.array;
+        const colArr = colAttr.array;
+
+        const linePosAttr = wireLine.geometry.attributes.position;
+        const lineColAttr = wireLine.geometry.attributes.color;
+        const linePosArr = linePosAttr.array;
+        const lineColArr = lineColAttr.array;
+
+        const baseRadius = 4.35;
+        const ribbonWidth = 0.85;
+        const verticalScale = 1.95;
+
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+          const idx = i % SAMPLE_COUNT;
+          const u = i / SAMPLE_COUNT;
+          const theta = u * Math.PI * 2;
+          const sig = norm[idx]; // Real synthesized sample in [-1.1, 1.1]
+
+          // Helical vertical base + actual signal displacement y(t)
+          const helixWave = Math.sin(theta * 2) * 0.45;
+          const yInner = helixWave + sig * verticalScale * 0.45;
+          const yOuter = helixWave + sig * verticalScale * 1.15;
+
+          const rInner = baseRadius - ribbonWidth * 0.45 + sig * 0.25;
+          const rOuter = baseRadius + ribbonWidth * 0.55 + sig * 0.72;
+
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
+
+          const vInner = i * 2 * 3;
+          const vOuter = (i * 2 + 1) * 3;
+
+          posArr[vInner] = cosT * rInner;
+          posArr[vInner + 1] = yInner;
+          posArr[vInner + 2] = sinT * rInner;
+
+          posArr[vOuter] = cosT * rOuter;
+          posArr[vOuter + 1] = yOuter;
+          posArr[vOuter + 2] = sinT * rOuter;
+
+          linePosArr[i * 3] = cosT * (rOuter + 0.06);
+          linePosArr[i * 3 + 1] = yOuter + 0.04;
+          linePosArr[i * 3 + 2] = sinT * (rOuter + 0.06);
+
+          // Map signal height & energy to RGB vertex color
+          // Crest (+): cyan/gold, Trough (-): royal blue/coral
+          const energy = Math.min(1, Math.abs(sig));
+          const rCol = sig >= 0 ? (0.18 + energy * 0.80) : (0.15 + energy * 0.72);
+          const gCol = sig >= 0 ? (0.68 + energy * 0.25) : (0.28 + (1 - energy) * 0.35);
+          const bCol = sig >= 0 ? (0.96 - energy * 0.45) : (0.88 - energy * 0.25);
+
+          colArr[vInner] = rCol * 0.65;
+          colArr[vInner + 1] = gCol * 0.65;
+          colArr[vInner + 2] = bCol * 0.75;
+
+          colArr[vOuter] = rCol;
+          colArr[vOuter + 1] = gCol;
+          colArr[vOuter + 2] = bCol;
+
+          lineColArr[i * 3] = Math.min(1, rCol + 0.2);
+          lineColArr[i * 3 + 1] = Math.min(1, gCol + 0.2);
+          lineColArr[i * 3 + 2] = Math.min(1, bCol + 0.2);
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+        ribbonMesh.geometry.computeVertexNormals();
+
+        linePosAttr.needsUpdate = true;
+        lineColAttr.needsUpdate = true;
+
+        // Update central harmonic spectrum pillars & rings
+        for (let n = 0; n < MAX_HARMONICS; n++) {
+          const amp = coeffs[n];
+          const pillar = harmonicPillars[n];
+          const ring = harmonicRings[n];
+          const h = Math.max(0.12, amp * 3.4);
+          pillar.scale.set(1, h, 1);
+          pillar.position.y = (h - 1.2) * 0.35;
+          pillar.material.emissiveIntensity = amp > 0.01 ? 0.25 + amp * 0.65 : 0.05;
+          pillar.material.opacity = amp > 0.01 ? 1.0 : 0.25;
+
+          ring.position.y = (amp - 0.3) * 1.1;
+          ring.material.opacity = amp > 0.01 ? 0.18 + amp * 0.55 : 0.04;
+        }
+
+        // Store real vertex sample snapshot for read-only diagnostics
+        state.vertexSampleSnapshot = [
+          Number(posArr[1].toFixed(4)),
+          Number(posArr[61].toFixed(4)),
+          Number(posArr[121].toFixed(4)),
+          Number(posArr[241].toFixed(4))
+        ];
+      }
+
+      // 2D Canvas Fallback Renderer using the exact same synthesized samples
+      function render2DFallback() {
+        const ctx = fbCanvas.getContext('2d');
+        const w = fbCanvas.width;
+        const h = fbCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        const cx = w * 0.5;
+        const cy = h * 0.5;
+        const baseR = Math.min(w, h) * 0.27;
+        const norm = state.normalizedSamples;
+
+        // Draw circular harmonic rings
+        for (let n = 0; n < MAX_HARMONICS; n++) {
+          const amp = state.coefficients[n];
+          ctx.beginPath();
+          ctx.arc(cx, cy, baseR * (0.25 + n * 0.07), 0, Math.PI * 2);
+          ctx.strokeStyle = `hsla(${195 - n * 18}, 85%, 60%, ${0.08 + amp * 0.45})`;
+          ctx.lineWidth = 1 + amp * 4;
+          ctx.stroke();
+        }
+
+        // Draw circular signal ribbon
+        ctx.beginPath();
+        for (let i = 0; i <= SAMPLE_COUNT; i++) {
+          const idx = i % SAMPLE_COUNT;
+          const angle = (i / SAMPLE_COUNT) * Math.PI * 2 + camSpherical.theta * 0.4;
+          const sig = norm[idx];
+          const r = baseR + sig * (baseR * 0.34);
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r * 0.78;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      // --- 4. UI Updates & Event Listeners ---
+      const elFreq = document.getElementById('ctrl-freq');
+      const elHarmonics = document.getElementById('ctrl-harmonics');
+      const elRolloff = document.getElementById('ctrl-rolloff');
+      const elVolume = document.getElementById('ctrl-volume');
+      const btnAudio = document.getElementById('btn-audio-toggle');
+      const coeffBarsContainer = document.getElementById('coeff-bars');
+
+      // Initialize 8 harmonic bar DOM elements
+      const coeffBarEls = [];
+      for (let n = 1; n <= MAX_HARMONICS; n++) {
+        const col = document.createElement('div');
+        col.className = 'coeff-col';
+        const fill = document.createElement('div');
+        fill.className = 'coeff-fill';
+        const lbl = document.createElement('span');
+        lbl.className = 'coeff-lbl';
+        lbl.textContent = n + '차';
+        col.appendChild(fill);
+        col.appendChild(lbl);
+        coeffBarsContainer.appendChild(col);
+        coeffBarEls.push(fill);
+      }
+
+      function refreshSystemState() {
+        computeHarmonicCoefficients();
+        synthesizeWaveformSamples(state.phase);
+        updateSculptureGeometry();
+        audioEngine.syncParameters();
+
+        // Update labels
+        document.getElementById('lbl-freq').textContent = `${state.freq} Hz (${freqToNoteName(state.freq)})`;
+        document.getElementById('lbl-harmonics').textContent = state.preset === 'pure'
+          ? `1개 (순음 고정)`
+          : `${state.harmonics}개 활성`;
+        document.getElementById('lbl-rolloff').textContent = `${state.rolloff.toFixed(2)} (1/n^${state.rolloff.toFixed(1)})`;
+
+        const presetNames = { pure: '순음형', string: '현악형', wind: '관악형' };
+        document.getElementById('lbl-preset').textContent = presetNames[state.preset] || '사용자';
+        document.getElementById('lbl-volume').textContent = `${state.volumePct}% (상한 보호)`;
+
+        document.getElementById('stat-peak').textContent = state.peakAmplitude.toFixed(2);
+        document.getElementById('stat-bright').textContent = `${state.harmonicBrightness}%`;
+        document.getElementById('stat-audio').textContent = state.isPlaying ? '재생 중 (Web Audio)' : '대기 중 (무음)';
+
+        // Preset button active states
+        document.querySelectorAll('[data-preset]').forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-preset') === state.preset);
+        });
+
+        // Update 8 harmonic coefficient mini-bars
+        for (let i = 0; i < MAX_HARMONICS; i++) {
+          const pct = Math.round(Math.min(1, state.coefficients[i]) * 100);
+          coeffBarEls[i].style.height = `${Math.max(6, pct * 0.26)}px`;
+          coeffBarEls[i].style.opacity = state.coefficients[i] > 0.005 ? '1' : '0.2';
+        }
+      }
+
+      // Bind 6 Core Controls
+      elFreq.addEventListener('input', (e) => {
+        state.freq = Number(e.target.value);
+        refreshSystemState();
+      });
+
+      elHarmonics.addEventListener('input', (e) => {
+        state.harmonics = Number(e.target.value);
+        if (state.preset === 'pure' && state.harmonics > 1) {
+          state.preset = 'string';
+        }
+        refreshSystemState();
+      });
+
+      elRolloff.addEventListener('input', (e) => {
+        state.rolloff = Number(e.target.value);
+        refreshSystemState();
+      });
+
+      document.querySelectorAll('[data-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetPreset = btn.getAttribute('data-preset');
+          state.preset = targetPreset;
+          if (targetPreset === 'pure') {
+            state.harmonics = 1;
+            elHarmonics.value = '1';
+          } else if (state.harmonics === 1) {
+            state.harmonics = 5;
+            elHarmonics.value = '5';
+          }
+          refreshSystemState();
+        });
+      });
+
+      btnAudio.addEventListener('click', () => {
+        if (!state.isPlaying) {
+          audioEngine.initAndStart();
+          btnAudio.textContent = '⏹ 소리 정지';
+          btnAudio.classList.add('playing');
+          btnAudio.setAttribute('aria-pressed', 'true');
+        } else {
+          audioEngine.stop();
+          btnAudio.textContent = '▶ 소리 재생 시작';
+          btnAudio.classList.remove('playing');
+          btnAudio.setAttribute('aria-pressed', 'false');
+        }
+        refreshSystemState();
+      });
+
+      elVolume.addEventListener('input', (e) => {
+        state.volumePct = Number(e.target.value);
+        refreshSystemState();
+      });
+
+      document.getElementById('btn-reset-all').addEventListener('click', () => {
+        state.freq = DEFAULT_STATE.freq;
+        state.harmonics = DEFAULT_STATE.harmonics;
+        state.rolloff = DEFAULT_STATE.rolloff;
+        state.preset = DEFAULT_STATE.preset;
+        state.volumePct = DEFAULT_STATE.volumePct;
+
+        elFreq.value = String(state.freq);
+        elHarmonics.value = String(state.harmonics);
+        elRolloff.value = String(state.rolloff);
+        elVolume.value = String(state.volumePct);
+
+        resetCameraHome();
+        refreshSystemState();
+      });
+
+      document.getElementById('btn-reset-cam').addEventListener('click', () => {
+        resetCameraHome();
+      });
+
+      // --- 5. Pointer, Touch & Keyboard Camera Orbit Exploration ---
+      let isDragging = false;
+      let prevX = 0;
+      let prevY = 0;
+
+      function onPointerDown(x, y) {
+        isDragging = true;
+        prevX = x;
+        prevY = y;
+      }
+
+      function onPointerMove(x, y) {
+        if (!isDragging) return;
+        const dx = x - prevX;
+        const dy = y - prevY;
+        prevX = x;
+        prevY = y;
+        camSpherical.theta -= dx * 0.007;
+        camSpherical.phi = Math.max(0.35, Math.min(Math.PI - 0.35, camSpherical.phi - dy * 0.007));
+        updateCameraTransform();
+      }
+
+      function onPointerUp() {
+        isDragging = false;
+      }
+
+      stageWrap.addEventListener('mousedown', (e) => onPointerDown(e.clientX, e.clientY));
+      window.addEventListener('mousemove', (e) => onPointerMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', onPointerUp);
+
+      stageWrap.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', (e) => {
+        if (isDragging && e.touches.length === 1) {
+          onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', onPointerUp);
+
+      stageWrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camSpherical.targetRadius = Math.max(8.5, Math.min(24.0, camSpherical.targetRadius + e.deltaY * 0.01));
+        camSpherical.radius = camSpherical.targetRadius;
+        updateCameraTransform();
+      }, { passive: false });
+
+      window.addEventListener('keydown', (e) => {
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+          if (e.key === 'ArrowLeft') camSpherical.theta -= 0.08;
+          if (e.key === 'ArrowRight') camSpherical.theta += 0.08;
+          if (e.key === 'ArrowUp') camSpherical.phi = Math.max(0.35, camSpherical.phi - 0.06);
+          if (e.key === 'ArrowDown') camSpherical.phi = Math.min(Math.PI - 0.35, camSpherical.phi + 0.06);
+          updateCameraTransform();
+        }
+      });
+
+      function handleResize() {
+        const w = Math.max(280, stageWrap.clientWidth);
+        const h = Math.max(260, stageWrap.clientHeight);
+        if (state.webglActive && renderer && camera) {
+          renderer.setSize(w, h);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        } else {
+          fbCanvas.width = w;
+          fbCanvas.height = h;
+        }
+      }
+
+      window.addEventListener('resize', handleResize);
+
+      // --- 6. Read-Only Real Diagnostics Interface ---
+      window.appDiagnostics = function () {
+        return Object.freeze({
+          appName: 'SOUND SCULPTOR | 소리를 조각하는 공방',
+          webglActive: state.webglActive,
+          isPlayingAudio: state.isPlaying,
+          fundamentalFreqHz: state.freq,
+          activeHarmonicsCount: state.preset === 'pure' ? 1 : state.harmonics,
+          rolloffExponent: state.rolloff,
+          presetMode: state.preset,
+          harmonicCoefficients: Array.from(state.coefficients).map((v) => Number(v.toFixed(4))),
+          vertexSamplesY: state.vertexSampleSnapshot.slice(),
+          signalChecksum: state.signalChecksum
+        });
+      };
+
+      // --- 7. Main Animation Loop ---
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Advance phase smoothly (faster when audio is actively playing)
+        const speed = state.isPlaying ? 0.032 : 0.012;
+        state.phase += speed;
+
+        synthesizeWaveformSamples(state.phase);
+        updateSculptureGeometry();
+
+        if (state.webglActive && renderer && scene && camera) {
+          sculptureGroup.rotation.y += 0.0022;
+          renderer.render(scene, camera);
+        } else {
+          render2DFallback();
+        }
+      }
+
+      window.onload = function () {
+        initThreeStage();
+        refreshSystemState();
+        animate();
+      };
+    })();
+  </script>
+</body>
+</html>

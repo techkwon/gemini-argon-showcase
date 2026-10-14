@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gemini 4 Argon 앱 16선</title>
+<meta name="description" content="Gemini 4 Argon으로 만든 수업용 인터랙티브 3D 앱 16개를 바로 체험해 보세요.">
+<meta property="og:title" content="Gemini 4 Argon 앱 16선">
+<meta property="og:description" content="Gemini 4 Argon으로 만든 수업용 인터랙티브 3D 앱 16개를 바로 체험해 보세요.">
+<meta property="og:image" content="https://techkwon.github.io/gemini-argon-showcase/thumbs/argon-showreel.jpg">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#08070f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@400;600;800&display=swap">
+<style>
+/* Layout: 방전관 히어로(좌 타이포 · 우 플라즈마 구) → 스펙트럼 띠 → 원소표처럼 늘어선 앱 카드 → 아르곤 노트 */
+:root {
+  --void: #08070f;
+  --void-2: #110f1d;
+  --void-3: #1a1729;
+  --line: rgba(182, 160, 255, 0.14);
+  --line-strong: rgba(182, 160, 255, 0.32);
+  --fg: #eeeaff;
+  --muted: #a39dc2;
+  --plasma: #b89dff;
+  --plasma-deep: #7b5cff;
+  --ion: #6fd6ff;
+  --ember: #ff7d9f;
+  --gold: #ffd46e;
+  --leaf: #7ef0b4;
+  --font-display: "Unbounded", "IBM Plex Sans KR", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --gutter: clamp(16px, 4vw, 48px);
+  --maxw: 1240px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ion); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding-inline: var(--gutter); }
+
+/* ── 필름 그레인 ── */
+.grain {
+  position: fixed; inset: -50%; z-index: 90; pointer-events: none; opacity: .07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: grain 1.2s steps(6) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0,0) } 20% { transform: translate(-3%,2%) } 40% { transform: translate(2%,-4%) }
+  60% { transform: translate(-4%,-1%) } 80% { transform: translate(3%,3%) } 100% { transform: translate(0,0) }
+}
+
+/* ── 커서 ── */
+.cursor, .cursor-dot { position: fixed; left: 0; top: 0; z-index: 100; pointer-events: none; border-radius: 50%; display: none; }
+.cursor { width: 38px; height: 38px; margin: -19px 0 0 -19px; border: 1px solid var(--plasma); box-shadow: 0 0 18px rgba(184,157,255,.55), inset 0 0 12px rgba(111,214,255,.3); transition: width .25s, height .25s, margin .25s, background .25s, border-color .25s; mix-blend-mode: screen; }
+.cursor.hot { width: 70px; height: 70px; margin: -35px 0 0 -35px; background: rgba(184,157,255,.12); border-color: var(--ion); }
+.cursor-dot { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: #fff; box-shadow: 0 0 10px #fff, 0 0 22px var(--plasma); }
+@media (pointer: fine) { .has-cursor .cursor, .has-cursor .cursor-dot { display: block; } .has-cursor, .has-cursor a, .has-cursor button { cursor: none; } }
+
+/* ── 상단 바 ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) var(--gutter) 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  transition: background .4s, backdrop-filter .4s, border-color .4s;
+  border-bottom: 1px solid transparent;
+}
+.topbar.scrolled { background: rgba(8,7,15,.72); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4); border-color: var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand-tile { width: 34px; height: 34px; border: 1px solid var(--plasma); border-radius: 6px; display: grid; place-items: center; position: relative; font: 600 14px/1 var(--font-display); color: var(--plasma); box-shadow: 0 0 14px rgba(184,157,255,.35), inset 0 0 10px rgba(184,157,255,.2); }
+.brand-tile small { position: absolute; top: 3px; left: 4px; font: 400 7px/1 var(--font-mono); color: var(--muted); }
+.brand-name { font: 600 13px/1.1 var(--font-display); letter-spacing: .06em; }
+.brand-name span { display: block; font: 400 10px/1.2 var(--font-mono); color: var(--muted); letter-spacing: .1em; }
+.topnav { display: flex; gap: 6px; }
+.topnav a { text-decoration: none; font-size: 13px; padding: 7px 12px; border-radius: 99px; color: var(--muted); transition: color .2s, background .2s; }
+.topnav a:hover { color: var(--fg); background: rgba(184,157,255,.1); }
+@media (max-width: 560px) { .topnav a:not(.primary) { display: none; } }
+
+/* ── 히어로 ── */
+.hero { position: relative; min-height: min(860px, 100svh); display: flex; align-items: center; overflow: hidden; isolation: isolate; }
+#plasma { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+.hero::after { content: ""; position: absolute; inset: auto 0 0 0; height: 180px; background: linear-gradient(to bottom, transparent, var(--void)); z-index: -1; pointer-events: none; }
+.hero-inner { width: 100%; padding-block: 120px 80px; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 24px; align-items: center; }
+.hero-copy { min-width: 0; position: relative; z-index: 2; text-shadow: 0 1px 12px rgba(8,7,15,.85); }
+.eyebrow { font: 400 12px/1.4 var(--font-mono); letter-spacing: .22em; text-transform: uppercase; color: var(--ion); display: flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ""; width: 28px; height: 1px; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.title { margin: 18px 0 0; font-family: var(--font-display); font-weight: 800; line-height: .9; letter-spacing: -.02em; text-wrap: balance; }
+.title .g4 { display: block; font-size: clamp(22px, 3.2vw, 38px); font-weight: 600; letter-spacing: .14em; color: var(--muted); margin-bottom: 10px; }
+.title .argon { display: inline-flex; font-size: clamp(64px, 12.5vw, 172px); }
+.title .argon span {
+  display: inline-block; color: #f6f1ff;
+  text-shadow: 0 0 6px #fff, 0 0 18px var(--plasma), 0 0 42px var(--plasma-deep), 0 0 90px rgba(123,92,255,.7);
+  animation: ignite 1.8s both, hum 6s 2.2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * .13s + .25s), calc(var(--i) * .4s + 2.2s);
+}
+@keyframes ignite {
+  0% { opacity: .05; transform: translateY(.3em) scale(.96); filter: blur(6px); text-shadow: none; }
+  12% { opacity: 1; filter: blur(0); }
+  16% { opacity: .15; }
+  22% { opacity: 1; }
+  30% { opacity: .3; }
+  36% { opacity: 1; transform: translateY(0) scale(1); }
+  44% { opacity: .55; }
+  50%, 100% { opacity: 1; transform: none; filter: none; }
+}
+@keyframes hum { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .72; } 49% { opacity: 1; } 51% { opacity: .85; } 52% { opacity: 1; } }
+.lede { margin: 26px 0 0; max-width: 34em; font-size: clamp(16px, 1.6vw, 19px); color: #d9d3f5; }
+.lede b { color: #fff; font-weight: 700; }
+.hero-cta { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px; }
+.btn {
+  position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 99px;
+  font-weight: 700; font-size: 15px; text-decoration: none; border: 1px solid var(--line-strong); background: rgba(17,15,29,.6);
+  backdrop-filter: blur(6px); cursor: pointer; transition: border-color .25s, box-shadow .25s, background .25s; will-change: transform;
+}
+.btn:hover { border-color: var(--plasma); box-shadow: 0 0 24px rgba(184,157,255,.35); }
+.btn.solid { border: 0; color: #120b26; background: linear-gradient(100deg, #fff 0%, var(--plasma) 45%, var(--ion) 100%); background-size: 200% 100%; box-shadow: 0 0 30px rgba(184,157,255,.45); animation: sheen 5s linear infinite; }
+@keyframes sheen { to { background-position: -200% 0; } }
+.btn svg { width: 16px; height: 16px; flex: none; }
+
+.hero-stats { margin-top: 44px; display: flex; flex-wrap: wrap; gap: 28px 40px; }
+.stat b { display: block; font: 600 clamp(26px, 3vw, 34px)/1 var(--font-display); font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 18px rgba(184,157,255,.6); }
+.stat span { font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+
+.element-card {
+  justify-self: end; align-self: end; margin-bottom: 10px; position: relative; z-index: 2;
+  width: 168px; aspect-ratio: 1 / 1.12; max-width: 100%; padding: 14px; border-radius: 14px;
+  border: 1px solid var(--line-strong); background: rgba(17,15,29,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: grid; grid-template-rows: auto 1fr auto; font-family: var(--font-mono);
+  box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 40px rgba(123,92,255,.25);
+  transform-style: preserve-3d; animation: floaty 7s ease-in-out infinite;
+}
+@keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-14px) rotate(1deg); } }
+.element-card .num { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.element-card .sym { font: 800 64px/1 var(--font-display); align-self: center; color: #fff; text-shadow: 0 0 20px var(--plasma); }
+.element-card .nm { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.element-card .nm b { color: var(--fg); font-weight: 600; font-family: var(--font-body); font-size: 13px; }
+@media (max-width: 860px) {
+  .hero-inner { grid-template-columns: 1fr; padding-block: 108px 56px; }
+  .element-card { justify-self: start; width: 140px; order: -1; margin: 0; }
+  .element-card .sym { font-size: 52px; }
+}
+
+/* ── 스펙트럼 ── */
+.spectrum { position: relative; padding-block: 8px 0; }
+.spec-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; font: 400 12px/1.4 var(--font-mono); color: var(--muted); letter-spacing: .08em; }
+.spec-head output { color: var(--fg); font-variant-numeric: tabular-nums; }
+.spec-box { position: relative; margin-top: 10px; height: 74px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #050409; }
+#spec { width: 100%; height: 100%; display: block; }
+.spec-scale { display: flex; justify-content: space-between; margin-top: 6px; font: 400 11px/1 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── 마키 ── */
+.marquee { margin-top: 64px; border-block: 1px solid var(--line); overflow: hidden; padding-block: 18px; background: linear-gradient(90deg, rgba(123,92,255,.08), rgba(111,214,255,.06), rgba(255,125,159,.08)); }
+.marquee-track { display: flex; width: max-content; animation: marquee 48s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+.marquee-track span { font: 600 clamp(18px, 2.4vw, 28px)/1 var(--font-display); letter-spacing: .04em; padding-inline: 22px; white-space: nowrap; color: transparent; -webkit-text-stroke: 1px rgba(184,157,255,.55); }
+.marquee-track span:nth-child(3n+1) { color: #fff; -webkit-text-stroke: 0; text-shadow: 0 0 16px rgba(184,157,255,.6); }
+.marquee-track i { font-style: normal; color: var(--ion); align-self: center; text-shadow: 0 0 10px var(--ion); }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* ── 섹션 공통 ── */
+section.block { padding-block: clamp(72px, 10vw, 128px) 0; }
+.sec-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: end; }
+.sec-head h2 { margin: 10px 0 0; font: 800 clamp(34px, 5.6vw, 68px)/1 var(--font-display); letter-spacing: -.02em; text-wrap: balance; }
+.sec-head h2 em { font-style: normal; color: transparent; background: linear-gradient(90deg, var(--plasma), var(--ion), var(--ember), var(--plasma)); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; animation: flow 8s linear infinite; }
+@keyframes flow { to { background-position: 300% 0; } }
+.sec-head p { margin: 0; max-width: 30em; color: var(--muted); }
+@media (max-width: 760px) { .sec-head { grid-template-columns: 1fr; } }
+
+/* ── 필터 ── */
+.filters { margin-top: 36px; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  position: relative; display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 99px;
+  border: 1px solid var(--line); background: rgba(17,15,29,.7); font-size: 14px; cursor: pointer; transition: border-color .2s, background .2s, color .2s, box-shadow .2s; color: var(--muted);
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--plasma)); box-shadow: 0 0 8px var(--c, var(--plasma)); }
+.chip .n { font: 400 11px/1 var(--font-mono); opacity: .7; }
+.chip:hover { color: var(--fg); border-color: var(--line-strong); }
+.chip[aria-pressed="true"] { color: #fff; border-color: var(--c, var(--plasma)); background: color-mix(in srgb, var(--c, var(--plasma)) 16%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--c, var(--plasma)) 35%, transparent); }
+
+/* ── 카드 그리드 ── */
+.grid { margin-top: 28px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; perspective: 1400px; }
+@media (max-width: 1040px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card {
+  --c: var(--plasma); --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 50%;
+  position: relative; min-width: 0; border-radius: 18px; padding: 1px; isolation: isolate;
+  background: var(--line); transform: rotateX(var(--rx)) rotateY(var(--ry)); transform-style: preserve-3d;
+  transition: transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .4s;
+}
+.card[hidden] { display: none !important; }
+.card::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; opacity: 0; transition: opacity .35s;
+  background: conic-gradient(from var(--spin, 0deg), var(--c), transparent 25%, var(--ion) 50%, transparent 75%, var(--c));
+  animation: spin 4s linear infinite;
+}
+@property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes spin { to { --spin: 360deg; } }
+.card:hover, .card:focus-within { box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 50px color-mix(in srgb, var(--c) 30%, transparent); transition: transform .12s linear, box-shadow .4s; }
+.card:hover::before, .card:focus-within::before { opacity: 1; }
+.card-in { position: relative; height: 100%; border-radius: 17px; background: var(--void-2); overflow: hidden; display: flex; flex-direction: column; }
+.card-in::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: radial-gradient(420px circle at var(--mx) var(--my), rgba(255,255,255,.11), transparent 45%); opacity: 0; transition: opacity .3s; }
+.card:hover .card-in::after { opacity: 1; }
+.thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--void-3); cursor: pointer; border: 0; padding: 0; width: 100%; display: block; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; transform: scale(1.02); transition: transform 1.2s cubic-bezier(.2,.8,.2,1), filter .6s; filter: saturate(.9) brightness(.92); }
+.card:hover .thumb img { transform: scale(1.12) translate(calc((var(--mx) - 50%) * -.04), calc((var(--my) - 50%) * -.04)); filter: saturate(1.15) brightness(1); }
+.thumb::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0 1px, transparent 1px 3px); mix-blend-mode: overlay; }
+.thumb::after { content: ""; position: absolute; left: 0; right: 0; top: -40%; height: 40%; z-index: 1; pointer-events: none; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c) 30%, transparent), transparent); opacity: 0; }
+.card:hover .thumb::after { opacity: 1; animation: scan 1.6s linear infinite; }
+@keyframes scan { to { top: 100%; } }
+.play {
+  position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(circle at center, rgba(8,7,15,.15), rgba(8,7,15,.55));
+}
+.play span { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 99px; background: rgba(255,255,255,.92); color: #120b26; font-weight: 700; font-size: 14px; transform: translateY(10px) scale(.94); transition: transform .35s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 30px color-mix(in srgb, var(--c) 70%, transparent); }
+.card:hover .play, .thumb:focus-visible .play { opacity: 1; }
+.card:hover .play span { transform: none; }
+.tile {
+  position: absolute; top: 12px; left: 12px; z-index: 3; width: 54px; height: 60px; border-radius: 8px; padding: 5px 6px;
+  background: rgba(8,7,15,.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  display: grid; grid-template-rows: auto 1fr; font-family: var(--font-mono); box-shadow: 0 0 16px color-mix(in srgb, var(--c) 40%, transparent);
+  transform: translateZ(40px);
+}
+.tile small { font-size: 10px; color: var(--muted); line-height: 1; }
+.tile b { font: 800 22px/1 var(--font-display); color: #fff; align-self: center; justify-self: center; text-shadow: 0 0 12px var(--c); }
+.cat { position: absolute; top: 14px; right: 14px; z-index: 3; font-size: 12px; padding: 4px 10px; border-radius: 99px; background: rgba(8,7,15,.72); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+.cat::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+.body h3 { margin: 0; font: 700 clamp(18px, 1.7vw, 21px)/1.15 var(--font-display); letter-spacing: .01em; overflow-wrap: anywhere; }
+.body .sub { margin: -4px 0 0; font-size: 14px; color: color-mix(in srgb, var(--c) 70%, #fff); font-weight: 500; }
+.body .desc { margin: 0; font-size: 14.5px; color: #cfc9e8; line-height: 1.7; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 0; padding: 0; list-style: none; }
+.tags li { font-size: 12px; padding: 3px 9px; border-radius: 6px; background: rgba(184,157,255,.08); border: 1px solid var(--line); color: var(--muted); }
+.note { margin: 0; font-size: 12.5px; color: var(--gold); }
+.actions { margin-top: auto; padding-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.act { flex: 1 1 auto; justify-content: center; display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; border: 1px solid var(--line-strong); background: transparent; transition: background .2s, border-color .2s, box-shadow .2s, color .2s; }
+.act.go { background: color-mix(in srgb, var(--c) 20%, transparent); border-color: color-mix(in srgb, var(--c) 60%, transparent); color: #fff; }
+.act.go:hover { background: color-mix(in srgb, var(--c) 34%, transparent); box-shadow: 0 0 20px color-mix(in srgb, var(--c) 45%, transparent); }
+.act.src { color: var(--muted); }
+.act.src:hover { color: var(--fg); border-color: var(--plasma); }
+.act svg { width: 15px; height: 15px; flex: none; }
+
+/* 리빌 — 기본은 보이는 상태, JS가 화면 아래 요소만 준비 상태로 바꿈 */
+.pre { opacity: 0; transform: translateY(46px) scale(.97); }
+.revealed { opacity: 1; transform: none; transition: opacity .9s cubic-bezier(.2,.8,.2,1), transform .9s cubic-bezier(.2,.8,.2,1); transition-delay: var(--d, 0s); }
+.card.revealed { transition: opacity .9s cubic-bezier(.2,.8,.2,1) var(--d,0s), transform .9s cubic-bezier(.2,.8,.2,1) var(--d,0s), box-shadow .4s; }
+
+/* ── 아르곤 노트 ── */
+.about { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(28px, 5vw, 64px); margin-top: 40px; }
+@media (max-width: 860px) { .about { grid-template-columns: 1fr; } }
+.about p { margin: 0 0 16px; color: #d4cdee; max-width: 38em; }
+.about p b { color: #fff; }
+.facts { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--void-2); }
+.facts div { display: grid; grid-template-columns: 9em minmax(0, 1fr); gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.facts div:last-child { border-bottom: 0; }
+.facts dt { font: 400 12px/1.6 var(--font-mono); color: var(--muted); letter-spacing: .06em; }
+.facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.howto { margin-top: 18px; display: grid; gap: 10px; padding: 0; list-style: none; counter-reset: s; }
+.howto li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; font-size: 14.5px; color: #d4cdee; }
+.howto li::before { content: counter(s); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--font-mono); border: 1px solid var(--plasma); color: var(--plasma); box-shadow: 0 0 10px rgba(184,157,255,.3); }
+
+footer { margin-top: clamp(80px, 10vw, 140px); border-top: 1px solid var(--line); padding-block: 36px calc(env(safe-area-inset-bottom, 0px) + 40px); color: var(--muted); font-size: 13px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px 32px; }
+footer a { color: var(--fg); text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+footer ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* ── 실행 창 ── */
+.viewer {
+  position: fixed; inset: 0; z-index: 80; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--void);
+  clip-path: circle(0px at var(--ox, 50%) var(--oy, 50%)); visibility: hidden;
+  transition: clip-path .75s cubic-bezier(.7,0,.2,1), visibility 0s .75s;
+}
+.viewer.open { clip-path: circle(150vmax at var(--ox, 50%) var(--oy, 50%)); visibility: visible; transition: clip-path .85s cubic-bezier(.7,0,.2,1), visibility 0s; }
+.vbar { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px; border-bottom: 1px solid var(--line); background: var(--void-2); min-width: 0; }
+.vtile { width: 36px; height: 36px; flex: none; border-radius: 7px; display: grid; place-items: center; font: 800 15px/1 var(--font-display); border: 1px solid var(--c, var(--plasma)); box-shadow: 0 0 14px var(--c, var(--plasma)); }
+.vtitle { min-width: 0; flex: 1; }
+.vtitle b { display: block; font: 700 15px/1.2 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vtitle span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vbtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: transparent; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .2s, border-color .2s; }
+.vbtn:hover { background: rgba(184,157,255,.12); border-color: var(--plasma); }
+.vbtn svg { width: 15px; height: 15px; }
+.vbtn.icon { width: 36px; padding: 0; justify-content: center; }
+@media (max-width: 640px) { .vbtn .lbl { display: none; } .vbtn { width: 36px; padding: 0; justify-content: center; } }
+.vstage { position: relative; min-height: 0; }
+.vstage iframe { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+.vload { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; transition: opacity .5s; }
+.vload.done { opacity: 0; }
+.vload div { display: grid; justify-items: center; gap: 14px; font: 400 12px/1 var(--font-mono); letter-spacing: .2em; color: var(--muted); }
+.vload i { width: 64px; height: 64px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--plasma); border-right-color: var(--ion); animation: rot 0.9s linear infinite; box-shadow: 0 0 30px rgba(184,157,255,.4); }
+@keyframes rot { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; }
+  .grain { display: none; }
+  .pre { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div class="cursor" aria-hidden="true"></div>
+<div class="cursor-dot" aria-hidden="true"></div>
+
+<header class="topbar" id="topbar">
+  <a class="brand" href="#top" aria-label="맨 위로">
+    <span class="brand-tile"><small>18</small>Ar</span>
+    <span class="brand-name">GEMINI 4 ARGON<span>APP SHOWCASE</span></span>
+  </a>
+  <nav class="topnav" aria-label="섹션">
+    <a href="#apps" class="primary">앱 16선</a>
+    <a href="#about">아르곤 노트</a>
+  </nav>
+</header>
+
+<main id="top">
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas id="plasma" aria-hidden="true"></canvas>
+    <div class="wrap hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">Noble gas · Element 18 · Frontier model</p>
+        <h1 class="title" id="hero-title">
+          <span class="g4">GEMINI 4</span>
+          <span class="argon" aria-label="ARGON"><span style="--i:0">A</span><span style="--i:1">R</span><span style="--i:2">G</span><span style="--i:3">O</span><span style="--i:4">N</span></span>
+        </h1>
+        <p class="lede">Gemini 4 Argon으로 만든 <b>수업용 인터랙티브 3D 앱 16개</b>를 모았습니다. 카드를 누르면 이 페이지 안에서 바로 실행됩니다. 로그인도 설치도 필요 없어요.</p>
+        <div class="hero-cta">
+          <a class="btn solid magnetic" href="#apps">
+            앱 둘러보기
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg>
+          </a>
+          <button class="btn magnetic" type="button" data-open="argon-showreel">
+            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>
+            쇼릴부터 보기
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><b data-count="16">16</b><span>체험 가능한 앱</span></div>
+          <div class="stat"><b data-count="6">6</b><span>교과 영역</span></div>
+          <div class="stat"><b data-count="18">18</b><span>아르곤의 원자번호</span></div>
+        </div>
+      </div>
+      <aside class="element-card" aria-label="아르곤 원소 정보">
+        <div class="num"><span>18</span><span>39.948</span></div>
+        <div class="sym">Ar</div>
+        <div class="nm"><b>아르곤</b><br>[Ne] 3s² 3p⁶<br>18족 · 비활성 기체</div>
+      </aside>
+    </div>
+  </section>
+
+  <div class="wrap spectrum" aria-label="아르곤 방출 스펙트럼">
+    <div class="spec-head">
+      <span>Ar I · Ar II 방출 스펙트럼 / 방전관 속 아르곤이 내는 빛</span>
+      <span>λ = <output id="spec-out">488.0 nm</output></span>
+    </div>
+    <div class="spec-box"><canvas id="spec" aria-hidden="true"></canvas></div>
+    <div class="spec-scale" aria-hidden="true"><span>380</span><span>480</span><span>580</span><span>680</span><span>780 nm</span></div>
+  </div>
+
+  <div class="marquee" aria-hidden="true"><div class="marquee-track" id="marquee"></div></div>
+
+  <section class="block" id="apps" aria-labelledby="apps-title">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="eyebrow">Collection · 16 apps</p>
+          <h2 id="apps-title" data-scramble>앱 <em>16선</em></h2>
+        </div>
+        <p>천체 운동부터 경복궁 근정전까지. 모두 한 장짜리 HTML로 만들어져 브라우저에서 바로 돌아갑니다. 영역을 골라 보세요.</p>
+      </div>
+      <div class="filters" id="filters" role="group" aria-label="교과 영역 필터"></div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
+
+  <section class="block" id="about" aria-labelledby="about-title">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <p class="eyebrow">Field notes</p>
+          <h2 id="about-title" data-scramble>아르곤 <em>노트</em></h2>
+        </div>
+      </div>
+      <div class="about">
+        <div>
+          <p><b>Gemini 4 Argon</b>은 Google이 2026년 9월 말 공개한 Gemini 4 세대의 최상위 모델입니다. 기존 Pro 계열보다 큰 모델로, 복잡한 작업 흐름과 소프트웨어 엔지니어링, 사이버 방어 분야의 성능을 앞세워 발표됐습니다. 공개 초기에는 일부 파트너부터 순차적으로 제공되고 있습니다.</p>
+          <p>이 페이지의 앱은 모두 Gemini Canvas에서 Argon으로 만든 결과물입니다. 3D 장면, 슬라이더, 실시간 계산, 수업 안내까지 파일 하나에 담겨 있어요. 각 앱에는 "교육용 단순화 모델"이라는 안내가 함께 들어 있어 수업에서 한계를 짚어 주기 좋습니다.</p>
+          <ol class="howto">
+            <li>카드의 <b>바로 체험</b>을 누르면 이 페이지 안에서 앱이 열립니다. Esc나 닫기 버튼으로 돌아옵니다.</li>
+            <li>전체 화면으로 쓰려면 실행 창의 <b>새 탭</b>을 누르세요. 수업 화면 공유에 편합니다.</li>
+            <li><b>Gemini 원본</b>은 Gemini에 공유된 원래 링크입니다. 같은 앱을 Gemini 화면에서 열고 이어서 고쳐 볼 수 있어요.</li>
+          </ol>
+        </div>
+        <dl class="facts">
+          <div><dt>원소 기호</dt><dd>Ar · 원자번호 18</dd></div>
+          <div><dt>원자량</dt><dd>39.948</dd></div>
+          <div><dt>족 · 분류</dt><dd>18족 비활성 기체</dd></div>
+          <div><dt>대기 중 비율</dt><dd>약 0.93% (질소·산소 다음)</dd></div>
+          <div><dt>방전관 색</dt><dd>보랏빛 라벤더</dd></div>
+          <div><dt>대표 파장</dt><dd>488.0 nm · 514.5 nm (아르곤 이온 레이저)</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <b style="color:var(--fg)">Gemini 4 Argon 앱 16선</b><br>
+      앱은 Gemini Canvas에서 생성되었고, 원본 공유 링크를 각 카드에 함께 실었습니다.<br>
+      모든 앱은 학생 정보를 입력받거나 저장하지 않습니다.
+    </div>
+    <div>
+      모델 소개 출처
+      <ul>
+        <li><a href="https://www.khaleejtimes.com/business/google-announces-gemini-4-flagship-ai-model-after-months-of-delays-2" target="_blank" rel="noopener">Khaleej Times (Reuters)</a></li>
+        <li><a href="https://cna.com.tw/news/ait/202610010031.aspx" target="_blank" rel="noopener">CNA 中央社</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-labelledby="v-name" aria-hidden="true">
+  <div class="vbar">
+    <span class="vtile" id="v-tile">Ar</span>
+    <div class="vtitle"><b id="v-name">앱</b><span id="v-sub"></span></div>
+    <button class="vbtn icon" type="button" id="v-prev" aria-label="이전 앱"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3L5 8l5 5"/></svg></button>
+    <button class="vbtn icon" type="button" id="v-next" aria-label="다음 앱"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3l5 5-5 5"/></svg></button>
+    <a class="vbtn" id="v-tab" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 2h5v5M14 2L7 9M12 10v4H2V4h4"/></svg><span class="lbl">새 탭</span></a>
+    <a class="vbtn" id="v-src" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0c.4 4.3 3.7 7.6 8 8-4.3.4-7.6 3.7-8 8-.4-4.3-3.7-7.6-8-8 4.3-.4 7.6-3.7 8-8z"/></svg><span class="lbl">Gemini 원본</span></a>
+    <button class="vbtn icon" type="button" id="v-close" aria-label="닫기"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l10 10M13 3L3 13"/></svg></button>
+  </div>
+  <div class="vstage">
+    <iframe id="v-frame" title="앱 실행 화면" allow="fullscreen; autoplay" allowfullscreen></iframe>
+    <div class="vload" id="v-load"><div><i></i>IGNITING</div></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const CATS = {
+    phys:  { label: '물리·공학', c: '#6fd6ff' },
+    space: { label: '지구·우주', c: '#b89dff' },
+    math:  { label: '수학',     c: '#ffd46e' },
+    life:  { label: '생명·환경', c: '#7ef0b4' },
+    arts:  { label: '예술·문화', c: '#ff7d9f' },
+    reel:  { label: '쇼케이스',  c: '#f2eeff' }
+  };
+
+  const APPS = [
+    { slug: 'orbital-clock', sym: 'Oc', cat: 'space', title: 'ORBITAL CLOCK', sub: '밤하늘의 시간 공방',
+      desc: '지구의 자전·공전과 달의 공전을 직접 돌리며 별의 일주 운동과 달의 위상 변화를 함께 관찰하는 3D 천체 시뮬레이터입니다.',
+      tags: ['우주 시점 ↔ 관측자 시점', '위도·시각 조절', '달 위상 조명률'], share: 'UXQScx29ooNP' },
+    { slug: 'bridge-forge', sym: 'Bf', cat: 'phys', title: 'BRIDGE FORGE', sub: '힘을 분산하는 다리 공방',
+      desc: '워런·프랫 트러스 다리에 하중을 올려 부재마다 걸리는 압축력과 인장력을 색으로 확인합니다. 처짐은 강성행렬로 실시간 계산해요.',
+      tags: ['트러스 형식 비교', '경간·높이·하중 6개 변수', '처짐 과장 배율'], share: 'GZn1vfqb6RiZ' },
+    { slug: 'sound-sculptor', sym: 'Ss', cat: 'arts', title: 'SOUND SCULPTOR', sub: '소리를 조각하는 공방',
+      desc: '기본음에 1~8차 배음을 더하는 푸리에 합성으로 음색을 만들고, 같은 파형을 3D 리본 조각과 스펙트럼 기둥으로 보여 줍니다. 실제 소리도 납니다.',
+      tags: ['110~523 Hz 기본음', '현악·관악·순음 프리셋', 'Web Audio 재생'], share: 'wVZ9qVyZMbL7' },
+    { slug: 'tessellation-city', sym: 'Tc', cat: 'math', title: 'TESSELLATION CITY', sub: '빈틈없이 이어지는 패턴 도시',
+      desc: '정삼각형·정사각형·정육각형으로 바닥을 빈틈없이 채우며 한 꼭짓점에 모인 각의 합이 360°가 되는 이유를 3D 도시로 탐구합니다.',
+      tags: ['정다각형 3종', '정오각형이 안 되는 이유', '줄무늬·체커 색 규칙'], share: 'VsfITDF0BPiU' },
+    { slug: 'contour-planet', sym: 'Cp', cat: 'space', title: 'CONTOUR PLANET', sub: '등고선으로 만드는 작은 행성',
+      desc: '산맥·분화구·협곡 지형의 높이와 해수면을 바꾸며 등고선 간격과 경사의 관계를 3D 행성과 단면도로 익힙니다.',
+      tags: ['등고 간격 조절', '해수면 침수율', '위에서 본 지도 ↔ 3D'], share: 'c4IwiH71cndt' },
+    { slug: 'fraction-garden', sym: 'Fg', cat: 'math', title: 'FRACTION GARDEN', sub: '분수로 피우는 정원',
+      desc: '두 분수를 원형 화단의 부채꼴 조각으로 피워 공통분모, 동치분수, 분수의 덧셈을 눈으로 확인하는 3D 수학 정원입니다.',
+      tags: ['분자·분모 조절', '공통분모 보기', '동치분수 2배'], share: 'bv4Hv5L1R5fe' },
+    { slug: 'shadow-theatre', sym: 'St', cat: 'phys', title: 'SHADOW THEATRE', sub: '빛으로 만드는 그림자 극장',
+      desc: '점광원·물체·스크린의 거리를 바꾸며 빛의 직진과 닮음비 M = Ds / Do로 그림자 크기를 예측하는 3D 그림자 극장입니다.',
+      tags: ['정육면체·구·삼각기둥', '광원 위치 이동', '광선 표시'], share: 'T1cHtq82MkCm' },
+    { slug: 'wave-loom', sym: 'Wl', cat: 'phys', title: 'WAVE LOOM', sub: '빛나는 파동 직조소',
+      desc: '두 발생원의 위상차·진동수·파장을 조절해 물결이 보강·상쇄 간섭하는 무늬를 3D 수면으로 짜냅니다. 발생원을 끌어 옮길 수도 있어요.',
+      tags: ['위상차 0°·180° 프리셋', '파장·진동수 조절', '발생원 드래그'], share: 'JW37q7cpEmay' },
+    { slug: 'dna-weaver', sym: 'Dw', cat: 'life', title: 'DNA WEAVER', sub: 'DNA를 짜는 분자 공방',
+      desc: 'A–T, C–G 염기쌍을 맞추고 역평행 이중나선이 복제되는 과정을 관찰하는 분자 공방입니다. 2D/3D 전환과 5분 수업 가이드가 들어 있어요.',
+      tags: ['염기쌍 맞추기 문제', '복제 관찰', 'GC 비율 계산'], share: '70MqT0fk8BpP' },
+    { slug: 'clay-studio', sym: 'Cs', cat: 'arts', title: 'CLAY STUDIO', sub: '손끝으로 빚는 도자기',
+      desc: '물레 위 도자기의 윤곽을 손끝으로 끌어 빚고 유약·질감·무늬·조명까지 입혀 작품을 완성하는 3D 도예 공방입니다.',
+      tags: ['달항아리 등 기형 프리셋', '유약·무늬 그리기', '작품 PNG 저장'], share: 'n53E1MeH5alc' },
+    { slug: 'living-island', sym: 'Li', cat: 'life', title: 'LIVING ISLAND', sub: '우리가 만드는 지속가능한 섬',
+      desc: '예산 안에서 집·학교·태양광·풍력·나무를 배치해 전력 수지를 맞추고, 해수면 상승과 낮·밤 변화를 견디는 섬을 설계하는 미션 게임입니다.',
+      tags: ['예산·전력 수지', '낮·노을·밤', '해수면 상승 미션'], share: 'eW1apTgoHzqm' },
+    { slug: 'magnetica', sym: 'Mg', cat: 'phys', title: 'MAGNETICA', sub: '자기장으로 빚는 금속',
+      desc: '두 자석의 극과 자기장 세기, 점성을 바꿔 액체 금속이 가시처럼 솟고 물결치는 모습을 크롬·골드·오로라 재질로 감상합니다.',
+      tags: ['N·S극 배치', '자기장 보기', '시네마틱 쇼'], share: 'wykgL4Wm7Rz6' },
+    { slug: 'cosmic-odyssey', sym: 'Co', cat: 'space', title: 'COSMIC ODYSSEY', sub: '은하와 블랙홀 사이',
+      desc: '항성 8만 5천 개가 도는 나선팔 은하를 탐험하고 블랙홀을 관측하는 3D 우주 무대입니다. 시네마틱 투어와 발표 모드를 지원합니다.',
+      tags: ['은하 탐험 ↔ 블랙홀 관측', '시네마틱 투어', '탐구 과제 3개'], share: 'CgTybeXce4Gb' },
+    { slug: 'physics-lab', sym: 'Pl', cat: 'phys', title: 'ARGON PHYSICS LAB', sub: '손끝으로 움직이는 물리 실험실',
+      desc: '투사체 연구소·충돌 아레나·진자 스튜디오, 세 가지 실험을 한곳에 모은 WebGL 물리 실험실입니다. 달 중력과 임팩트 슬로모션까지 담았어요.',
+      tags: ['발사각·속도 조절', '충돌·진자 실험', '교사용 5분 가이드'], share: 'ZPVY9RF62n4P' },
+    { slug: 'geunjeongjeon', sym: 'Gj', cat: 'arts', title: 'GEUNJEONGJEON', sub: '경복궁 근정전 3D 건축 해체',
+      desc: '경복궁 근정전을 14개 구조 계층, 3,077개 부재로 분해했다가 다시 짜 맞추는 전통 건축 모션 그래픽입니다. 공포·대들보·꽃살문을 하나씩 살펴봅니다.',
+      tags: ['부재 3,077개', '14개 구조 계층', '다포계 공포·월대'], share: 'Lbiy3SydSxYn' },
+    { slug: 'argon-showreel', sym: 'Ar', cat: 'reel', title: 'ARGON SHOWREEL', sub: '60FPS 모션그래픽 쇼릴 스튜디오',
+      desc: 'WebGL 셰이더, 키네틱 타이포그래피, 절차적 신디사이저 사운드로 Gemini 4 Argon을 소개하는 쇼릴입니다. 16:9와 9:16 숏폼을 오갈 수 있어요.',
+      tags: ['6개 시퀀스', '사운드 + 모션', '숏폼 9:16'], note: 'AI 성우 합성 버튼은 Gemini 원본 링크에서만 작동합니다.', share: 'NqyMnNkyTaPk' }
+  ];
+
+  const shareURL = id => 'https://share.gemini.google/' + id;
+  const appURL = slug => 'apps/' + slug + '.html';
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const ICON_PLAY = '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>';
+  const ICON_OUT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 2h5v5M14 2L7 9M12 10v4H2V4h4"/></svg>';
+
+  /* ── 카드 렌더 ── */
+  const grid = document.getElementById('grid');
+  grid.innerHTML = APPS.map((a, i) => {
+    const c = CATS[a.cat];
+    const no = String(i + 1).padStart(2, '0');
+    return `<article class="card" data-cat="${a.cat}" data-slug="${a.slug}" style="--c:${c.c}">
+      <div class="card-in">
+        <button class="thumb" type="button" data-open="${a.slug}" aria-label="${esc(a.title)} 바로 체험">
+          <img src="thumbs/${a.slug}.jpg" alt="" loading="lazy" decoding="async" width="960" height="540">
+          <span class="play"><span>${ICON_PLAY} 바로 체험</span></span>
+        </button>
+        <span class="tile" aria-hidden="true"><small>${no}</small><b>${a.sym}</b></span>
+        <span class="cat">${c.label}</span>
+        <div class="body">
+          <h3>${esc(a.title)}</h3>
+          <p class="sub">${esc(a.sub)}</p>
+          <p class="desc">${esc(a.desc)}</p>
+          <ul class="tags">${a.tags.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+          ${a.note ? `<p class="note">${esc(a.note)}</p>` : ''}
+          <div class="actions">
+            <button class="act go" type="button" data-open="${a.slug}">${ICON_PLAY} 바로 체험</button>
+            <a class="act src" href="${shareURL(a.share)}" target="_blank" rel="noopener">Gemini 원본 ${ICON_OUT}</a>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+
+  /* ── 마키 ── */
+  const mq = APPS.map(a => `<span>${esc(a.title)}</span><i>✦</i>`).join('');
+  document.getElementById('marquee').innerHTML = mq + mq;
+
+  /* ── 필터 + FLIP ── */
+  const filters = document.getElementById('filters');
+  const counts = APPS.reduce((m, a) => (m[a.cat] = (m[a.cat] || 0) + 1, m), {});
+  filters.innerHTML = `<button class="chip" type="button" data-f="all" aria-pressed="true"><span class="dot" style="--c:#fff"></span>전체<span class="n">${APPS.length}</span></button>` +
+    Object.entries(CATS).map(([k, v]) => `<button class="chip" type="button" data-f="${k}" aria-pressed="false" style="--c:${v.c}"><span class="dot"></span>${v.label}<span class="n">${counts[k] || 0}</span></button>`).join('');
+  const cards = [...grid.children];
+  filters.addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    filters.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const f = b.dataset.f;
+    const before = new Map(cards.filter(c => !c.hidden).map(c => [c, c.getBoundingClientRect()]));
+    cards.forEach(c => { c.hidden = !(f === 'all' || c.dataset.cat === f); c.classList.remove('pre'); c.classList.add('revealed'); });
+    if (REDUCED) return;
+    cards.filter(c => !c.hidden).forEach((c, i) => {
+      const now = c.getBoundingClientRect();
+      const old = before.get(c);
+      if (old) {
+        const dx = old.left - now.left, dy = old.top - now.top;
+        if (dx || dy) c.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 650, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      } else {
+        c.animate([{ opacity: 0, scale: .85, filter: 'blur(8px)' }, { opacity: 1, scale: 1, filter: 'blur(0)' }], { duration: 600, delay: i * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      }
+    });
+  });
+
+  /* ── 카드 기울기 + 광택 ── */
+  if (!REDUCED && matchMedia('(pointer: fine)').matches) {
+    cards.forEach(card => {
+      card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+        card.style.setProperty('--ry', ((px - .5) * 14).toFixed(2) + 'deg');
+        card.style.setProperty('--rx', ((.5 - py) * 12).toFixed(2) + 'deg');
+        card.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+        card.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+      });
+      card.addEventListener('pointerleave', () => { card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg'); });
+    });
+  }
+
+  /* ── 스크롤 리빌 (화면 아래 요소만) ── */
+  const revealables = [...document.querySelectorAll('.card, .sec-head, .about > *, .filters')];
+  if (!REDUCED && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(en => {
+        if (!en.isIntersecting) return;
+        en.target.classList.add('revealed'); en.target.classList.remove('pre');
+        io.unobserve(en.target);
+        en.target.querySelectorAll?.('[data-scramble]').forEach(scramble);
+      });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    const vh = innerHeight;
+    revealables.forEach(el => {
+      if (el.getBoundingClientRect().top > vh * .92) {
+        el.classList.add('pre');
+        if (el.classList.contains('card')) el.style.setProperty('--d', ((cards.indexOf(el) % 3) * 0.09) + 's');
+        io.observe(el);
+      }
+    });
+  }
+
+  /* ── 텍스트 스크램블 ── */
+  function scramble(el) {
+    if (REDUCED || el.dataset.done) return; el.dataset.done = 1;
+    const nodes = [];
+    const walk = n => n.childNodes.forEach(ch => ch.nodeType === 3 ? nodes.push([ch, ch.textContent]) : walk(ch));
+    walk(el);
+    const pool = 'ArΔλΣ018ψ∿⚡▚▞#*';
+    const t0 = performance.now(), dur = 900;
+    (function step(t) {
+      const p = Math.min(1, (t - t0) / dur);
+      nodes.forEach(([n, s]) => {
+        const k = Math.floor(s.length * p);
+        n.textContent = s.slice(0, k) + [...s.slice(k)].map(c => c === ' ' ? ' ' : pool[(Math.random() * pool.length) | 0]).join('');
+      });
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  /* ── 카운터 ── */
+  if (!REDUCED) {
+    document.querySelectorAll('[data-count]').forEach((el, i) => {
+      const to = +el.dataset.count, t0 = performance.now() + 900 + i * 150;
+      el.textContent = '0';
+      (function step(t) {
+        const p = Math.max(0, Math.min(1, (t - t0) / 1400));
+        el.textContent = Math.round(to * (1 - Math.pow(1 - p, 4)));
+        if (p < 1) requestAnimationFrame(step);
+      })(performance.now());
+    });
+  }
+
+  /* ── 상단 바 ── */
+  const topbar = document.getElementById('topbar');
+  const onScroll = () => topbar.classList.toggle('scrolled', scrollY > 30);
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+
+  /* ── 자석 버튼 ── */
+  if (!REDUCED && matchMedia('(pointer: fine)').matches) {
+    document.querySelectorAll('.magnetic').forEach(b => {
+      b.addEventListener('pointermove', e => {
+        const r = b.getBoundingClientRect();
+        b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * .25}px, ${(e.clientY - r.top - r.height / 2) * .35}px)`;
+      });
+      b.addEventListener('pointerleave', () => { b.style.transition = 'transform .5s cubic-bezier(.2,.8,.2,1)'; b.style.transform = ''; setTimeout(() => b.style.transition = '', 500); });
+    });
+  }
+
+  /* ── 커서 ── */
+  const pointer = { x: -999, y: -999, active: false };
+  addEventListener('pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; }, { passive: true });
+  if (!REDUCED && matchMedia('(pointer: fine)').matches) {
+    document.body.classList.add('has-cursor');
+    const ring = document.querySelector('.cursor'), dot = document.querySelector('.cursor-dot');
+    let rx = 0, ry = 0;
+    (function loop() {
+      rx += (pointer.x - rx) * .18; ry += (pointer.y - ry) * .18;
+      ring.style.transform = `translate(${rx}px, ${ry}px)`;
+      dot.style.transform = `translate(${pointer.x}px, ${pointer.y}px)`;
+      requestAnimationFrame(loop);
+    })();
+    document.addEventListener('pointerover', e => ring.classList.toggle('hot', !!e.target.closest('a, button, .card')));
+    document.addEventListener('pointerleave', () => { pointer.x = pointer.y = -999; });
+  }
+
+  /* ── 실행 창 ── */
+  const viewer = document.getElementById('viewer');
+  const vf = document.getElementById('v-frame'), vload = document.getElementById('v-load');
+  let current = -1, lastFocus = null;
+  function openApp(slug, origin) {
+    const i = APPS.findIndex(a => a.slug === slug); if (i < 0) return;
+    const ox = origin ? origin.x : innerWidth / 2, oy = origin ? origin.y : innerHeight / 2;
+    viewer.style.setProperty('--ox', ox + 'px'); viewer.style.setProperty('--oy', oy + 'px');
+    if (!viewer.classList.contains('open')) lastFocus = document.activeElement;
+    load(i);
+    viewer.classList.add('open'); viewer.setAttribute('aria-hidden', 'false');
+    document.documentElement.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('v-close').focus(), 60);
+    try { history.replaceState(null, '', '#' + slug); } catch (_) {}
+  }
+  function load(i) {
+    current = (i + APPS.length) % APPS.length;
+    const a = APPS[current], c = CATS[a.cat];
+    viewer.style.setProperty('--c', c.c);
+    document.getElementById('v-tile').textContent = a.sym;
+    document.getElementById('v-name').textContent = a.title;
+    document.getElementById('v-sub').textContent = `${String(current + 1).padStart(2, '0')} / 16 · ${c.label} · ${a.sub}`;
+    document.getElementById('v-tab').href = appURL(a.slug);
+    document.getElementById('v-src').href = shareURL(a.share);
+    vload.classList.remove('done');
+    vf.src = appURL(a.slug);
+  }
+  vf.addEventListener('load', () => vload.classList.add('done'));
+  function closeApp() {
+    viewer.classList.remove('open'); viewer.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    setTimeout(() => { if (!viewer.classList.contains('open')) vf.src = 'about:blank'; }, 800);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    if (lastFocus) lastFocus.focus({ preventScroll: true });
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-open]'); if (!t) return;
+    e.preventDefault();
+    openApp(t.dataset.open, { x: e.clientX || innerWidth / 2, y: e.clientY || innerHeight / 2 });
+  });
+  document.getElementById('v-close').addEventListener('click', closeApp);
+  document.getElementById('v-prev').addEventListener('click', () => load(current - 1));
+  document.getElementById('v-next').addEventListener('click', () => load(current + 1));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && viewer.classList.contains('open')) closeApp(); });
+  const fromHash = location.hash.slice(1);
+  if (APPS.some(a => a.slug === fromHash)) openApp(fromHash);
+
+  /* ── 플라즈마 구 ── */
+  const cv = document.getElementById('plasma'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, cx = 0, cy = 0, R = 0, running = true;
+  const motes = Array.from({ length: 140 }, () => ({ a: Math.random() * Math.PI * 2, r: Math.random(), s: (Math.random() * .5 + .2) * (Math.random() < .5 ? -1 : 1), z: Math.random() }));
+  const fil = Array.from({ length: 11 }, (_, i) => ({ a: i / 11 * Math.PI * 2, v: (Math.random() - .5) * .5, seed: Math.random() * 100, hue: Math.random() }));
+  function resize() {
+    DPR = Math.min(devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (W > 860) { cx = W * .72; cy = H * .48; R = Math.min(H * .36, W * .22); }
+    else { cx = W * .7; cy = H * .19; R = Math.min(W * .3, H * .15); }
+    ctx.fillStyle = '#08070f'; ctx.fillRect(0, 0, W, H);
+  }
+  const n1 = (x, s) => Math.sin(x * 1.7 + s) * .5 + Math.sin(x * 3.1 - s * 1.3) * .3 + Math.sin(x * 7.3 + s * 2.1) * .2;
+  const t0 = performance.now();
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    // 점등: 첫 1.6초 깜빡임
+    let power = 1;
+    if (t < 1.8 && !REDUCED) power = Math.min(1, t / 1.8) * (Math.random() < .35 ? .15 : 1);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = REDUCED ? '#08070f' : 'rgba(8,7,15,0.32)';
+    ctx.fillRect(0, 0, W, H);
+
+    // 배경 오로라
+    const g0 = ctx.createRadialGradient(cx, cy, R * .2, cx, cy, R * 2.6);
+    g0.addColorStop(0, `rgba(123,92,255,${.16 * power})`); g0.addColorStop(.5, `rgba(111,214,255,${.04 * power})`); g0.addColorStop(1, 'rgba(8,7,15,0)');
+    ctx.fillStyle = g0; ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = 'lighter';
+    // 먼지 입자
+    motes.forEach(m => {
+      m.a += m.s * .003 * (REDUCED ? 0 : 1);
+      const rr = R * (1.25 + m.r * 1.9);
+      const x = cx + Math.cos(m.a) * rr, y = cy + Math.sin(m.a) * rr * .55 + Math.sin(t * .6 + m.z * 6) * 10;
+      ctx.fillStyle = `rgba(${m.z > .5 ? '184,157,255' : '111,214,255'},${(.25 + m.z * .5) * power})`;
+      ctx.fillRect(x, y, 1.2 + m.z * 1.4, 1.2 + m.z * 1.4);
+    });
+
+    // 포인터 끌림
+    let pa = null, pin = false, pd = 0;
+    if (pointer.active) {
+      const rect = cv.getBoundingClientRect();
+      const px = pointer.x - rect.left, py = pointer.y - rect.top;
+      pd = Math.hypot(px - cx, py - cy);
+      if (pd < R * 2.2) { pa = Math.atan2(py - cy, px - cx); pin = pd < R * 1.05; }
+    }
+    // 필라멘트
+    fil.forEach((f, k) => {
+      if (!REDUCED) {
+        f.v += (Math.random() - .5) * .06; f.v *= .96; f.a += f.v * .05;
+        if (pa !== null && k % 2 === 0) { let d = pa - f.a; d = Math.atan2(Math.sin(d), Math.cos(d)); f.a += d * .12; }
+      }
+      const reach = (pin && k % 2 === 0) ? Math.min(pd, R) : R * (.94 + .06 * Math.sin(t * 3 + f.seed));
+      const ex = Math.cos(f.a), ey = Math.sin(f.a), nx = -ey, ny = ex;
+      const segs = 22, pts = [];
+      for (let i = 0; i <= segs; i++) {
+        const u = i / segs;
+        const amp = Math.sin(Math.PI * u) * R * .16;
+        const off = n1(u * 4 + t * 2.4, f.seed + t * 1.7) * amp + (Math.random() - .5) * 3 * u;
+        pts.push([cx + ex * reach * u + nx * off, cy + ey * reach * u + ny * off]);
+      }
+      const col = f.hue < .55 ? '184,157,255' : (f.hue < .85 ? '111,214,255' : '255,125,159');
+      [[9, .05], [4, .16], [1.4, .85]].forEach(([w, al], j) => {
+        ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+        ctx.strokeStyle = j === 2 ? `rgba(240,234,255,${al * power})` : `rgba(${col},${al * power})`;
+        ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.stroke();
+      });
+      // 유리 벽 닿는 점
+      const [lx, ly] = pts[pts.length - 1];
+      const gl = ctx.createRadialGradient(lx, ly, 0, lx, ly, 22);
+      gl.addColorStop(0, `rgba(${col},${.55 * power})`); gl.addColorStop(1, `rgba(${col},0)`);
+      ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(lx, ly, 22, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // 중심 전극
+    const pulse = 1 + Math.sin(t * 4) * .06;
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * .3 * pulse);
+    core.addColorStop(0, `rgba(255,255,255,${.95 * power})`); core.addColorStop(.25, `rgba(210,190,255,${.7 * power})`);
+    core.addColorStop(.6, `rgba(123,92,255,${.28 * power})`); core.addColorStop(1, 'rgba(123,92,255,0)');
+    ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx, cy, R * .3 * pulse, 0, Math.PI * 2); ctx.fill();
+
+    // 유리 구
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(184,157,255,${.35 * power + .05})`;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    const hl = ctx.createLinearGradient(cx - R, cy - R, cx, cy);
+    hl.addColorStop(0, 'rgba(255,255,255,.14)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.strokeStyle = hl; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(cx, cy, R - 7, Math.PI * 1.05, Math.PI * 1.45); ctx.stroke();
+    // 받침대
+    const bw = R * .5, by = cy + R * .97;
+    const base = ctx.createLinearGradient(0, by, 0, by + R * .35);
+    base.addColorStop(0, '#1d1932'); base.addColorStop(1, '#08070f');
+    ctx.fillStyle = base; ctx.beginPath();
+    ctx.moveTo(cx - bw * .55, by); ctx.lineTo(cx + bw * .55, by); ctx.lineTo(cx + bw, by + R * .35); ctx.lineTo(cx - bw, by + R * .35); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(184,157,255,.25)'; ctx.lineWidth = 1; ctx.stroke();
+
+    if (running && !REDUCED) requestAnimationFrame(frame);
+  }
+  resize(); addEventListener('resize', resize);
+  requestAnimationFrame(frame);
+  if ('IntersectionObserver' in window && !REDUCED) {
+    new IntersectionObserver(([en]) => {
+      const was = running; running = en.isIntersecting;
+      if (running && !was) requestAnimationFrame(frame);
+    }).observe(cv);
+  }
+
+  /* ── 아르곤 방출 스펙트럼 ── */
+  const LINES = [
+    [404.4, .5], [415.9, .7], [420.1, .75], [427.2, .5], [434.8, .8], [442.6, .45], [451.1, .55], [458.9, .4], [465.8, .5],
+    [472.7, .55], [476.5, .9], [480.6, .6], [488.0, 1], [496.5, .55], [514.5, .95], [549.6, .4], [555.9, .35], [560.7, .45],
+    [603.2, .45], [641.6, .3], [667.7, .4], [696.5, .85], [706.7, .8], [714.7, .5], [727.3, .6], [738.4, .75], [750.4, .9], [763.5, 1], [772.4, .7]
+  ];
+  function wl2rgb(w) {
+    let r = 0, g = 0, b = 0;
+    if (w < 440) { r = -(w - 440) / 60; b = 1; } else if (w < 490) { g = (w - 440) / 50; b = 1; }
+    else if (w < 510) { g = 1; b = -(w - 510) / 20; } else if (w < 580) { r = (w - 510) / 70; g = 1; }
+    else if (w < 645) { r = 1; g = -(w - 645) / 65; } else { r = 1; }
+    let f = 1; if (w < 420) f = .3 + .7 * (w - 380) / 40; else if (w > 700) f = .3 + .7 * (780 - w) / 80;
+    return [r, g, b].map(v => Math.round(255 * Math.pow(v * f, .8)));
+  }
+  const sc = document.getElementById('spec'), sx = sc.getContext('2d'), out = document.getElementById('spec-out');
+  let SW = 0, SH = 0, hoverX = null;
+  function sresize() { const d = Math.min(devicePixelRatio || 1, 2); SW = sc.clientWidth; SH = sc.clientHeight; sc.width = SW * d; sc.height = SH * d; sx.setTransform(d, 0, 0, d, 0, 0); }
+  const toX = w => (w - 380) / 400 * SW;
+  sc.parentElement.addEventListener('pointermove', e => { const r = sc.getBoundingClientRect(); hoverX = e.clientX - r.left; });
+  sc.parentElement.addEventListener('pointerleave', () => hoverX = null);
+  function sframe(now) {
+    const t = now / 1000;
+    sx.globalCompositeOperation = 'source-over';
+    sx.fillStyle = '#050409'; sx.fillRect(0, 0, SW, SH);
+    // 연속 스펙트럼 희미하게
+    for (let x = 0; x < SW; x += 2) { const [r, g, b] = wl2rgb(380 + x / SW * 400); sx.fillStyle = `rgba(${r},${g},${b},.07)`; sx.fillRect(x, 0, 2, SH); }
+    sx.globalCompositeOperation = 'lighter';
+    const scanX = REDUCED ? toX(488) : (hoverX ?? ((Math.sin(t * .35) * .5 + .5) * SW));
+    let best = null, bd = 1e9;
+    LINES.forEach(([w, I], i) => {
+      const x = toX(w), [r, g, b] = wl2rgb(w);
+      const flick = REDUCED ? 1 : .82 + .18 * Math.sin(t * 9 + i * 1.7);
+      const near = Math.max(0, 1 - Math.abs(x - scanX) / 40);
+      const a = I * flick * (.7 + near * .6);
+      const gr = sx.createLinearGradient(x - 10, 0, x + 10, 0);
+      gr.addColorStop(0, `rgba(${r},${g},${b},0)`); gr.addColorStop(.5, `rgba(${r},${g},${b},${a * .5})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      sx.fillStyle = gr; sx.fillRect(x - 10, 0, 20, SH);
+      sx.fillStyle = `rgba(${r},${g},${b},${Math.min(1, a + .2)})`; sx.fillRect(x - .9, 0, 1.8, SH);
+      sx.fillStyle = `rgba(255,255,255,${a * .5})`; sx.fillRect(x - .4, SH * .2, .8, SH * .6);
+      const d = Math.abs(x - scanX); if (d < bd) { bd = d; best = w; }
+    });
+    sx.globalCompositeOperation = 'source-over';
+    sx.fillStyle = 'rgba(255,255,255,.85)'; sx.fillRect(scanX - .5, 0, 1, SH);
+    sx.beginPath(); sx.moveTo(scanX - 5, 0); sx.lineTo(scanX + 5, 0); sx.lineTo(scanX, 7); sx.fill();
+    if (best !== null) out.textContent = best.toFixed(1) + ' nm';
+    if (!REDUCED) requestAnimationFrame(sframe);
+  }
+  sresize(); addEventListener('resize', sresize); requestAnimationFrame(sframe);
+})();
+</script>
+</body>
+</html>

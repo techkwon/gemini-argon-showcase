@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WAVE LOOM | 빛나는 파동 직조소</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #060913;
+      --bg-panel: rgba(10, 16, 30, 0.78);
+      --border-soft: rgba(94, 234, 212, 0.22);
+      --cyan: #2dd4bf;
+      --coral: #fb7185;
+      --amber: #fbbf24;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #0f172a 0%, #050811 75%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+    }
+
+    /* 무대 전체를 차지하는 3D/2D 캔버스 영역 */
+    #stage-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    #stage-container canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #stage-container canvas:active {
+      cursor: grabbing;
+    }
+
+    /* 상단 헤더 및 물리 원리 안내 바 */
+    .top-bar {
+      position: fixed;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .brand-card, .formula-card {
+      pointer-events: auto;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 10px 15px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.02rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan), var(--coral));
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    .brand-sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .formula-card {
+      max-width: 580px;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+    }
+
+    .formula-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .code-pill {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      color: var(--cyan);
+      font-size: 0.73rem;
+    }
+
+    .diag-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      background: rgba(45, 212, 191, 0.14);
+      color: var(--cyan);
+      border: 1px solid rgba(45, 212, 191, 0.35);
+    }
+
+    /* 하단 약 84px 안전 공간을 확보한 슬림 조작 독 */
+    .bottom-dock {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 84px;
+      width: min(1120px, calc(100vw - 24px));
+      z-index: 10;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-soft);
+      border-radius: 16px;
+      padding: 10px 14px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .dock-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button {
+      appearance: none;
+      background: rgba(30, 41, 59, 0.85);
+      color: var(--text-main);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 9px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    button:hover {
+      border-color: var(--cyan);
+      background: rgba(45, 212, 191, 0.15);
+    }
+
+    button.active {
+      background: linear-gradient(135deg, rgba(45, 212, 191, 0.28), rgba(251, 113, 133, 0.24));
+      border-color: var(--cyan);
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(45, 212, 191, 0.25);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px 12px;
+      align-items: center;
+    }
+
+    .ctrl-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: rgba(15, 23, 42, 0.55);
+      padding: 6px 9px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .ctrl-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.71rem;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    .ctrl-val {
+      color: var(--cyan);
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .ctrl-val.coral {
+      color: var(--coral);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+      height: 5px;
+      cursor: pointer;
+    }
+
+    .dual-sliders {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .dual-sliders span {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+
+    .legend-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.71rem;
+      color: var(--text-muted);
+    }
+
+    .grad-pill {
+      width: 68px;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #0ea5e9 0%, #2dd4bf 35%, #1e293b 50%, #fb7185 80%, #fda4af 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .dock-collapsed .dock-body {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .controls-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .formula-card {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .controls-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .top-bar {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+      }
+      .bottom-dock {
+        bottom: 78px;
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="stage-container" aria-label="3D 파동 중첩 시뮬레이션 캔버스"></div>
+
+  <header class="top-bar">
+    <div class="brand-card">
+      <div class="brand-title">
+        <span class="badge-dot"></span>
+        <span>WAVE LOOM | 빛나는 파동 직조소</span>
+        <span id="self-test-badge" class="diag-badge">검증 계산 중...</span>
+      </div>
+      <div class="brand-sub">
+        이상적 선형 파동 중첩 학습 도식 (수조 유체 역학이 아닌 도식 단위 모형) · 마우스/터치로 발생원 원기둥 드래그 또는 시점 회전
+      </div>
+    </div>
+
+    <div class="formula-card" role="region" aria-label="파동 물리량 및 중첩 원리 안내">
+      <div class="formula-row">
+        <span class="code-pill">y = Σ A·sin(k·r - ω·t + φ)</span>
+        <span id="derived-readout" class="code-pill">k=2.09 | ω=7.54 | v=3.60 (도식 단위)</span>
+      </div>
+      <div id="principle-guide">
+        두 발생원으로부터 같은 거리(Δr=0)이고 진폭(A)이 같을 때: 위상차 0°이면 최대 진폭 2A(보강), 180°이면 중심선 진폭 0(상쇄)이 됩니다. 단, 두 발생원 위치가 다르면 경로차(Δr)에 따라 공간별로 보강·상쇄 무늬가 교차합니다.
+      </div>
+    </div>
+  </header>
+
+  <section id="bottom-dock" class="bottom-dock" aria-label="파동 제어판">
+    <div class="dock-header">
+      <div class="btn-group" role="group" aria-label="간섭 프리셋 및 재생 제어">
+        <button type="button" id="btn-play" class="active" aria-label="일시정지 또는 재생 전환">⏸ 일시정지</button>
+        <button type="button" id="preset-constructive" class="active">보강 프리셋 (0°)</button>
+        <button type="button" id="preset-destructive">역위상 프리셋 (180°)</button>
+        <button type="button" id="preset-single">단일 발생원 A</button>
+      </div>
+
+      <div class="btn-group" role="group" aria-label="키보드 대상 선택 및 시점 도구">
+        <button type="button" id="btn-key-target" title="화살표 키로 선택된 발생원을 이동합니다">⌨ 키보드 이동: 발생원 A</button>
+        <button type="button" id="btn-view-mode">2D 상단 시점</button>
+        <button type="button" id="btn-home">홈 시점</button>
+        <button type="button" id="btn-reset">초기화</button>
+        <button type="button" id="btn-toggle-dock" aria-label="조작부 접기 또는 펼치기">조작부 접기</button>
+      </div>
+    </div>
+
+    <div class="dock-body">
+      <div class="controls-grid">
+        <div class="ctrl-item">
+          <label class="ctrl-label" for="slider-phase">
+            <span>위상차 Δφ (B 기준)</span>
+            <span id="val-phase" class="ctrl-val">0°</span>
+          </label>
+          <input id="slider-phase" type="range" min="0" max="360" step="1" value="0" aria-label="위상차 0도에서 360도" />
+        </div>
+
+        <div class="ctrl-item">
+          <label class="ctrl-label" for="slider-freq">
+            <span>진동수 f</span>
+            <span id="val-freq" class="ctrl-val">1.2 Hz</span>
+          </label>
+          <input id="slider-freq" type="range" min="0.2" max="3.0" step="0.1" value="1.2" aria-label="진동수 조절" />
+        </div>
+
+        <div class="ctrl-item">
+          <label class="ctrl-label" for="slider-wave">
+            <span>파장 λ</span>
+            <span id="val-wave" class="ctrl-val">3.0</span>
+          </label>
+          <input id="slider-wave" type="range" min="1.2" max="6.0" step="0.1" value="3.0" aria-label="파장 조절" />
+        </div>
+
+        <div class="ctrl-item">
+          <label class="ctrl-label" for="slider-amp">
+            <span>진폭 A (각 발생원)</span>
+            <span id="val-amp" class="ctrl-val">0.55</span>
+          </label>
+          <input id="slider-amp" type="range" min="0.10" max="1.10" step="0.05" value="0.55" aria-label="진폭 조절" />
+        </div>
+
+        <div class="ctrl-item">
+          <div class="ctrl-label">
+            <span>발생원 A (X, Z)</span>
+            <span id="val-pos-a" class="ctrl-val">(-3.5, 0.0)</span>
+          </div>
+          <div class="dual-sliders">
+            <span>X</span>
+            <input id="slider-ax" type="range" min="-8" max="8" step="0.1" value="-3.5" aria-label="발생원 A X좌표" />
+            <span>Z</span>
+            <input id="slider-az" type="range" min="-8" max="8" step="0.1" value="0.0" aria-label="발생원 A Z좌표" />
+          </div>
+        </div>
+
+        <div class="ctrl-item">
+          <div class="ctrl-label">
+            <span>발생원 B (X, Z)</span>
+            <span id="val-pos-b" class="ctrl-val coral">(3.5, 0.0)</span>
+          </div>
+          <div class="dual-sliders">
+            <span>X</span>
+            <input id="slider-bx" type="range" min="-8" max="8" step="0.1" value="3.5" aria-label="발생원 B X좌표" />
+            <span>Z</span>
+            <input id="slider-bz" type="range" min="-8" max="8" step="0.1" value="0.0" aria-label="발생원 B Z좌표" />
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:7px; flex-wrap:wrap; gap:8px;">
+        <div class="legend-bar">
+          <span>높이 색상: 골(-2A 청록)</span>
+          <span class="grad-pill"></span>
+          <span>마루(+2A 산호)</span>
+        </div>
+        <div id="status-line" class="legend-bar" style="color:#94a3b8;">
+          상태: 실시간 중첩 연산 중 · 일시정지 중에도 슬라이더/드래그 변경이 표면 정점에 즉시 반영됩니다.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const GRID_SIZE = 22; // 표면 가로/세로 도식 길이 (-11 ~ +11)
+      const SEGMENTS = 104; // 입체 격자 분할 수 (105 x 105 = 11,025 정점)
+
+      const INITIAL_STATE = Object.freeze({
+        sourceA: { x: -3.5, z: 0.0, active: true },
+        sourceB: { x: 3.5, z: 0.0, active: true },
+        phaseDeg: 0,
+        frequency: 1.2,
+        wavelength: 3.0,
+        amplitude: 0.55,
+        time: 0,
+        playing: true,
+        preset: 'constructive',
+        keyTarget: 'A',
+        topView: false
+      });
+
+      const state = {
+        sourceA: { ...INITIAL_STATE.sourceA },
+        sourceB: { ...INITIAL_STATE.sourceB },
+        phaseDeg: INITIAL_STATE.phaseDeg,
+        frequency: INITIAL_STATE.frequency,
+        wavelength: INITIAL_STATE.wavelength,
+        amplitude: INITIAL_STATE.amplitude,
+        time: INITIAL_STATE.time,
+        playing: INITIAL_STATE.playing,
+        preset: INITIAL_STATE.preset,
+        keyTarget: INITIAL_STATE.keyTarget,
+        topView: INITIAL_STATE.topView
+      };
+
+      // 파수 k = 2π / λ, 각진동수 ω = 2πf, 전파속력 v = fλ
+      function getDerivedPhysics(params) {
+        const k = (2 * Math.PI) / params.wavelength;
+        const omega = 2 * Math.PI * params.frequency;
+        const speed = params.frequency * params.wavelength;
+        const phaseRad = (params.phaseDeg * Math.PI) / 180;
+        return { k, omega, speed, phaseRad };
+      }
+
+      // 단일 발생원 변위 y = A * sin(k*r - omega*t + phase)
+      function singleWaveValue(x, z, src, k, omega, t, amplitude, phaseRad) {
+        if (!src.active) return 0;
+        const dx = x - src.x;
+        const dz = z - src.z;
+        const r = Math.hypot(dx, dz);
+        return amplitude * Math.sin(k * r - omega * t + phaseRad);
+      }
+
+      // 두 발생원 합성 변위 계산 (순수 함수)
+      function computeSuperposition(x, z, params) {
+        const { k, omega, phaseRad } = getDerivedPhysics(params);
+        const yA = singleWaveValue(x, z, params.sourceA, k, omega, params.time, params.amplitude, 0);
+        const yB = singleWaveValue(x, z, params.sourceB, k, omega, params.time, params.amplitude, phaseRad);
+        return yA + yB;
+      }
+
+      // 변위 높이를 청록(골) ~ 남색(0) ~ 산호색(마루) RGB로 변환
+      function displacementToRGB(y, maxPossibleAmp) {
+        const norm = Math.max(-1, Math.min(1, y / Math.max(0.15, maxPossibleAmp)));
+        if (norm >= 0) {
+          // 0 -> +1 : 짙은 청남색(0.09, 0.16, 0.28) -> 산호/밝은 코랄(0.99, 0.48, 0.54)
+          const t = Math.pow(norm, 0.85);
+          return [
+            0.09 + t * (0.99 - 0.09),
+            0.16 + t * (0.48 - 0.16),
+            0.28 + t * (0.54 - 0.28)
+          ];
+        } else {
+          // 0 -> -1 : 짙은 청남색(0.09, 0.16, 0.28) -> 빛나는 청록(0.12, 0.88, 0.80)
+          const t = Math.pow(-norm, 0.85);
+          return [
+            0.09 + t * (0.12 - 0.09),
+            0.16 + t * (0.88 - 0.16),
+            0.28 + t * (0.80 - 0.28)
+          ];
+        }
+      }
+
+      const stageContainer = document.getElementById('stage-container');
+      let renderMode = 'webgl';
+      let scene, camera, renderer, surfaceMesh, wireMesh, markerA, markerB, ringA, ringB;
+      let surfaceGeo, posAttr, colorAttr;
+      let fallbackCanvas, fallbackCtx;
+
+      // 카메라 구면 좌표 제어 상태
+      const camOrbit = {
+        theta: 0.0,
+        phi: 0.92,
+        radius: 26,
+        targetTheta: 0.0,
+        targetPhi: 0.92,
+        targetRadius: 26
+      };
+
+      function initStage() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('Three.js 로드 실패');
+          renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          stageContainer.innerHTML = '';
+          stageContainer.appendChild(renderer.domElement);
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 150);
+
+          const ambient = new THREE.AmbientLight(0xffffff, 0.68);
+          scene.add(ambient);
+
+          const dirLight1 = new THREE.DirectionalLight(0xfff1f2, 0.85);
+          dirLight1.position.set(14, 24, 16);
+          scene.add(dirLight1);
+
+          const dirLight2 = new THREE.DirectionalLight(0x2dd4bf, 0.55);
+          dirLight2.position.set(-16, 18, -12);
+          scene.add(dirLight2);
+
+          // 파동 표면 Geometry 생성 (XZ 평면으로 회전)
+          surfaceGeo = new THREE.PlaneBufferGeometry(GRID_SIZE, GRID_SIZE, SEGMENTS, SEGMENTS);
+          surfaceGeo.rotateX(-Math.PI / 2);
+
+          posAttr = surfaceGeo.attributes.position;
+          const colors = new Float32Array(posAttr.count * 3);
+          colorAttr = new THREE.BufferAttribute(colors, 3);
+          surfaceGeo.setAttribute('color', colorAttr);
+
+          const surfaceMat = new THREE.MeshPhongMaterial({
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            shininess: 65,
+            specular: new THREE.Color(0x475569)
+          });
+          surfaceMesh = new THREE.Mesh(surfaceGeo, surfaceMat);
+          scene.add(surfaceMesh);
+
+          // 입체 격자(Wireframe) 오버레이: 동일 surfaceGeo를 공유하여 정점 변위가 즉시 동기화됨
+          const wireMat = new THREE.MeshBasicMaterial({
+            color: 0x99f6e4,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.17
+          });
+          wireMesh = new THREE.Mesh(surfaceGeo, wireMat);
+          wireMesh.position.y = 0.006;
+          scene.add(wireMesh);
+
+          // 발생원 A, B 입체 마커 생성
+          markerA = createSourceMarker(0x2dd4bf);
+          markerB = createSourceMarker(0xfb7185);
+          scene.add(markerA.group);
+          scene.add(markerB.group);
+
+          fitCameraToViewport();
+        } catch (err) {
+          // WebGL 초기화 실패 시 실제 파동 수식을 계산하는 2D 캔버스 대체 화면 가동
+          renderMode = 'canvas2d';
+          stageContainer.innerHTML = '';
+          fallbackCanvas = document.createElement('canvas');
+          fallbackCtx = fallbackCanvas.getContext('2d');
+          stageContainer.appendChild(fallbackCanvas);
+          resizeFallbackCanvas();
+        }
+      }
+
+      function createSourceMarker(hexColor) {
+        const group = new THREE.Group();
+        const stemGeo = new THREE.CylinderBufferGeometry(0.14, 0.14, 2.8, 20);
+        const stemMat = new THREE.MeshBasicMaterial({ color: hexColor });
+        const stem = new THREE.Mesh(stemGeo, stemMat);
+        stem.position.y = 0.8;
+        group.add(stem);
+
+        const sphereGeo = new THREE.SphereBufferGeometry(0.42, 24, 24);
+        const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+        sphere.position.y = 2.2;
+        group.add(sphere);
+
+        const ringGeo = new THREE.RingBufferGeometry(0.5, 0.68, 32);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({ color: hexColor, side: THREE.DoubleSide });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.y = 0.05;
+        group.add(ring);
+
+        return { group, stem, sphere, ring };
+      }
+
+      let lastVertexChecksum = 0;
+
+      function updateWaveSurface() {
+        const maxAmp = state.sourceB.active ? state.amplitude * 2 : state.amplitude;
+
+        if (renderMode === 'webgl' && posAttr && colorAttr) {
+          const count = posAttr.count;
+          let checksum = 0;
+
+          for (let i = 0; i < count; i++) {
+            const x = posAttr.getX(i);
+            const z = posAttr.getZ(i);
+            const y = computeSuperposition(x, z, state);
+            posAttr.setY(i, y);
+
+            const rgb = displacementToRGB(y, maxAmp);
+            colorAttr.setXYZ(i, rgb[0], rgb[1], rgb[2]);
+
+            if (i % 97 === 0) {
+              checksum += y * (i + 1);
+            }
+          }
+
+          lastVertexChecksum = Number(checksum.toFixed(5));
+          posAttr.needsUpdate = true;
+          colorAttr.needsUpdate = true;
+          surfaceGeo.computeVertexNormals();
+
+          // 발생원 A, B 마커 위치 및 높이 동기화
+          const yA = computeSuperposition(state.sourceA.x, state.sourceA.z, state);
+          markerA.group.position.set(state.sourceA.x, yA * 0.35, state.sourceA.z);
+          markerA.group.visible = state.sourceA.active;
+
+          const yB = computeSuperposition(state.sourceB.x, state.sourceB.z, state);
+          markerB.group.position.set(state.sourceB.x, yB * 0.35, state.sourceB.z);
+          markerB.group.visible = state.sourceB.active;
+        } else if (renderMode === 'canvas2d' && fallbackCtx) {
+          drawFallback2D(maxAmp);
+        }
+      }
+
+      function drawFallback2D(maxAmp) {
+        const w = fallbackCanvas.width;
+        const h = fallbackCanvas.height;
+        const cols = 90;
+        const rows = 90;
+        const cellW = w / cols;
+        const cellH = h / rows;
+        let checksum = 0;
+
+        for (let r = 0; r < rows; r++) {
+          const z = ((r / (rows - 1)) - 0.5) * GRID_SIZE;
+          for (let c = 0; c < cols; c++) {
+            const x = ((c / (cols - 1)) - 0.5) * GRID_SIZE;
+            const y = computeSuperposition(x, z, state);
+            if ((r * cols + c) % 41 === 0) checksum += y;
+            const rgb = displacementToRGB(y, maxAmp);
+            fallbackCtx.fillStyle = `rgb(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)})`;
+            fallbackCtx.fillRect(c * cellW, r * cellH, Math.ceil(cellW), Math.ceil(cellH));
+          }
+        }
+        lastVertexChecksum = Number(checksum.toFixed(5));
+      }
+
+      function renderScene() {
+        if (renderMode === 'webgl' && renderer && scene && camera) {
+          camOrbit.theta += (camOrbit.targetTheta - camOrbit.theta) * 0.18;
+          camOrbit.phi += (camOrbit.targetPhi - camOrbit.phi) * 0.18;
+          camOrbit.radius += (camOrbit.targetRadius - camOrbit.radius) * 0.18;
+
+          const sinPhi = Math.sin(camOrbit.phi);
+          camera.position.x = camOrbit.radius * sinPhi * Math.sin(camOrbit.theta);
+          camera.position.y = camOrbit.radius * Math.cos(camOrbit.phi);
+          camera.position.z = camOrbit.radius * sinPhi * Math.cos(camOrbit.theta);
+          camera.lookAt(0, -1.2, 1.5);
+          renderer.render(scene, camera);
+        }
+      }
+
+      function fitCameraToViewport() {
+        const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        // 화면 비율이 좁은 모바일에서도 전체 파동 표면이 한눈에 보이도록 거리 자동 조절
+        const baseRadius = aspect < 1 ? 25 / Math.max(0.52, aspect * 0.85) : 25.5;
+        camOrbit.targetRadius = Math.min(44, Math.max(22, baseRadius));
+        if (camera) {
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+        }
+        if (renderer) {
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+      }
+
+      function resizeFallbackCanvas() {
+        if (!fallbackCanvas) return;
+        fallbackCanvas.width = window.innerWidth;
+        fallbackCanvas.height = window.innerHeight;
+      }
+
+      const dom = {
+        btnPlay: document.getElementById('btn-play'),
+        presetConstructive: document.getElementById('preset-constructive'),
+        presetDestructive: document.getElementById('preset-destructive'),
+        presetSingle: document.getElementById('preset-single'),
+        btnKeyTarget: document.getElementById('btn-key-target'),
+        btnViewMode: document.getElementById('btn-view-mode'),
+        btnHome: document.getElementById('btn-home'),
+        btnReset: document.getElementById('btn-reset'),
+        btnToggleDock: document.getElementById('btn-toggle-dock'),
+        bottomDock: document.getElementById('bottom-dock'),
+        sliderPhase: document.getElementById('slider-phase'),
+        sliderFreq: document.getElementById('slider-freq'),
+        sliderWave: document.getElementById('slider-wave'),
+        sliderAmp: document.getElementById('slider-amp'),
+        sliderAx: document.getElementById('slider-ax'),
+        sliderAz: document.getElementById('slider-az'),
+        sliderBx: document.getElementById('slider-bx'),
+        sliderBz: document.getElementById('slider-bz'),
+        valPhase: document.getElementById('val-phase'),
+        valFreq: document.getElementById('val-freq'),
+        valWave: document.getElementById('val-wave'),
+        valAmp: document.getElementById('val-amp'),
+        valPosA: document.getElementById('val-pos-a'),
+        valPosB: document.getElementById('val-pos-b'),
+        derivedReadout: document.getElementById('derived-readout'),
+        principleGuide: document.getElementById('principle-guide'),
+        selfTestBadge: document.getElementById('self-test-badge')
+      };
+
+      function syncUIAndSurface() {
+        dom.sliderPhase.value = state.phaseDeg;
+        dom.sliderFreq.value = state.frequency;
+        dom.sliderWave.value = state.wavelength;
+        dom.sliderAmp.value = state.amplitude;
+        dom.sliderAx.value = state.sourceA.x;
+        dom.sliderAz.value = state.sourceA.z;
+        dom.sliderBx.value = state.sourceB.x;
+        dom.sliderBz.value = state.sourceB.z;
+        dom.sliderBx.disabled = !state.sourceB.active;
+        dom.sliderBz.disabled = !state.sourceB.active;
+        dom.sliderPhase.disabled = !state.sourceB.active;
+
+        dom.valPhase.textContent = `${state.phaseDeg}°`;
+        dom.valFreq.textContent = `${state.frequency.toFixed(1)} Hz`;
+        dom.valWave.textContent = `${state.wavelength.toFixed(1)}`;
+        dom.valAmp.textContent = `${state.amplitude.toFixed(2)}`;
+        dom.valPosA.textContent = `(${state.sourceA.x.toFixed(1)}, ${state.sourceA.z.toFixed(1)})`;
+        dom.valPosB.textContent = state.sourceB.active
+          ? `(${state.sourceB.x.toFixed(1)}, ${state.sourceB.z.toFixed(1)})`
+          : '비활성 (단일 A)';
+
+        const { k, omega, speed } = getDerivedPhysics(state);
+        dom.derivedReadout.textContent = `k=${k.toFixed(2)} | ω=${omega.toFixed(2)} | v=fλ=${speed.toFixed(2)} (도식 단위)`;
+
+        dom.btnPlay.textContent = state.playing ? '⏸ 일시정지' : '▶ 재생';
+        dom.btnPlay.classList.toggle('active', state.playing);
+
+        dom.presetConstructive.classList.toggle('active', state.preset === 'constructive');
+        dom.presetDestructive.classList.toggle('active', state.preset === 'destructive');
+        dom.presetSingle.classList.toggle('active', state.preset === 'single');
+
+        dom.btnKeyTarget.textContent = `⌨ 키보드 이동: 발생원 ${state.keyTarget}`;
+        dom.btnViewMode.textContent = state.topView ? '3D 입체 시점' : '2D 상단 시점';
+
+        // 현재 위상 및 발생원 활성 상태에 따른 정확한 물리 설명 표시
+        if (!state.sourceB.active) {
+          dom.principleGuide.textContent =
+            `[단일 발생원 A] 진폭 A=${state.amplitude.toFixed(2)}인 동심원 파동이 파장 λ=${state.wavelength.toFixed(1)}, 속력 v=${speed.toFixed(2)}로 전파됩니다.`;
+        } else if (state.phaseDeg === 0 || state.phaseDeg === 360) {
+          dom.principleGuide.textContent =
+            `[동위상 Δφ=0°] 두 발생원에서 같은 거리(Δr=0, 중앙 수직이등분선)인 지점들은 최대 진폭 2A=${(state.amplitude * 2).toFixed(2)}로 보강 간섭하며, 경로차 Δr=(n+1/2)λ 지점에는 상쇄 마디선이 형성됩니다.`;
+        } else if (state.phaseDeg === 180) {
+          dom.principleGuide.textContent =
+            `[역위상 Δφ=180°] 같은 거리(Δr=0) 중심선에서는 두 파동이 서로 상쇄되어 진폭이 0이 됩니다. 단, 두 발생원 위치가 다르므로 전체 표면이 모두 0이 되는 것이 아니라 Δr=(n+1/2)λ 지점에서 최대 진폭 2A 보강 무늬가 나타납니다.`;
+        } else {
+          dom.principleGuide.textContent =
+            `[위상차 Δφ=${state.phaseDeg}°] 경로차(Δr)와 위상차(Δφ)의 결합 위상이 2nπ인 곳에서 최대 진폭 2A=${(state.amplitude * 2).toFixed(2)} 보강, (2n+1)π인 곳에서 진폭 0 상쇄 간섭이 일어납니다.`;
+        }
+
+        // 일시정지 상태여도 파라미터 변경을 즉시 표면 정점에 반영하고 렌더링
+        updateWaveSurface();
+        renderScene();
+      }
+
+      function applyPreset(presetName) {
+        state.preset = presetName;
+        if (presetName === 'constructive') {
+          state.sourceA = { x: -3.5, z: 0.0, active: true };
+          state.sourceB = { x: 3.5, z: 0.0, active: true };
+          state.phaseDeg = 0;
+        } else if (presetName === 'destructive') {
+          state.sourceA = { x: -3.5, z: 0.0, active: true };
+          state.sourceB = { x: 3.5, z: 0.0, active: true };
+          state.phaseDeg = 180;
+        } else if (presetName === 'single') {
+          state.sourceA = { x: 0.0, z: 0.0, active: true };
+          state.sourceB = { x: 3.5, z: 0.0, active: false };
+          state.phaseDeg = 0;
+          state.keyTarget = 'A';
+        }
+        syncUIAndSurface();
+      }
+
+      dom.presetConstructive.addEventListener('click', () => applyPreset('constructive'));
+      dom.presetDestructive.addEventListener('click', () => applyPreset('destructive'));
+      dom.presetSingle.addEventListener('click', () => applyPreset('single'));
+
+      dom.btnPlay.addEventListener('click', () => {
+        state.playing = !state.playing;
+        syncUIAndSurface();
+      });
+
+      dom.btnKeyTarget.addEventListener('click', () => {
+        state.keyTarget = state.keyTarget === 'A' && state.sourceB.active ? 'B' : 'A';
+        syncUIAndSurface();
+      });
+
+      dom.btnViewMode.addEventListener('click', () => {
+        state.topView = !state.topView;
+        if (state.topView) {
+          camOrbit.targetTheta = 0.0;
+          camOrbit.targetPhi = 0.05;
+        } else {
+          camOrbit.targetTheta = 0.0;
+          camOrbit.targetPhi = 0.92;
+        }
+        syncUIAndSurface();
+      });
+
+      dom.btnHome.addEventListener('click', () => {
+        state.topView = false;
+        camOrbit.targetTheta = 0.0;
+        camOrbit.targetPhi = 0.92;
+        fitCameraToViewport();
+        syncUIAndSurface();
+      });
+
+      dom.btnReset.addEventListener('click', () => {
+        state.sourceA = { ...INITIAL_STATE.sourceA };
+        state.sourceB = { ...INITIAL_STATE.sourceB };
+        state.phaseDeg = INITIAL_STATE.phaseDeg;
+        state.frequency = INITIAL_STATE.frequency;
+        state.wavelength = INITIAL_STATE.wavelength;
+        state.amplitude = INITIAL_STATE.amplitude;
+        state.time = 0;
+        state.playing = true;
+        state.preset = 'constructive';
+        state.keyTarget = 'A';
+        state.topView = false;
+        camOrbit.targetTheta = 0.0;
+        camOrbit.targetPhi = 0.92;
+        fitCameraToViewport();
+        syncUIAndSurface();
+      });
+
+      dom.btnToggleDock.addEventListener('click', () => {
+        const collapsed = dom.bottomDock.classList.toggle('dock-collapsed');
+        dom.btnToggleDock.textContent = collapsed ? '조작부 펼치기' : '조작부 접기';
+      });
+
+      // 슬라이더 이벤트 바인딩
+      dom.sliderPhase.addEventListener('input', (e) => {
+        state.phaseDeg = Number(e.target.value);
+        state.preset = 'custom';
+        syncUIAndSurface();
+      });
+      dom.sliderFreq.addEventListener('input', (e) => {
+        state.frequency = Number(e.target.value);
+        syncUIAndSurface();
+      });
+      dom.sliderWave.addEventListener('input', (e) => {
+        state.wavelength = Number(e.target.value);
+        syncUIAndSurface();
+      });
+      dom.sliderAmp.addEventListener('input', (e) => {
+        state.amplitude = Number(e.target.value);
+        syncUIAndSurface();
+      });
+
+      function clampCoord(v) {
+        return Math.max(-8, Math.min(8, Number(v)));
+      }
+
+      dom.sliderAx.addEventListener('input', (e) => {
+        state.sourceA.x = clampCoord(e.target.value);
+        state.preset = 'custom';
+        syncUIAndSurface();
+      });
+      dom.sliderAz.addEventListener('input', (e) => {
+        state.sourceA.z = clampCoord(e.target.value);
+        state.preset = 'custom';
+        syncUIAndSurface();
+      });
+      dom.sliderBx.addEventListener('input', (e) => {
+        state.sourceB.x = clampCoord(e.target.value);
+        state.preset = 'custom';
+        syncUIAndSurface();
+      });
+      dom.sliderBz.addEventListener('input', (e) => {
+        state.sourceB.z = clampCoord(e.target.value);
+        state.preset = 'custom';
+        syncUIAndSurface();
+      });
+
+      // 키보드 방향키로 선택된 발생원 이동
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
+        const step = 0.3;
+        const target = state.keyTarget === 'B' && state.sourceB.active ? state.sourceB : state.sourceA;
+        let handled = true;
+        if (e.key === 'ArrowLeft') target.x = clampCoord(target.x - step);
+        else if (e.key === 'ArrowRight') target.x = clampCoord(target.x + step);
+        else if (e.key === 'ArrowUp') target.z = clampCoord(target.z - step);
+        else if (e.key === 'ArrowDown') target.z = clampCoord(target.z + step);
+        else if (e.key === ' ') {
+          state.playing = !state.playing;
+        } else {
+          handled = false;
+        }
+        if (handled) {
+          e.preventDefault();
+          state.preset = 'custom';
+          syncUIAndSurface();
+        }
+      });
+
+      // 마우스/터치 3D 발생원 드래그 및 카메라 회전 제어
+      const raycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
+      const pointerNDC = typeof THREE !== 'undefined' ? new THREE.Vector2() : null;
+      const dragPlane = typeof THREE !== 'undefined' ? new THREE.Plane(new THREE.Vector3(0, 1, 0), 0) : null;
+      const planeHit = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
+
+      let dragMode = null; // 'sourceA' | 'sourceB' | 'orbit' | null
+      let lastPointer = { x: 0, y: 0 };
+
+      function updatePointerNDC(clientX, clientY) {
+        if (!pointerNDC) return;
+        pointerNDC.x = (clientX / window.innerWidth) * 2 - 1;
+        pointerNDC.y = -(clientY / window.innerHeight) * 2 + 1;
+      }
+
+      stageContainer.addEventListener('pointerdown', (e) => {
+        lastPointer = { x: e.clientX, y: e.clientY };
+        if (renderMode === 'webgl' && raycaster && camera) {
+          updatePointerNDC(e.clientX, e.clientY);
+          raycaster.setFromCamera(pointerNDC, camera);
+          if (raycaster.ray.intersectPlane(dragPlane, planeHit)) {
+            const distA = Math.hypot(planeHit.x - state.sourceA.x, planeHit.z - state.sourceA.z);
+            const distB = state.sourceB.active
+              ? Math.hypot(planeHit.x - state.sourceB.x, planeHit.z - state.sourceB.z)
+              : Infinity;
+
+            if (distA < 1.35 && distA <= distB) {
+              dragMode = 'sourceA';
+              state.keyTarget = 'A';
+              stageContainer.setPointerCapture(e.pointerId);
+              return;
+            }
+            if (distB < 1.35) {
+              dragMode = 'sourceB';
+              state.keyTarget = 'B';
+              stageContainer.setPointerCapture(e.pointerId);
+              return;
+            }
+          }
+        }
+        dragMode = 'orbit';
+        stageContainer.setPointerCapture(e.pointerId);
+      });
+
+      stageContainer.addEventListener('pointermove', (e) => {
+        if (!dragMode) return;
+        if ((dragMode === 'sourceA' || dragMode === 'sourceB') && raycaster && camera) {
+          updatePointerNDC(e.clientX, e.clientY);
+          raycaster.setFromCamera(pointerNDC, camera);
+          if (raycaster.ray.intersectPlane(dragPlane, planeHit)) {
+            const target = dragMode === 'sourceA' ? state.sourceA : state.sourceB;
+            target.x = clampCoord(Number(planeHit.x.toFixed(1)));
+            target.z = clampCoord(Number(planeHit.z.toFixed(1)));
+            state.preset = 'custom';
+            syncUIAndSurface();
+          }
+        } else if (dragMode === 'orbit') {
+          const dx = e.clientX - lastPointer.x;
+          const dy = e.clientY - lastPointer.y;
+          lastPointer = { x: e.clientX, y: e.clientY };
+          camOrbit.targetTheta -= dx * 0.0065;
+          camOrbit.targetPhi = Math.max(0.08, Math.min(1.38, camOrbit.targetPhi - dy * 0.0055));
+          renderScene();
+        }
+      });
+
+      stageContainer.addEventListener('pointerup', () => {
+        dragMode = null;
+      });
+
+      stageContainer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camOrbit.targetRadius = Math.max(14, Math.min(46, camOrbit.targetRadius + e.deltaY * 0.015));
+        renderScene();
+      }, { passive: false });
+
+      window.addEventListener('resize', () => {
+        fitCameraToViewport();
+        resizeFallbackCanvas();
+        syncUIAndSurface();
+      });
+
+      function runPhysicsSelfVerification() {
+        const testAmp = 0.65;
+        const baseTest = {
+          sourceA: { x: -4, z: 0, active: true },
+          sourceB: { x: 4, z: 0, active: true },
+          phaseDeg: 0,
+          frequency: 1.0,
+          wavelength: 4.0,
+          amplitude: testAmp,
+          time: 0
+        };
+        // 1) 보강 간섭 검증: 동일 거리(0,0), r=4=1.0*λ, sin(2π*1 + π/2) 지점인 t에서 최대 2A 확인
+        // r=4, λ=4 -> k*r = 2π. ω*t = -π/2 이면 sin(2π + π/2) = +1 -> yA=A, yB=A => y = 2A
+        const tPeak = -0.25 / baseTest.frequency;
+        const constructiveVal = computeSuperposition(0, 0, { ...baseTest, time: tPeak, phaseDeg: 0 });
+        const passConstructive = Math.abs(constructiveVal - 2 * testAmp) < 1e-6;
+
+        // 2) 역위상 중심선 상쇄 검증: 동일 거리(0,0)에서 위상차 180도이면 임의 시각 t에서 합성 변위 0
+        const destructiveVal1 = computeSuperposition(0, 0, { ...baseTest, time: 0.13, phaseDeg: 180 });
+        const destructiveVal2 = computeSuperposition(0, 3.2, { ...baseTest, time: 0.77, phaseDeg: 180 });
+        const passDestructive = Math.abs(destructiveVal1) < 1e-6 && Math.abs(destructiveVal2) < 1e-6;
+
+        // 3) 유한성(Finiteness) 및 초기화 일치 검증
+        const sampleVal = computeSuperposition(2.1, -1.7, state);
+        const passFinite = Number.isFinite(sampleVal) && Number.isFinite(lastVertexChecksum);
+        const passInit =
+          INITIAL_STATE.phaseDeg === 0 &&
+          INITIAL_STATE.sourceA.active === true &&
+          INITIAL_STATE.sourceB.active === true;
+
+        const allPassed = passConstructive && passDestructive && passFinite && passInit;
+        dom.selfTestBadge.textContent = allPassed
+          ? `물리 검증 통과 (2A=${(2 * testAmp).toFixed(2)} / 상쇄=0.00)`
+          : '물리 검증 오류 감지';
+
+        return {
+          allPassed,
+          passConstructive,
+          passDestructive,
+          passFinite,
+          passInit,
+          constructiveVal: Number(constructiveVal.toFixed(6)),
+          destructiveVal: Number(destructiveVal1.toFixed(6))
+        };
+      }
+
+      // 외부에서 현재 파라미터와 실제 geometry 정점 샘플/체크섬을 읽기 전용으로 확인할 수 있는 진단 함수
+      window.appDiagnostics = function () {
+        const derived = getDerivedPhysics(state);
+        const vertexSamples = [];
+        if (posAttr) {
+          const indices = [0, Math.floor(posAttr.count * 0.25), Math.floor(posAttr.count * 0.5), posAttr.count - 1];
+          for (const idx of indices) {
+            vertexSamples.push({
+              index: idx,
+              x: Number(posAttr.getX(idx).toFixed(3)),
+              y: Number(posAttr.getY(idx).toFixed(5)),
+              z: Number(posAttr.getZ(idx).toFixed(3))
+            });
+          }
+        }
+        return Object.freeze({
+          renderMode,
+          playing: state.playing,
+          preset: state.preset,
+          time: Number(state.time.toFixed(4)),
+          parameters: {
+            phaseDeg: state.phaseDeg,
+            frequency: state.frequency,
+            wavelength: state.wavelength,
+            amplitude: state.amplitude,
+            sourceA: { ...state.sourceA },
+            sourceB: { ...state.sourceB }
+          },
+          derived: {
+            k: Number(derived.k.toFixed(5)),
+            omega: Number(derived.omega.toFixed(5)),
+            speed: Number(derived.speed.toFixed(5))
+          },
+          geometry: {
+            vertexCount: posAttr ? posAttr.count : 0,
+            checksum: lastVertexChecksum,
+            samples: vertexSamples
+          },
+          selfTest: runPhysicsSelfVerification()
+        });
+      };
+
+      let lastFrameTime = performance.now();
+
+      function animateLoop(now) {
+        requestAnimationFrame(animateLoop);
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+
+        if (state.playing) {
+          state.time += dt;
+          updateWaveSurface();
+        }
+        renderScene();
+      }
+
+      window.onload = function () {
+        initStage();
+        syncUIAndSurface();
+        runPhysicsSelfVerification();
+        lastFrameTime = performance.now();
+        requestAnimationFrame(animateLoop);
+      };
+    })();
+  </script>
+</body>
+</html>

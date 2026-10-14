@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BRIDGE FORGE | 힘을 분산하는 다리 공방</title>
+  <style>
+    :root {
+      --bg-dark: #0b111e;
+      --panel-bg: rgba(15, 23, 42, 0.86);
+      --border-col: rgba(148, 163, 184, 0.22);
+      --text-main: #f1f5f9;
+      --text-sub: #94a3b8;
+      --accent: #38bdf8;
+      --comp-blue: #3b82f6;
+      --tens-red: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    /* 하단 110px Gemini 입력창 안전 공간 확보 */
+    #app-wrapper {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - 110px);
+      min-height: 420px;
+      display: flex;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 25%, #1e293b 0%, #090d16 100%);
+    }
+    #viewport-area {
+      position: relative;
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+      touch-action: none;
+    }
+    #webgl-canvas, #fallback-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #fallback-canvas { display: none; }
+
+    /* 상단 타이틀 및 범례 오버레이 */
+    .hud-top {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 316px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .brand-box {
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-col);
+      border-radius: 12px;
+      padding: 10px 15px;
+      pointer-events: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 10px;
+      padding: 2px 7px;
+      background: rgba(56, 189, 248, 0.16);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .brand-sub {
+      font-size: 11.5px;
+      color: var(--text-sub);
+      margin-top: 3px;
+    }
+
+    /* 인장/압축 범례 및 실시간 계산 요약 */
+    .legend-box {
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-col);
+      border-radius: 12px;
+      padding: 10px 14px;
+      pointer-events: auto;
+      min-width: 265px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .legend-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .gradient-bar {
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #2563eb 0%, #60a5fa 32%, #94a3b8 50%, #f87171 68%, #dc2626 100%);
+      margin-bottom: 5px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .lbl-comp { color: #60a5fa; }
+    .lbl-zero { color: #94a3b8; font-weight: 500; }
+    .lbl-tens { color: #f87171; }
+    .telemetry-row {
+      margin-top: 7px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #e2e8f0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 좌측 하단 카메라 & 안내 오버레이 */
+    .hud-bottom-left {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      right: 316px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .notice-card {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-col);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text-sub);
+      max-width: 520px;
+      pointer-events: auto;
+    }
+    .notice-card strong { color: #e2e8f0; }
+    #webgl-status-banner {
+      display: none;
+      margin-top: 4px;
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    /* 우측 슬림 조작 패널 */
+    #control-dock {
+      width: 300px;
+      height: 100%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      border-left: 1px solid var(--border-col);
+      padding: 12px 14px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .dock-section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.03em;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ctrl-group {
+      margin-bottom: 9px;
+      background: rgba(30, 41, 59, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 9px;
+      padding: 8px 10px;
+    }
+    .ctrl-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #f8fafc;
+    }
+    .ctrl-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+    .seg-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .seg-btn {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: var(--text-sub);
+      padding: 6px 8px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .seg-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #334155;
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #fff;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    }
+    .scale-tag {
+      font-size: 10.5px;
+      color: #fbbf24;
+      margin-top: 3px;
+      display: block;
+    }
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-top: 4px;
+    }
+    .act-btn {
+      background: rgba(51, 65, 85, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #f1f5f9;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .act-btn:hover { background: rgba(71, 85, 105, 0.95); }
+    .act-btn.primary {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.45);
+      color: #e0f2fe;
+    }
+
+    @media (max-width: 860px) {
+      #app-wrapper { flex-direction: column; height: calc(100vh - 105px); }
+      .hud-top { right: 12px; top: 10px; }
+      .hud-bottom-left { right: 12px; bottom: 8px; }
+      .notice-card { font-size: 10px; padding: 6px 9px; }
+      #control-dock {
+        width: 100%;
+        height: 230px;
+        border-left: none;
+        border-top: 1px solid var(--border-col);
+        padding: 10px 12px;
+      }
+    }
+  </style>
+  <!-- 안정적 단일 Three.js 전역 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="app-wrapper">
+    <main id="viewport-area" aria-label="3D 트러스 구조 시뮬레이션 영역">
+      <canvas id="webgl-canvas"></canvas>
+      <canvas id="fallback-canvas"></canvas>
+
+      <div class="hud-top">
+        <div class="brand-box">
+          <div class="brand-title">
+            <span>BRIDGE FORGE</span>
+            <span class="brand-badge">힘을 분산하는 다리 공방</span>
+          </div>
+          <div class="brand-sub">마우스 드래그/터치로 3D 다리를 회전하고 삼각형 트러스의 하중 분산을 비교하세요</div>
+        </div>
+
+        <div class="legend-box">
+          <div class="legend-header">
+            <span>부재 축력 분포 (압축 vs 인장)</span>
+            <span id="active-truss-label">워런 트러스</span>
+          </div>
+          <div class="gradient-bar"></div>
+          <div class="legend-labels">
+            <span class="lbl-comp" id="legend-max-comp">압축 -0.0 kN</span>
+            <span class="lbl-zero">0 kN</span>
+            <span class="lbl-tens" id="legend-max-tens">인장 +0.0 kN</span>
+          </div>
+          <div class="telemetry-row">
+            <span>최대 처짐(실제): <strong id="stat-deflection">0.00 mm</strong></span>
+            <span>부재 수: <strong id="stat-members">0개</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-bottom-left">
+        <div class="notice-card">
+          <strong>[학습용 공학 모형 안내]</strong> 본 시뮬레이션은 <strong>이상화된 핀 접합(Pin-joint)·선형 탄성 평면 트러스 강성행렬</strong> 계산에 기반하며, 변형 모습은 관찰을 위해 배율로 과장되었습니다. 실제 교량 설계나 안전 판정 용도로 사용할 수 없습니다. (키보드 ←/→: 하중 이동)
+          <div id="webgl-status-banner">WebGL 가속을 사용할 수 없어 동일 강성행렬 계산 결과를 표시하는 정밀 2D 구조 뷰로 전환되었습니다.</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 우측 6대 핵심 조작부 + 초기화/홈 -->
+    <aside id="control-dock" aria-label="트러스 다리 조작부">
+      <div>
+        <div class="dock-section-title">
+          <span>구조 및 하중 제어 (6대 변수)</span>
+          <span style="font-size:10.5px; color:#94a3b8; font-weight:500;">실시간 해법</span>
+        </div>
+
+        <!-- 1. 트러스 형식 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <span>1. 트러스 형식</span>
+            <span class="ctrl-val" id="val-type">워런 (Warren)</span>
+          </div>
+          <div class="seg-buttons" role="group" aria-label="트러스 형식 선택">
+            <button type="button" class="seg-btn active" id="btn-warren" data-type="warren">워런 (정삼각 교차)</button>
+            <button type="button" class="seg-btn" id="btn-pratt" data-type="pratt">프랫 (수직+대각)</button>
+          </div>
+        </div>
+
+        <!-- 2. 경간 길이 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <label for="slider-span">2. 경간 길이 (Span)</label>
+            <span class="ctrl-val" id="val-span">48 m</span>
+          </div>
+          <input type="range" id="slider-span" min="24" max="72" step="4" value="48">
+        </div>
+
+        <!-- 3. 트러스 높이 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <label for="slider-height">3. 트러스 높이 (Height)</label>
+            <span class="ctrl-val" id="val-height">8.0 m</span>
+          </div>
+          <input type="range" id="slider-height" min="4.0" max="14.0" step="0.5" value="8.0">
+        </div>
+
+        <!-- 4. 하중 크기 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <label for="slider-load">4. 하중 크기 (Load)</label>
+            <span class="ctrl-val" id="val-load">240 kN</span>
+          </div>
+          <input type="range" id="slider-load" min="40" max="500" step="10" value="240">
+        </div>
+
+        <!-- 5. 하중 위치 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <label for="slider-pos">5. 하중 위치 (Position)</label>
+            <span class="ctrl-val" id="val-pos">50% (중앙)</span>
+          </div>
+          <input type="range" id="slider-pos" min="10" max="90" step="2" value="50">
+        </div>
+
+        <!-- 6. 변형 표시 배율 -->
+        <div class="ctrl-group">
+          <div class="ctrl-head">
+            <label for="slider-scale">6. 변형 표시 배율 (Exaggeration)</label>
+            <span class="ctrl-val" id="val-scale">60x 과장</span>
+          </div>
+          <input type="range" id="slider-scale" min="1" max="150" step="1" value="60">
+          <span class="scale-tag">* 시각적 이해를 위해 실제 탄성 변위를 과장하여 그림</span>
+        </div>
+      </div>
+
+      <!-- 초기화 및 카메라 홈 버튼 -->
+      <div class="action-row">
+        <button type="button" class="act-btn" id="btn-reset-params">기본값 초기화</button>
+        <button type="button" class="act-btn primary" id="btn-reset-camera">카메라 보기 홈</button>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // 기본 상태값 (6개 핵심 조작 변수)
+      const DEFAULTS = {
+        trussType: 'warren', // 'warren' | 'pratt'
+        span: 48,            // m (24 ~ 72)
+        height: 8.0,         // m (4.0 ~ 14.0)
+        loadMag: 240,        // kN (40 ~ 500)
+        loadPosPct: 50,      // % (10 ~ 90)
+        deformScale: 60      // 배율 (1 ~ 150)
+      };
+
+      const state = Object.assign({}, DEFAULTS);
+
+      // 최신 구조 해석 결과 저장소 (3D, 2D 대안, 진단 함수에서 공유)
+      let currentAnalysis = null;
+      let geometryChecksum = 0;
+
+      /**
+       * 선형 연립방정식 해법 (가우스 소거법 + 부분 피벗팅)
+       * K * u = F 계산용
+       */
+      function solveLinearSystem(A, b) {
+        const n = b.length;
+        const M = A.map((row, i) => [...row, b[i]]);
+
+        for (let col = 0; col < n; col++) {
+          let maxRow = col;
+          let maxVal = Math.abs(M[col][col]);
+          for (let r = col + 1; r < n; r++) {
+            const v = Math.abs(M[r][col]);
+            if (v > maxVal) {
+              maxVal = v;
+              maxRow = r;
+            }
+          }
+          if (maxRow !== col) {
+            const tmp = M[col];
+            M[col] = M[maxRow];
+            M[maxRow] = tmp;
+          }
+          const pivot = M[col][col];
+          if (Math.abs(pivot) < 1e-12) continue;
+
+          for (let r = col + 1; r < n; r++) {
+            const factor = M[r][col] / pivot;
+            if (factor === 0) continue;
+            for (let c = col; c <= n; c++) {
+              M[r][c] -= factor * M[col][c];
+            }
+          }
+        }
+
+        const x = new Array(n).fill(0);
+        for (let i = n - 1; i >= 0; i--) {
+          let sum = M[i][n];
+          for (let j = i + 1; j < n; j++) {
+            sum -= M[i][j] * x[j];
+          }
+          const diag = M[i][i];
+          x[i] = Math.abs(diag) > 1e-12 ? sum / diag : 0;
+        }
+        return x;
+      }
+
+      /**
+       * 트러스 절점(nodes)과 부재(members) 위상 생성 및 강성행렬(Direct Stiffness Method) 해석
+       */
+      function solveTrussStructure(params) {
+        const N = 6; // 하현재 구획(패널) 수 = 6칸
+        const L = params.span;
+        const H = params.height;
+        const panelLen = L / N;
+        const halfL = L / 2;
+
+        const nodes = [];
+        const members = [];
+
+        if (params.trussType === 'warren') {
+          // 하현재 절점 0..N (7개)
+          for (let i = 0; i <= N; i++) {
+            nodes.push({ id: i, x: -halfL + i * panelLen, y: 0, role: 'bottom' });
+          }
+          // 상현재 절점 N+1..2N (6개, 삼각형 정점 배치)
+          for (let i = 0; i < N; i++) {
+            nodes.push({ id: N + 1 + i, x: -halfL + (i + 0.5) * panelLen, y: H, role: 'top' });
+          }
+          // 하현재 부재
+          for (let i = 0; i < N; i++) {
+            members.push({ a: i, b: i + 1, kind: 'bottom_chord' });
+          }
+          // 상현재 부재
+          for (let i = 0; i < N - 1; i++) {
+            members.push({ a: N + 1 + i, b: N + 2 + i, kind: 'top_chord' });
+          }
+          // 사재 (지그재그 정삼각/이등변삼각 웨브)
+          for (let i = 0; i < N; i++) {
+            members.push({ a: i, b: N + 1 + i, kind: 'diagonal' });
+            members.push({ a: N + 1 + i, b: i + 1, kind: 'diagonal' });
+          }
+        } else {
+          // 프랫(Pratt) 트러스: 하현재 0..N (7개), 상현재 N+1..2N-1 (i=1..N-1 상부 5개)
+          for (let i = 0; i <= N; i++) {
+            nodes.push({ id: i, x: -halfL + i * panelLen, y: 0, role: 'bottom' });
+          }
+          for (let i = 1; i < N; i++) {
+            nodes.push({ id: N + i, x: -halfL + i * panelLen, y: H, role: 'top' });
+          }
+          // 하현재 부재
+          for (let i = 0; i < N; i++) {
+            members.push({ a: i, b: i + 1, kind: 'bottom_chord' });
+          }
+          // 상현재 부재
+          for (let i = 1; i < N - 1; i++) {
+            members.push({ a: N + i, b: N + i + 1, kind: 'top_chord' });
+          }
+          // 양단 경사 기둥 (End Post)
+          members.push({ a: 0, b: N + 1, kind: 'end_post' });
+          members.push({ a: N, b: 2 * N - 1, kind: 'end_post' });
+          // 수직재 (Verticals)
+          for (let i = 1; i < N; i++) {
+            members.push({ a: i, b: N + i, kind: 'vertical' });
+          }
+          // 프랫 대각재 (중앙을 향해 아래로 경사 -> 인장 분담 유도)
+          for (let i = 1; i < N - 1; i++) {
+            const topIdx = N + i;
+            const nextTopIdx = N + i + 1;
+            if (i < N / 2) {
+              members.push({ a: topIdx, b: i + 1, kind: 'diagonal' });
+            } else {
+              members.push({ a: i, b: nextTopIdx, kind: 'diagonal' });
+            }
+          }
+        }
+
+        const numNodes = nodes.length;
+        const dof = numNodes * 2;
+        // 강재 탄성계수 E = 200 GPa (200,000,000 kN/m²), 단면적 A = 0.012 m² -> EA = 2,400,000 kN
+        // 한쪽 트러스 평면이 전체 교량 하중의 절반을 분담하되 시각적·수치적 일관성을 위해 등가 강성 적용
+        const EA = 1200000; // kN
+
+        const K = Array.from({ length: dof }, () => new Array(dof).fill(0));
+        const F = new Array(dof).fill(0);
+
+        members.forEach((m) => {
+          const nA = nodes[m.a];
+          const nB = nodes[m.b];
+          const dx = nB.x - nA.x;
+          const dy = nB.y - nA.y;
+          const len = Math.hypot(dx, dy);
+          m.length = len;
+          const c = dx / len;
+          const s = dy / len;
+          const kLocal = EA / len;
+
+          const idx = [m.a * 2, m.a * 2 + 1, m.b * 2, m.b * 2 + 1];
+          const q = [
+            [ c * c,  c * s, -c * c, -c * s],
+            [ c * s,  s * s, -c * s, -s * s],
+            [-c * c, -c * s,  c * c,  c * s],
+            [-c * s, -s * s,  c * s,  s * s]
+          ];
+
+          for (let r = 0; r < 4; r++) {
+            for (let col = 0; col < 4; col++) {
+              K[idx[r]][idx[col]] += kLocal * q[r][col];
+            }
+          }
+        });
+
+        // 하중 위치(loadPosPct)를 하현재 연속 좌표 xLoad로 변환 후 인접 두 절점에 선형 분배
+        const frac = (params.loadPosPct / 100) * N;
+        const leftNodeIdx = Math.min(N - 1, Math.max(0, Math.floor(frac)));
+        const rightNodeIdx = leftNodeIdx + 1;
+        const alpha = frac - leftNodeIdx;
+
+        const P = params.loadMag; // 총 하중 (kN, 아래 방향 -Y)
+        F[leftNodeIdx * 2 + 1] -= P * (1 - alpha);
+        F[rightNodeIdx * 2 + 1] -= P * alpha;
+
+        // 경계조건: 좌측 지점(절점 0) 핀 고정(ux=0, uy=0), 우측 지점(절점 N) 롤러 고정(uy=0)
+        const fixedDofs = [0, 1, N * 2 + 1];
+        const penalty = 1e15;
+        fixedDofs.forEach((d) => {
+          K[d][d] += penalty;
+          F[d] = 0;
+        });
+
+        const u = solveLinearSystem(K, F);
+
+        // 절점 변위 저장 및 최대 처짐 계산
+        let maxDeflectionM = 0;
+        nodes.forEach((node, i) => {
+          node.dx = u[i * 2];
+          node.dy = u[i * 2 + 1];
+          const dispMag = Math.hypot(node.dx, node.dy);
+          if (dispMag > maxDeflectionM) maxDeflectionM = dispMag;
+        });
+
+        // 각 부재 축력 계산 (+: 인장 Tension, -: 압축 Compression)
+        let maxTension = 0;
+        let maxCompression = 0;
+        members.forEach((m) => {
+          const nA = nodes[m.a];
+          const nB = nodes[m.b];
+          const c = (nB.x - nA.x) / m.length;
+          const s = (nB.y - nA.y) / m.length;
+          const elongation = (nB.dx - nA.dx) * c + (nB.dy - nA.dy) * s;
+          const axialForce = (EA / m.length) * elongation; // kN
+          m.force = axialForce;
+          if (axialForce > maxTension) maxTension = axialForce;
+          if (axialForce < maxCompression) maxCompression = axialForce;
+        });
+
+        const loadWorldX = -halfL + (params.loadPosPct / 100) * L;
+        const loadWorldY = (1 - alpha) * nodes[leftNodeIdx].dy + alpha * nodes[rightNodeIdx].dy;
+
+        return {
+          nodes,
+          members,
+          maxDeflectionMM: maxDeflectionM * 1000,
+          maxTension,
+          maxCompression,
+          loadWorldX,
+          loadWorldY,
+          leftNodeIdx,
+          rightNodeIdx,
+          alpha
+        };
+      }
+
+      /**
+       * 축력(force)에 따른 색상 보간: 압축(푸른색) <-> 중립(은회색) <-> 인장(붉은색)
+       */
+      function getMemberColorRGB(force, refMaxForce) {
+        const ref = Math.max(refMaxForce, 40);
+        const ratio = Math.max(-1, Math.min(1, force / ref));
+        // 중립 회색 (0.58, 0.64, 0.72)
+        const nr = 0.58, ng = 0.64, nb = 0.72;
+        if (ratio < 0) {
+          // 압축: 푸른색 (#2563eb -> 0.14, 0.39, 0.92)
+          const t = Math.pow(-ratio, 0.78);
+          return {
+            r: nr + (0.14 - nr) * t,
+            g: ng + (0.42 - ng) * t,
+            b: nb + (0.96 - nb) * t,
+            intensity: t
+          };
+        } else {
+          // 인장: 붉은색 (#ef4444 -> 0.94, 0.24, 0.24)
+          const t = Math.pow(ratio, 0.78);
+          return {
+            r: nr + (0.95 - nr) * t,
+            g: ng + (0.22 - ng) * t,
+            b: nb + (0.22 - nb) * t,
+            intensity: t
+          };
+        }
+      }
+
+      const viewportEl = document.getElementById('viewport-area');
+      const webglCanvas = document.getElementById('webgl-canvas');
+      const fallbackCanvas = document.getElementById('fallback-canvas');
+
+      let useWebGL = true;
+      let renderer = null;
+      let scene = null;
+      let camera = null;
+      let bridgeGroup = null;
+      let canyonGroup = null;
+
+      // 궤도 카메라 상태
+      const camSpherical = {
+        theta: 0.32,
+        phi: 1.18,
+        radius: 68,
+        targetX: 0,
+        targetY: 2.5,
+        targetZ: 0
+      };
+
+      function initThreeScene() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('THREE not loaded');
+          renderer = new THREE.WebGLRenderer({
+            canvas: webglCanvas,
+            antialias: true,
+            powerPreference: 'high-performance'
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.shadowMap.enabled = true;
+
+          scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x0b111e);
+          scene.fog = new THREE.FogExp2(0x0b111e, 0.0045);
+
+          camera = new THREE.PerspectiveCamera(44, 1, 0.5, 450);
+
+          const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.68);
+          scene.add(ambientLight);
+
+          const dirLight = new THREE.DirectionalLight(0xffffff, 0.92);
+          dirLight.position.set(35, 65, 45);
+          scene.add(dirLight);
+
+          const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.35);
+          rimLight.position.set(-40, -20, -35);
+          scene.add(rimLight);
+
+          canyonGroup = new THREE.Group();
+          scene.add(canyonGroup);
+
+          bridgeGroup = new THREE.Group();
+          scene.add(bridgeGroup);
+
+          buildStaticRiverEnvironment();
+        } catch (err) {
+          useWebGL = false;
+          webglCanvas.style.display = 'none';
+          fallbackCanvas.style.display = 'block';
+          document.getElementById('webgl-status-banner').style.display = 'block';
+        }
+      }
+
+      function buildStaticRiverEnvironment() {
+        if (!useWebGL) return;
+        // 협곡 바닥 강물
+        const riverGeo = new THREE.PlaneGeometry(260, 180);
+        const riverMat = new THREE.MeshPhongMaterial({
+          color: 0x0c4a6e,
+          emissive: 0x082f49,
+          shininess: 70
+        });
+        const river = new THREE.Mesh(riverGeo, riverMat);
+        river.rotation.x = -Math.PI / 2;
+        river.position.y = -26;
+        canyonGroup.add(river);
+
+        // 강물 위 가이드 그리드
+        const grid = new THREE.GridHelper(220, 44, 0x1e3a8a, 0x0f172a);
+        grid.position.y = -25.8;
+        canyonGroup.add(grid);
+      }
+
+      /**
+       * 현재 구조 해석 결과를 바탕으로 3D 협곡 절벽, 교대, 원본 윤곽선, 변형된 트러스 부재, 하중 블록을 재생성
+       */
+      function rebuild3DBridge() {
+        if (!useWebGL || !bridgeGroup) return;
+
+        // 기존 bridgeGroup 내부 geometry/material 메모리 해제
+        while (bridgeGroup.children.length > 0) {
+          const child = bridgeGroup.children.pop();
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
+        }
+
+        const { nodes, members, maxTension, maxCompression, loadWorldX, loadWorldY } = currentAnalysis;
+        const halfL = state.span / 2;
+        const deckHalfWidth = 3.2; // 입체 3D 다리 폭 (전면 트러스 + 후면 트러스 = 6.4m 폭)
+        const scale = state.deformScale;
+        const refForce = Math.max(Math.abs(maxCompression), Math.abs(maxTension), 80);
+
+        let checksumAcc = 0;
+
+        // 1. 좌우 협곡 절벽 및 교대(Abutment) 생성 (경간 길이에 맞춰 동적 이동)
+        const cliffMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+        const pierMat = new THREE.MeshPhongMaterial({ color: 0x475569 });
+
+        [-1, 1].forEach((side) => {
+          const cliffWidth = 44;
+          const cliffGeo = new THREE.BoxGeometry(cliffWidth, 30, 38);
+          const cliffMesh = new THREE.Mesh(cliffGeo, cliffMat);
+          cliffMesh.position.set(side * (halfL + cliffWidth / 2 + 0.6), -15.5, 0);
+          bridgeGroup.add(cliffMesh);
+
+          // 콘크리트 교대 받침
+          const abutmentGeo = new THREE.BoxGeometry(3.4, 3.2, deckHalfWidth * 2 + 2.4);
+          const abutment = new THREE.Mesh(abutmentGeo, pierMat);
+          abutment.position.set(side * (halfL + 0.5), -1.8, 0);
+          bridgeGroup.add(abutment);
+        });
+
+        // 좌측 핀 지점(삼각 피라미드) / 우측 롤러 지점(원통) 표시
+        const supportMat = new THREE.MeshPhongMaterial({ color: 0x94a3b8 });
+        [-deckHalfWidth, deckHalfWidth].forEach((zPos) => {
+          const pinGeo = new THREE.ConeGeometry(0.65, 1.0, 4);
+          const pinMesh = new THREE.Mesh(pinGeo, supportMat);
+          pinMesh.position.set(-halfL, -0.5, zPos);
+          pinMesh.rotation.y = Math.PI / 4;
+          bridgeGroup.add(pinMesh);
+
+          const rollerGeo = new THREE.CylinderGeometry(0.45, 0.45, 1.1, 16);
+          const rollerMesh = new THREE.Mesh(rollerGeo, supportMat);
+          rollerMesh.rotation.x = Math.PI / 2;
+          rollerMesh.position.set(halfL, -0.48, zPos);
+          bridgeGroup.add(rollerMesh);
+        });
+
+        // 2. 변형 전 원본 트러스 기준 윤곽선 (반투명 점선/실선 가이드)
+        const ghostMat = new THREE.LineBasicMaterial({
+          color: 0x64748b,
+          transparent: true,
+          opacity: 0.32
+        });
+        const ghostPoints = [];
+        [-deckHalfWidth, deckHalfWidth].forEach((zPos) => {
+          members.forEach((m) => {
+            const nA = nodes[m.a];
+            const nB = nodes[m.b];
+            ghostPoints.push(new THREE.Vector3(nA.x, nA.y, zPos));
+            ghostPoints.push(new THREE.Vector3(nB.x, nB.y, zPos));
+          });
+        });
+        const ghostGeo = new THREE.BufferGeometry().setFromPoints(ghostPoints);
+        const ghostLines = new THREE.LineSegments(ghostGeo, ghostMat);
+        bridgeGroup.add(ghostLines);
+
+        // 3. 변형된 절점 위치 계산
+        const defNodes = nodes.map((n) => ({
+          x: n.x + n.dx * scale,
+          y: n.y + n.dy * scale,
+          role: n.role
+        }));
+
+        // 4. 전면(+Z) 및 후면(-Z) 주 트러스 부재 실린더 생성 (축력에 따른 색상 + 단면 두께 반영)
+        const upVec = new THREE.Vector3(0, 1, 0);
+        [-deckHalfWidth, deckHalfWidth].forEach((zPos) => {
+          members.forEach((m) => {
+            const pA = new THREE.Vector3(defNodes[m.a].x, defNodes[m.a].y, zPos);
+            const pB = new THREE.Vector3(defNodes[m.b].x, defNodes[m.b].y, zPos);
+            const dir = new THREE.Vector3().subVectors(pB, pA);
+            const len = dir.length();
+
+            const col = getMemberColorRGB(m.force, refForce);
+            // 힘의 크기가 클수록 부재 반지름을 살짝 키워 시각적 강조
+            const radius = 0.22 + col.intensity * 0.11;
+
+            const cylGeo = new THREE.CylinderGeometry(radius, radius, len, 12);
+            const cylMat = new THREE.MeshPhongMaterial({
+              color: new THREE.Color(col.r, col.g, col.b),
+              emissive: new THREE.Color(col.r * 0.22, col.g * 0.22, col.b * 0.22),
+              shininess: 55
+            });
+
+            const mesh = new THREE.Mesh(cylGeo, cylMat);
+            mesh.position.copy(pA).add(pB).multiplyScalar(0.5);
+            mesh.quaternion.setFromUnitVectors(upVec, dir.clone().normalize());
+            bridgeGroup.add(mesh);
+
+            checksumAcc += len + Math.abs(m.force) * 0.01 + pA.y;
+          });
+
+          // 절점 거셋 플레이트(구체 조인트)
+          const jointGeo = new THREE.SphereGeometry(0.36, 12, 12);
+          const jointMat = new THREE.MeshPhongMaterial({ color: 0xe2e8f0 });
+          defNodes.forEach((dn) => {
+            const jMesh = new THREE.Mesh(jointGeo, jointMat);
+            jMesh.position.set(dn.x, dn.y, zPos);
+            bridgeGroup.add(jMesh);
+          });
+        });
+
+        // 5. 좌우 트러스를 연결하는 횡방향 가로보(Cross Beams) 및 상부 브레이싱, 반투명 교량 상판
+        const strutMat = new THREE.MeshPhongMaterial({ color: 0x475569 });
+        const deckWidth = deckHalfWidth * 2;
+        defNodes.forEach((dn) => {
+          const r = dn.role === 'bottom' ? 0.20 : 0.14;
+          const strutGeo = new THREE.CylinderGeometry(r, r, deckWidth, 8);
+          const strut = new THREE.Mesh(strutGeo, strutMat);
+          strut.rotation.x = Math.PI / 2;
+          strut.position.set(dn.x, dn.y, 0);
+          bridgeGroup.add(strut);
+        });
+
+        // 하현재 구간별 교량 데크(상판) 슬래브
+        const bottomNodes = defNodes.slice(0, 7);
+        for (let i = 0; i < 6; i++) {
+          const n1 = bottomNodes[i];
+          const n2 = bottomNodes[i + 1];
+          const p1 = new THREE.Vector3(n1.x, n1.y, 0);
+          const p2 = new THREE.Vector3(n2.x, n2.y, 0);
+          const segVec = new THREE.Vector3().subVectors(p2, p1);
+          const segLen = segVec.length();
+          const angle = Math.atan2(segVec.y, segVec.x);
+
+          const slabGeo = new THREE.BoxGeometry(segLen, 0.18, deckWidth - 0.3);
+          const slabMat = new THREE.MeshPhongMaterial({
+            color: 0x334155,
+            transparent: true,
+            opacity: 0.72
+          });
+          const slab = new THREE.Mesh(slabGeo, slabMat);
+          slab.position.copy(p1).add(p2).multiplyScalar(0.5);
+          slab.rotation.z = angle;
+          bridgeGroup.add(slab);
+        }
+
+        // 6. 이동하는 시험 하중 웨이트 블록 & 거대한 힘 화살표(Arrow)
+        const defLoadY = loadWorldY * scale;
+        const loadRatio = state.loadMag / 500;
+        const arrowHeight = 2.8 + loadRatio * 4.2;
+
+        const weightGeo = new THREE.BoxGeometry(2.4, 1.3 + loadRatio * 1.2, 3.6);
+        const weightMat = new THREE.MeshPhongMaterial({
+          color: 0xf59e0b,
+          emissive: 0x78350f,
+          shininess: 80
+        });
+        const weightMesh = new THREE.Mesh(weightGeo, weightMat);
+        const weightCenterY = defLoadY + 0.9 + (loadRatio * 0.6);
+        weightMesh.position.set(loadWorldX, weightCenterY, 0);
+        bridgeGroup.add(weightMesh);
+
+        // 하향 하중 화살표 기둥 및 원뿔 촉
+        const arrowMat = new THREE.MeshPhongMaterial({
+          color: 0xfbbf24,
+          emissive: 0xb45309
+        });
+        const shaftGeo = new THREE.CylinderGeometry(0.28, 0.28, arrowHeight, 14);
+        const shaft = new THREE.Mesh(shaftGeo, arrowMat);
+        shaft.position.set(loadWorldX, weightCenterY + 1.8 + arrowHeight / 2, 0);
+        bridgeGroup.add(shaft);
+
+        const headGeo = new THREE.ConeGeometry(0.75, 1.5, 16);
+        const head = new THREE.Mesh(headGeo, arrowMat);
+        head.rotation.x = Math.PI; // 아래 방향(-Y)
+        head.position.set(loadWorldX, weightCenterY + 1.3, 0);
+        bridgeGroup.add(head);
+
+        geometryChecksum = Number(checksumAcc.toFixed(4));
+      }
+
+      function render2DFallback() {
+        if (!currentAnalysis) return;
+        const ctx = fallbackCanvas.getContext('2d');
+        const w = fallbackCanvas.width;
+        const h = fallbackCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+
+        // 배경 그라데이션
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(1, '#090d16');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, w, h);
+
+        const { nodes, members, maxTension, maxCompression, loadWorldX, loadWorldY } = currentAnalysis;
+        const refForce = Math.max(Math.abs(maxCompression), Math.abs(maxTension), 80);
+        const scale = state.deformScale;
+
+        const padX = 70;
+        const availW = Math.max(200, w - padX * 2);
+        const pxPerMeter = Math.min(availW / (state.span + 8), (h * 0.45) / Math.max(state.height, 10));
+        const cx = w / 2;
+        const cy = h * 0.56;
+
+        const toScreen = (mx, my) => ({
+          x: cx + mx * pxPerMeter,
+          y: cy - my * pxPerMeter
+        });
+
+        // 협곡 절벽 표현
+        const halfL = state.span / 2;
+        const leftEdge = toScreen(-halfL, 0);
+        const rightEdge = toScreen(halfL, 0);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, leftEdge.y, leftEdge.x, h - leftEdge.y);
+        ctx.fillRect(rightEdge.x, rightEdge.y, w - rightEdge.x, h - rightEdge.y);
+
+        // 원본 점선 트러스
+        ctx.save();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        members.forEach((m) => {
+          const pA = toScreen(nodes[m.a].x, nodes[m.a].y);
+          const pB = toScreen(nodes[m.b].x, nodes[m.b].y);
+          ctx.beginPath();
+          ctx.moveTo(pA.x, pA.y);
+          ctx.lineTo(pB.x, pB.y);
+          ctx.stroke();
+        });
+        ctx.restore();
+
+        // 변형 부재 및 축력 색상 렌더링
+        members.forEach((m) => {
+          const nA = nodes[m.a];
+          const nB = nodes[m.b];
+          const pA = toScreen(nA.x + nA.dx * scale, nA.y + nA.dy * scale);
+          const pB = toScreen(nB.x + nB.dx * scale, nB.y + nB.dy * scale);
+          const col = getMemberColorRGB(m.force, refForce);
+          const r = Math.round(col.r * 255);
+          const g = Math.round(col.g * 255);
+          const b = Math.round(col.b * 255);
+
+          ctx.strokeStyle = `rgb(${r},${g},${b})`;
+          ctx.lineWidth = 4 + col.intensity * 4;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(pA.x, pA.y);
+          ctx.lineTo(pB.x, pB.y);
+          ctx.stroke();
+        });
+
+        // 절점 원
+        nodes.forEach((n) => {
+          const p = toScreen(n.x + n.dx * scale, n.y + n.dy * scale);
+          ctx.fillStyle = '#f8fafc';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 하중 화살표 표시
+        const loadPt = toScreen(loadWorldX, loadWorldY * scale);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.fillStyle = '#fbbf24';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(loadPt.x, loadPt.y - 55);
+        ctx.lineTo(loadPt.x, loadPt.y - 8);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(loadPt.x, loadPt.y - 2);
+        ctx.lineTo(loadPt.x - 8, loadPt.y - 16);
+        ctx.lineTo(loadPt.x + 8, loadPt.y - 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${state.loadMag} kN`, loadPt.x, loadPt.y - 62);
+      }
+
+      /**
+       * 카메라 위치 갱신 및 반응형 프레이밍
+       */
+      function updateCameraTransform() {
+        if (!useWebGL || !camera) return;
+        const sinPhi = Math.sin(camSpherical.phi);
+        const x = camSpherical.targetX + camSpherical.radius * sinPhi * Math.sin(camSpherical.theta);
+        const y = camSpherical.targetY + camSpherical.radius * Math.cos(camSpherical.phi);
+        const z = camSpherical.targetZ + camSpherical.radius * sinPhi * Math.cos(camSpherical.theta);
+        camera.position.set(x, y, z);
+        camera.lookAt(camSpherical.targetX, camSpherical.targetY, camSpherical.targetZ);
+      }
+
+      function fitCameraToSpan(resetAngles) {
+        const w = viewportEl.clientWidth || 800;
+        const h = viewportEl.clientHeight || 500;
+        const aspect = w / Math.max(h, 1);
+
+        if (resetAngles) {
+          camSpherical.theta = 0.28;
+          camSpherical.phi = 1.20;
+          camSpherical.targetX = 0;
+          camSpherical.targetY = state.height * 0.35;
+          camSpherical.targetZ = 0;
+        }
+        // 경간 전체와 협곡 교대가 한눈에 들어오도록 거리 자동 계산
+        const baseDist = (state.span * 0.88) / Math.min(aspect, 1.35);
+        camSpherical.radius = Math.max(46, Math.min(135, baseDist + 18));
+        updateCameraTransform();
+      }
+
+      function updateUIAndRebuild() {
+        // 1. UI 텍스트 라벨 업데이트
+        const isWarren = state.trussType === 'warren';
+        document.getElementById('val-type').textContent = isWarren ? '워런 (Warren)' : '프랫 (Pratt)';
+        document.getElementById('active-truss-label').textContent = isWarren ? '워런 트러스' : '프랫 트러스';
+        document.getElementById('btn-warren').classList.toggle('active', isWarren);
+        document.getElementById('btn-pratt').classList.toggle('active', !isWarren);
+
+        document.getElementById('val-span').textContent = `${state.span} m`;
+        document.getElementById('val-height').textContent = `${state.height.toFixed(1)} m`;
+        document.getElementById('val-load').textContent = `${state.loadMag} kN`;
+        document.getElementById('val-pos').textContent = `${state.loadPosPct}% (${((state.loadPosPct / 100) * state.span).toFixed(1)}m)`;
+        document.getElementById('val-scale').textContent = `${state.deformScale}x 과장`;
+
+        document.getElementById('slider-span').value = state.span;
+        document.getElementById('slider-height').value = state.height;
+        document.getElementById('slider-load').value = state.loadMag;
+        document.getElementById('slider-pos').value = state.loadPosPct;
+        document.getElementById('slider-scale').value = state.deformScale;
+
+        // 2. 실제 강성행렬 구조 해석 수행
+        currentAnalysis = solveTrussStructure(state);
+
+        // 3. 범례 및 실시간 계산 요약 갱신
+        document.getElementById('legend-max-comp').textContent =
+          `압축 ${currentAnalysis.maxCompression.toFixed(1)} kN`;
+        document.getElementById('legend-max-tens').textContent =
+          `인장 +${currentAnalysis.maxTension.toFixed(1)} kN`;
+        document.getElementById('stat-deflection').textContent =
+          `${currentAnalysis.maxDeflectionMM.toFixed(2)} mm`;
+        document.getElementById('stat-members').textContent =
+          `${currentAnalysis.members.length}개`;
+
+        // 4. 3D 지오메트리 또는 2D 캔버스 재생성
+        if (useWebGL) {
+          rebuild3DBridge();
+        } else {
+          render2DFallback();
+        }
+      }
+
+      function setupInteractions() {
+        // 트러스 형식 버튼
+        document.getElementById('btn-warren').addEventListener('click', () => {
+          state.trussType = 'warren';
+          updateUIAndRebuild();
+        });
+        document.getElementById('btn-pratt').addEventListener('click', () => {
+          state.trussType = 'pratt';
+          updateUIAndRebuild();
+        });
+
+        // 슬라이더 이벤트
+        document.getElementById('slider-span').addEventListener('input', (e) => {
+          state.span = parseFloat(e.target.value);
+          fitCameraToSpan(false);
+          updateUIAndRebuild();
+        });
+        document.getElementById('slider-height').addEventListener('input', (e) => {
+          state.height = parseFloat(e.target.value);
+          updateUIAndRebuild();
+        });
+        document.getElementById('slider-load').addEventListener('input', (e) => {
+          state.loadMag = parseFloat(e.target.value);
+          updateUIAndRebuild();
+        });
+        document.getElementById('slider-pos').addEventListener('input', (e) => {
+          state.loadPosPct = parseFloat(e.target.value);
+          updateUIAndRebuild();
+        });
+        document.getElementById('slider-scale').addEventListener('input', (e) => {
+          state.deformScale = parseFloat(e.target.value);
+          updateUIAndRebuild();
+        });
+
+        // 기본값 초기화 및 카메라 홈
+        document.getElementById('btn-reset-params').addEventListener('click', () => {
+          Object.assign(state, DEFAULTS);
+          fitCameraToSpan(true);
+          updateUIAndRebuild();
+        });
+        document.getElementById('btn-reset-camera').addEventListener('click', () => {
+          fitCameraToSpan(true);
+        });
+
+        // 키보드 화살표로 하중 위치 미세 이동 및 카메라 회전 지원
+        window.addEventListener('keydown', (e) => {
+          if (e.target && e.target.tagName === 'INPUT') return;
+          if (e.key === 'ArrowLeft') {
+            state.loadPosPct = Math.max(10, state.loadPosPct - 2);
+            updateUIAndRebuild();
+          } else if (e.key === 'ArrowRight') {
+            state.loadPosPct = Math.min(90, state.loadPosPct + 2);
+            updateUIAndRebuild();
+          }
+        });
+
+        // 마우스 & 터치 3D 카메라 회전/줌 조작
+        let isDragging = false;
+        let prevX = 0;
+        let prevY = 0;
+
+        viewportEl.addEventListener('pointerdown', (e) => {
+          if (e.target.closest('.brand-box, .legend-box, .notice-card')) return;
+          isDragging = true;
+          prevX = e.clientX;
+          prevY = e.clientY;
+          viewportEl.setPointerCapture(e.pointerId);
+        });
+
+        viewportEl.addEventListener('pointermove', (e) => {
+          if (!isDragging) return;
+          const dx = e.clientX - prevX;
+          const dy = e.clientY - prevY;
+          prevX = e.clientX;
+          prevY = e.clientY;
+
+          camSpherical.theta -= dx * 0.0075;
+          camSpherical.phi = Math.max(0.25, Math.min(1.52, camSpherical.phi - dy * 0.0065));
+          updateCameraTransform();
+        });
+
+        const endDrag = () => { isDragging = false; };
+        viewportEl.addEventListener('pointerup', endDrag);
+        viewportEl.addEventListener('pointercancel', endDrag);
+
+        viewportEl.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          camSpherical.radius = Math.max(24, Math.min(165, camSpherical.radius + e.deltaY * 0.05));
+          updateCameraTransform();
+        }, { passive: false });
+
+        window.addEventListener('resize', handleResize);
+      }
+
+      function handleResize() {
+        const w = viewportEl.clientWidth || window.innerWidth;
+        const h = viewportEl.clientHeight || (window.innerHeight - 110);
+        if (useWebGL && renderer && camera) {
+          renderer.setSize(w, h);
+          camera.aspect = w / Math.max(h, 1);
+          camera.updateProjectionMatrix();
+          fitCameraToSpan(false);
+        } else {
+          fallbackCanvas.width = w;
+          fallbackCanvas.height = h;
+          render2DFallback();
+        }
+      }
+
+      // 읽기 전용 진단 인터페이스 (실제 절점·부재력·변위 샘플 및 지오메트리 체크섬 제공)
+      window.appDiagnostics = function () {
+        const res = currentAnalysis || solveTrussStructure(state);
+        return Object.freeze({
+          appName: 'BRIDGE FORGE | 힘을 분산하는 다리 공방',
+          renderMode: useWebGL ? 'WebGL_3D' : 'Canvas_2D_Fallback',
+          parameters: Object.assign({}, state),
+          nodeCount: res.nodes.length,
+          memberCount: res.members.length,
+          maxTensionKN: Number(res.maxTension.toFixed(3)),
+          maxCompressionKN: Number(res.maxCompression.toFixed(3)),
+          maxDeflectionMM: Number(res.maxDeflectionMM.toFixed(4)),
+          sampleNodes: res.nodes.slice(0, 5).map(n => ({
+            id: n.id,
+            x: Number(n.x.toFixed(3)),
+            y: Number(n.y.toFixed(3)),
+            dxMM: Number((n.dx * 1000).toFixed(4)),
+            dyMM: Number((n.dy * 1000).toFixed(4))
+          })),
+          sampleMemberForcesKN: res.members.slice(0, 6).map(m => ({
+            nodes: [m.a, m.b],
+            kind: m.kind,
+            forceKN: Number(m.force.toFixed(3))
+          })),
+          geometryChecksum: geometryChecksum
+        });
+      };
+
+      function animateLoop() {
+        requestAnimationFrame(animateLoop);
+        if (useWebGL && renderer && scene && camera) {
+          renderer.render(scene, camera);
+        }
+      }
+
+      window.onload = function () {
+        initThreeScene();
+        setupInteractions();
+        handleResize();
+        fitCameraToSpan(true);
+        updateUIAndRebuild();
+        animateLoop();
+      };
+    })();
+  </script>
+</body>
+</html>

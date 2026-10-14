@@ -1,0 +1,2866 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>경복궁 근정전(勤政殿) 3D 초정밀 건축 해체 모션 그래픽스</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts for Korean & Technical HUD Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@500;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --dancheong-red: #b8332a;
+            --dancheong-green: #2d8a6e;
+            --dancheong-gold: #e6b84c;
+            --dancheong-blue: #27568b;
+            --bg-dark: #070a0f;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Noto Sans KR', sans-serif;
+            color: #f1f5f9;
+        }
+
+        .font-serif-kr {
+            font-family: 'Noto Serif KR', serif;
+        }
+
+        .font-mono-tech {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            cursor: grab;
+        }
+
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+
+        /* Subtle Motion Graphics Grid Overlay */
+        .hud-grid-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background-image: 
+                radial-gradient(circle at 50% 50%, transparent 45%, rgba(4, 7, 13, 0.72) 100%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+            background-size: 100% 100%, 48px 48px, 48px 48px;
+        }
+
+        /* Glassmorphism HUD Panels */
+        .hud-panel {
+            background: rgba(10, 15, 24, 0.78);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(230, 184, 76, 0.22);
+            box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .hud-panel-subtle {
+            background: rgba(12, 18, 28, 0.68);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Corner Accents for Motion Graphics Feel */
+        .corner-bracket {
+            position: relative;
+        }
+        .corner-bracket::before,
+        .corner-bracket::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-color: #e6b84c;
+            pointer-events: none;
+        }
+        .corner-bracket::before {
+            top: -1px;
+            left: -1px;
+            border-top: 2px solid #e6b84c;
+            border-left: 2px solid #e6b84c;
+        }
+        .corner-bracket::after {
+            bottom: -1px;
+            right: -1px;
+            border-bottom: 2px solid #e6b84c;
+            border-right: 2px solid #e6b84c;
+        }
+
+        /* Custom Range Slider */
+        input[type="range"].explode-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"].explode-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #e6b84c;
+            border: 3px solid #090d16;
+            box-shadow: 0 0 14px rgba(230, 184, 76, 0.9);
+            cursor: pointer;
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type="range"].explode-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #ffd46b;
+        }
+
+        /* 3D Floating Motion Graphics Callout Labels */
+        .callout-pin {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: auto;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s ease;
+            z-index: 15;
+        }
+        .callout-pin:hover .callout-card {
+            border-color: #e6b84c;
+            background: rgba(20, 28, 44, 0.95);
+            transform: scale(1.06);
+        }
+        .callout-card {
+            background: rgba(8, 13, 22, 0.85);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(230, 184, 76, 0.45);
+            padding: 3px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Custom Scrollbar for Layer List */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(230, 184, 76, 0.35);
+            border-radius: 999px;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 1; }
+        }
+        .animate-pulse-glow {
+            animation: pulseGlow 2.4s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden">
+
+    <!-- 3D WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Subtle Motion Graphics Grid & Vignette -->
+    <div class="hud-grid-bg"></div>
+
+    <!-- 3D Pinned Motion Graphics Callout Container -->
+    <div id="callouts-container" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+    <!-- TOP HEADER HUD -->
+    <header class="absolute top-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+        <!-- Title & National Treasure Badge -->
+        <div class="hud-panel corner-bracket rounded-xl px-4 py-2.5 pointer-events-auto flex items-center gap-3.5">
+            <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500/20 to-red-700/30 border border-amber-400/40 flex flex-col items-center justify-center shrink-0">
+                <span class="text-[10px] font-mono-tech text-amber-300 leading-none">국보</span>
+                <span class="text-xs font-bold text-amber-400 leading-tight">223호</span>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-serif-kr text-base sm:text-lg font-bold tracking-tight text-white">
+                        경복궁 근정전 <span class="text-amber-400 font-normal text-xs sm:text-sm">勤政殿 · Geunjeongjeon</span>
+                    </h1>
+                    <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono-tech bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        중층 팔작지붕 다포계
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-300 mt-0.5">
+                    초정밀 전통 목조·석조 건축 부재 전수 분해 모션 그래픽 시뮬레이션
+                </p>
+            </div>
+        </div>
+
+        <!-- Real-Time Telemetry Counters & Quick Visual Mode Toggles -->
+        <div class="flex flex-wrap items-center gap-2 pointer-events-auto">
+            <!-- Live Telemetry Metrics -->
+            <div class="hud-panel rounded-xl px-3.5 py-2 flex items-center gap-4 text-xs">
+                <div>
+                    <div class="text-[10px] text-slate-400 font-mono-tech uppercase">총 해석 부품 수 (PARTS)</div>
+                    <div id="hud-total-parts" class="font-mono-tech text-sm sm:text-base font-bold text-amber-400">3,680</div>
+                </div>
+                <div class="h-6 w-px bg-white/10"></div>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-mono-tech uppercase">구조 계층 (LAYERS)</div>
+                    <div class="font-mono-tech text-sm sm:text-base font-bold text-emerald-400">14 <span class="text-[10px] font-normal text-slate-400">단계</span></div>
+                </div>
+                <div class="h-6 w-px bg-white/10"></div>
+                <div>
+                    <div class="text-[10px] text-slate-400 font-mono-tech uppercase">분해 진행률 (EXPLODE)</div>
+                    <div id="hud-explode-pct" class="font-mono-tech text-sm sm:text-base font-bold text-sky-400">0.0%</div>
+                </div>
+                <div class="hidden sm:block h-6 w-px bg-white/10"></div>
+                <div class="hidden sm:block">
+                    <div class="text-[10px] text-slate-400 font-mono-tech uppercase">활성 부재</div>
+                    <div id="hud-active-parts" class="font-mono-tech text-sm sm:text-base font-bold text-white">3,680</div>
+                </div>
+            </div>
+
+            <!-- Visual Style & Overlay Buttons -->
+            <div class="hud-panel rounded-xl p-1.5 flex items-center gap-1">
+                <button id="btn-style-dancheong" onclick="setRenderStyle('dancheong')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/25 text-amber-300 border border-amber-400/40 transition">
+                    단청 정밀
+                </button>
+                <button id="btn-style-spectrum" onclick="setRenderStyle('spectrum')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/10 transition">
+                    계층 스펙트럼
+                </button>
+                <button id="btn-style-blueprint" onclick="setRenderStyle('blueprint')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/10 transition">
+                    청사진 X-Ray
+                </button>
+                <div class="h-4 w-px bg-white/15 mx-0.5"></div>
+                <button id="btn-toggle-pins" onclick="toggleCalloutPins()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 transition" title="3D 지시선 라벨 표시/숨김">
+                    지시선 ON
+                </button>
+                <button id="btn-toggle-vectors" onclick="toggleTrajectoryVectors()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-400/30 transition" title="분해 궤적 가이드라인">
+                    궤적선 ON
+                </button>
+                <button id="btn-toggle-sound" onclick="toggleSoundEngine()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/10 transition" title="모션 사운드 효과">
+                    사운드 OFF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- LEFT SIDEBAR: 14 ARCHITECTURAL HIERARCHY LAYERS -->
+    <aside id="left-sidebar" class="absolute top-24 bottom-36 left-3 sm:left-4 z-20 w-64 sm:w-72 pointer-events-none flex flex-col gap-2 transition-transform duration-300">
+        <div class="hud-panel rounded-xl p-3 pointer-events-auto flex flex-col h-full overflow-hidden">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                <div>
+                    <h2 class="text-xs font-bold tracking-wider uppercase text-amber-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse-glow"></span>
+                        14대 건축 구조 계층도
+                    </h2>
+                    <p class="text-[10px] text-slate-400 mt-0.5">클릭하여 특정 구조 계층 단독 분해·집중 조명</p>
+                </div>
+                <button onclick="resetLayerFilter()" id="btn-reset-layer" class="hidden px-2 py-1 rounded text-[10px] font-mono-tech bg-amber-500/20 text-amber-300 border border-amber-400/40 hover:bg-amber-500/30">
+                    전체 보기
+                </button>
+            </div>
+
+            <!-- Scrollable 14 Layer List -->
+            <div id="layer-list-container" class="custom-scroll flex-1 overflow-y-auto pr-1 space-y-1">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </div>
+    </aside>
+
+    <!-- RIGHT SIDEBAR: SELECTED PART INSPECTOR & CAMERA / MOTION PRESETS -->
+    <aside class="absolute top-24 right-3 sm:right-4 z-20 w-64 sm:w-72 pointer-events-none flex flex-col gap-2.5">
+        <!-- Part Inspector Card -->
+        <div class="hud-panel corner-bracket rounded-xl p-3.5 pointer-events-auto">
+            <div class="flex items-center justify-between mb-1.5">
+                <span id="inspect-badge" class="px-2 py-0.5 rounded text-[10px] font-mono-tech bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                    LAYER 01 · 지붕 마루장식
+                </span>
+                <span id="inspect-id" class="text-[10px] font-mono-tech text-slate-400">#PART-0001</span>
+            </div>
+            <h3 id="inspect-title" class="font-serif-kr text-base font-bold text-white leading-snug">
+                용마루·취두·잡상 (鷲頭·雜像)
+            </h3>
+            <p id="inspect-subtitle" class="text-[11px] font-mono-tech text-emerald-300 mt-0.5">
+                Roof Ridge, Dragon Finials & Guardian Figures
+            </p>
+            <p id="inspect-desc" class="text-xs text-slate-300 mt-2 leading-relaxed">
+                지붕 최상단 용마루와 추녀마루를 장식하는 양성바름, 대들보 위 치미/취두, 그리고 액운을 막는 7종의 잡상 및 토수 부재군입니다.3D 모델의 부품을 마우스로 가리키거나 클릭하면 개별 부재 제원이 표시됩니다.
+            </p>
+            <div class="mt-3 pt-2.5 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
+                <div class="bg-white/5 rounded-lg p-1.5">
+                    <div class="text-[9px] text-slate-400 font-mono-tech">계층 부품수</div>
+                    <div id="inspect-count" class="text-xs font-mono-tech font-bold text-amber-300">138개</div>
+                </div>
+                <div class="bg-white/5 rounded-lg p-1.5">
+                    <div class="text-[9px] text-slate-400 font-mono-tech">변위 거리</div>
+                    <div id="inspect-disp" class="text-xs font-mono-tech font-bold text-sky-300">0.00m</div>
+                </div>
+                <div class="bg-white/5 rounded-lg p-1.5">
+                    <div class="text-[9px] text-slate-400 font-mono-tech">주요 재질</div>
+                    <div id="inspect-mat" class="text-xs font-bold text-emerald-300">점토·회반죽</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Angle Presets -->
+        <div class="hud-panel rounded-xl p-3 pointer-events-auto">
+            <div class="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between">
+                <span>시네마틱 카메라 앵글</span>
+                <span class="text-[10px] font-mono-tech text-slate-400">드래그: 회전 / 휠: 줌</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5">
+                <button onclick="setCameraPreset('isometric')" class="px-2.5 py-1.5 rounded-lg text-xs bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition text-left">
+                    01. 정남동 조감도
+                </button>
+                <button onclick="setCameraPreset('front')" class="px-2.5 py-1.5 rounded-lg text-xs bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition text-left">
+                    02. 정면 어도 앙각
+                </button>
+                <button onclick="setCameraPreset('gongpo')" class="px-2.5 py-1.5 rounded-lg text-xs bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition text-left">
+                    03. 처마·다포 클로즈업
+                </button>
+                <button onclick="setCameraPreset('throne')" class="px-2.5 py-1.5 rounded-lg text-xs bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition text-left">
+                    04. 내부 어좌·일월오봉도
+                </button>
+                <button onclick="setCameraPreset('roofTop')" class="px-2.5 py-1.5 rounded-lg text-xs bg-white/5 hover:bg-amber-500/20 hover:text-amber-300 border border-white/10 transition text-left">
+                    05. 상부 연목·기와 수직뷰
+                </button>
+                <button onclick="setCameraPreset('orbitAuto')" id="btn-auto-orbit" class="px-2.5 py-1.5 rounded-lg text-xs bg-amber-500/20 text-amber-300 border border-amber-400/30 transition text-left">
+                    06. 360° 자동 공전 ON
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- BOTTOM MOTION GRAPHICS TIMELINE & CHOREOGRAPHY CONTROLLER -->
+    <footer class="absolute bottom-0 left-0 right-0 z-20 p-3 sm:p-4 pointer-events-none">
+        <div class="max-w-6xl mx-auto hud-panel corner-bracket rounded-2xl p-3 sm:p-4 pointer-events-auto flex flex-col gap-3">
+            <!-- Top Row: Choreography Mode Buttons & Playback Controls -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- Choreography Presets -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-[11px] font-mono-tech text-amber-400 mr-1 uppercase font-semibold">모션 시퀀스:</span>
+                    <button id="mode-cascade" onclick="setChoreographyMode('cascade')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 transition">
+                        시퀀셜 계층 분해 (Cascade)
+                    </button>
+                    <button id="mode-radial" onclick="setChoreographyMode('radial')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-200 hover:bg-white/15 border border-white/10 transition">
+                        방사형 최대 분해 (Radial)
+                    </button>
+                    <button id="mode-cutaway" onclick="setChoreographyMode('cutaway')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-200 hover:bg-white/15 border border-white/10 transition">
+                        내부 어좌 단면 개방 (Cutaway)
+                    </button>
+                    <button id="mode-timber" onclick="setChoreographyMode('timber')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-200 hover:bg-white/15 border border-white/10 transition">
+                        목구조·공포 결구 해부 (Timber)
+                    </button>
+                    <button id="mode-wave" onclick="setChoreographyMode('wave')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-200 hover:bg-white/15 border border-white/10 transition">
+                        하모닉 파동 (Harmonic Wave)
+                    </button>
+                </div>
+
+                <!-- Playback & Explosion Scale Controls -->
+                <div class="flex items-center gap-2">
+                    <button id="btn-play-pause" onclick="togglePlayAnimation()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20">
+                        <span id="play-icon">❚❚</span>
+                        <span id="play-text">모션 일시정지</span>
+                    </button>
+                    <button onclick="triggerFullAssemble()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white/10 hover:bg-white/20 text-white transition">
+                        원형 결합 (0%)
+                    </button>
+                    <button onclick="triggerFullExplode()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 transition">
+                        최대 분해 (100%)
+                    </button>
+                    <select id="select-amp" onchange="setExplosionAmplitude(this.value)" class="bg-slate-900/90 text-amber-300 text-xs font-mono-tech rounded-lg px-2 py-1.5 border border-amber-400/30 outline-none">
+                        <option value="1.0">분해 폭 1.0x (표준)</option>
+                        <option value="1.6" selected>분해 폭 1.6x (광역)</option>
+                        <option value="2.4">분해 폭 2.4x (초극대화)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Interactive Scrubbing Timeline Slider & 14-Stage Progress Bar -->
+            <div class="flex flex-col gap-1.5">
+                <div class="flex items-center gap-3">
+                    <span class="text-[11px] font-mono-tech text-slate-400 w-16 shrink-0">결합 상태</span>
+                    <div class="relative flex-1 flex items-center">
+                        <input id="timeline-slider" type="range" min="0" max="1000" value="0" class="explode-slider" oninput="onSliderScrub(this.value)">
+                    </div>
+                    <span class="text-[11px] font-mono-tech text-amber-400 w-20 text-right shrink-0">3,680 부품 분해</span>
+                </div>
+
+                <!-- 14 Layer Micro-Timeline Track Segments -->
+                <div id="timeline-segments" class="grid grid-cols-14 gap-1 pt-0.5" style="grid-template-columns: repeat(14, minmax(0, 1fr));">
+                    <!-- Dynamically populated 14 mini bars -->
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /* ============================================================================
+         * 1. ARCHITECTURAL LAYER DEFINITIONS (경복궁 근정전 14대 건축 해부 계층)
+         * ============================================================================ */
+        const ARCH_LAYERS = [
+            {
+                id: 0,
+                code: "L01",
+                nameKo: "용마루·취두·잡상",
+                nameHanja: "龍마루·鷲頭·雜像",
+                nameEn: "Roof Ridges, Dragon Finials & Japsang",
+                materialName: "소성점토·양성회",
+                colorHex: "#f59e0b",
+                staggerRange: [0.00, 0.22],
+                desc: "팔작지붕 최상단 용마루·내림마루·추녀마루의 양성바름과 양 끝의 취두(鷲頭), 추녀마루 위 용두 및 대당사부·손행자 등 7종 잡상 장식 부재입니다."
+            },
+            {
+                id: 1,
+                code: "L02",
+                nameKo: "상층 본기와 (암·수키와·막새)",
+                nameHanja: "上層 기와·瓦當",
+                nameEn: "Upper Tier Roof Tiles & Eave Maksae",
+                materialName: "전통 한와(韓瓦)",
+                colorHex: "#38bdf8",
+                staggerRange: [0.04, 0.34],
+                desc: "중층 팔작지붕 상층부를 덮는 수백 장의 암키와·수키와 및 처마 끝을 장식하는 용문·연화문 수막새와 암막새 기와 군집입니다."
+            },
+            {
+                id: 2,
+                code: "L03",
+                nameKo: "하층 본기와 (암·수키와·막새)",
+                nameHanja: "下層 기와·瓦當",
+                nameEn: "Lower Tier Roof Tiles & Eave Maksae",
+                materialName: "전통 한와(韓瓦)",
+                colorHex: "#0284c7",
+                staggerRange: [0.08, 0.38],
+                desc: "1층 지붕(하층 처마)의 완만한 현수선 곡면을 형성하는 암키와·수키와 골과 처마 끝 와당(막새) 부재군입니다."
+            },
+            {
+                id: 3,
+                code: "L04",
+                nameKo: "개판·평고대·착고판",
+                nameHanja: "蓋板·平高臺·着固",
+                nameEn: "Roof Boarding & Eave Curve Battens",
+                materialName: "육송·단청가칠",
+                colorHex: "#a855f7",
+                staggerRange: [0.14, 0.44],
+                desc: "서까래 위를 덮어 기와와 보토를 받치는 개판(지붕널)과 처마의 앙곡(昂曲)·안허리곡을 잡아주는 평고대 및 착고판입니다."
+            },
+            {
+                id: 4,
+                code: "L05",
+                nameKo: "상·하층 서까래·부연·선자연",
+                nameHanja: "椽木·附椽·扇子椽",
+                nameEn: "Main Rafters, Flying Rafters & Fan Rafters",
+                materialName: "적송·모로단청",
+                colorHex: "#ec4899",
+                staggerRange: [0.18, 0.52],
+                desc: "처마를 깊게 돌출시키는 겹처마 구조의 핵심인 원형 연목(서까래), 각형 부연(초매기), 추녀 및 모서리 부채꼴 선자연 부재군입니다."
+            },
+            {
+                id: 5,
+                code: "L06",
+                nameKo: "대들보·종보·중도리·대공",
+                nameHanja: "大樑·宗樑·道里·臺工",
+                nameEn: "Main Transverse Beams, Purlins & Struts",
+                materialName: "금강송 대경목",
+                colorHex: "#f97316",
+                staggerRange: [0.24, 0.58],
+                desc: "지붕 하중을 기둥으로 전달하는 대들보, 용머리 조각 충량(衝樑), 종보, 주심도리·중도리·종도리, 장여 및 파련대공 목구조 가구재입니다."
+            },
+            {
+                id: 6,
+                code: "L07",
+                nameKo: "상층 다포계 공포군",
+                nameHanja: "上層 多包 貢包",
+                nameEn: "Upper Story Multi-Bracket Gongpo System",
+                materialName: "적송·금단청",
+                colorHex: "#10b981",
+                staggerRange: [0.28, 0.64],
+                desc: "중층 처마를 받치는 다포식 공포로, 주두(柱頭)·소로(小)·살미(山彌)·첨차(檐遮)가 정교한 맞춤과 장부로 결구된 복합 브래킷입니다."
+            },
+            {
+                id: 7,
+                code: "L08",
+                nameKo: "하층 다포계 공포군",
+                nameHanja: "下層 多包 貢包",
+                nameEn: "Lower Story Multi-Bracket Gongpo System",
+                materialName: "적송·금단청",
+                colorHex: "#14b8a6",
+                staggerRange: [0.32, 0.68],
+                desc: "1층 기둥 위 평방과 창방 위에 촘촘히 배치된 주심포·주간포 다포 결구체로, 내·외출목을 통해 처마 하중을 분산합니다."
+            },
+            {
+                id: 8,
+                code: "L09",
+                nameKo: "창방·평방·인방 수장재",
+                nameHanja: "昌·平·引",
+                nameEn: "Architraves, Flat Plates & Tie Beams",
+                materialName: "적송·얼금단청",
+                colorHex: "#84cc16",
+                staggerRange: [0.36, 0.72],
+                desc: "기둥 머리를 수평으로 결속하는 창방(昌), 그 위에서 다포 공포를 받치는 평방(平), 그리고 창호를 고정하는 상·중·하인방입니다."
+            },
+            {
+                id: 9,
+                code: "L10",
+                nameKo: "삼분변작 꽃살문·교살창·화방벽",
+                nameHanja: "花살門·交살窓·火防壁",
+                nameEn: "Floral Lattice Doors, Windows & Walls",
+                materialName: "춘양목·전벽돌",
+                colorHex: "#ef4444",
+                staggerRange: [0.40, 0.76],
+                desc: "근정전 사면을 감싸는 정교한 솟을꽃살문·빗살창짝과 상부 교창, 그리고 하부의 화강석·전벽돌 화방벽 마감 부재입니다."
+            },
+            {
+                id: 10,
+                code: "L11",
+                nameKo: "내부 어좌·일월오봉도·보개천장",
+                nameHanja: "御座·日月五峯圖·寶蓋",
+                nameEn: "Royal Throne, Ilwolobongdo & Dragon Canopy",
+                materialName: "황금칠·비단·홍송",
+                colorHex: "#eab308",
+                staggerRange: [0.45, 0.80],
+                desc: "통층 내부 중앙의 수미단과 어좌(御座), 왕권을 상징하는 일월오봉도 병풍, 화려한 닫집(唐家), 그리고 보개천장의 칠조룡(七爪龍) 조각입니다."
+            },
+            {
+                id: 11,
+                code: "L12",
+                nameKo: "외진 평주·우주·내진 고주 기둥",
+                nameHanja: "平柱·隅柱·高柱",
+                nameEn: "Perimeter Columns, Corner Columns & High Pillars",
+                materialName: "금강송·석간주가칠",
+                colorHex: "#dc2626",
+                staggerRange: [0.48, 0.84],
+                desc: "정면 5칸·측면 5칸을 이루는 외진 평주와 귀솟음·안쏠림 기법이 적용된 우주(모서리 기둥), 내부 2층까지 관통하는 내진 고주(高柱)입니다."
+            },
+            {
+                id: 12,
+                code: "L13",
+                nameKo: "화강석 주초석·고막이석·전돌바닥",
+                nameHanja: "柱礎石·고막이·塼石",
+                nameEn: "Granite Plinth Stones & Hall Paving Bricks",
+                materialName: "포천 화강석·방전",
+                colorHex: "#94a3b8",
+                staggerRange: [0.54, 0.90],
+                desc: "기둥 하부를 받쳐 습기와 하중을 지탱하는 원형 화강석 초석(주초), 기둥 사이 하부 고막이석, 그리고 실내 바닥에 깔린 방전(方塼)입니다."
+            },
+            {
+                id: 13,
+                code: "L14",
+                nameKo: "상·하월대 기단·봉황답도·돌난간·석수",
+                nameHanja: "月臺·踏道·石欄干·石獸",
+                nameEn: "Two-Tier Woldae Terrace, Phoenix Dapdo & Balustrades",
+                materialName: "장대석·풍혈석 조각",
+                colorHex: "#cbd5e1",
+                staggerRange: [0.58, 0.98],
+                desc: "근정전을 떠받치는 2단 석조 기단(상월대·하월대), 정면 어계의 봉황문 답도(踏道), 구름문 풍혈석 돌난간, 엄지기둥 위 해치·서수(瑞獸) 조각입니다."
+            }
+        ];
+
+        /* ============================================================================
+         * 2. GLOBAL APPLICATION STATE
+         * ============================================================================ */
+        const state = {
+            explodeProgress: 0.0,       // Current smoothed progress (0.0 = assembled, 1.0 = exploded)
+            targetProgress: 0.0,        // Target progress when scrubbing or auto-playing
+            isPlaying: true,            // Motion graphics auto-play loop active
+            playDirection: 1,           // 1 = exploding, -1 = assembling
+            playSpeed: 0.14,            // Speed of timeline progression
+            explosionAmp: 1.6,          // Amplitude multiplier for explosion vectors
+            choreographyMode: 'cascade',// 'cascade' | 'radial' | 'cutaway' | 'timber' | 'wave'
+            renderStyle: 'dancheong',   // 'dancheong' | 'spectrum' | 'blueprint'
+            isolatedLayer: -1,          // -1 = all layers visible, 0..13 = focused layer
+            showCalloutPins: true,
+            showTrajectoryVectors: true,
+            autoOrbit: true,
+            soundEnabled: false,
+            hoveredPart: null,
+            selectedPart: null,
+            clockTime: 0
+        };
+
+        // Registry of all 3,600+ individual architectural parts
+        const allParts = [];
+        const instancedBatches = [];
+        const layerPartCounts = new Array(14).fill(0);
+        let trajectoryLinesMesh = null;
+        let highlightBoxMesh = null;
+        let selectedTrajectoryLine = null;
+
+        // Three.js Core Variables
+        let scene, camera, renderer;
+        const dummyObj = new THREE.Object3D();
+        const tempVec = new THREE.Vector3();
+        const tempQuat = new THREE.Quaternion();
+        const tempEuler = new THREE.Euler();
+        const tempScale = new THREE.Vector3();
+        const tempColor = new THREE.Color();
+
+        // Camera Spherical Orbit State
+        const camSpherical = {
+            radius: 56,
+            theta: 0.62,
+            phi: 1.12,
+            targetRadius: 56,
+            targetTheta: 0.62,
+            targetPhi: 1.12,
+            lookAt: new THREE.Vector3(0, 7.5, 0),
+            targetLookAt: new THREE.Vector3(0, 7.5, 0),
+            isDragging: false,
+            isPanning: false,
+            prevX: 0,
+            prevY: 0
+        };
+
+        /* ============================================================================
+         * 3. PROCEDURAL KOREAN ARCHITECTURAL TEXTURE GENERATOR (단청·꽃살문·화강석·일월오봉도)
+         * ============================================================================ */
+        function createProceduralTextures() {
+            const textures = {};
+
+            // 1. Dancheong Beam Texture (머리초 & 금단청 문양)
+            const dcCanvas = document.createElement('canvas');
+            dcCanvas.width = 512;
+            dcCanvas.height = 128;
+            const dctx = dcCanvas.getContext('2d');
+            dctx.fillStyle = '#246b56'; // Noerok (뇌록 바탕)
+            dctx.fillRect(0, 0, 512, 128);
+            // Red & Blue end bands (머리초)
+            const bandColors = ['#b8332a', '#e6b84c', '#234c82', '#389e7f', '#ffffff'];
+            for (let i = 0; i < 5; i++) {
+                dctx.fillStyle = bandColors[i];
+                dctx.fillRect(i * 18, 0, 14, 128);
+                dctx.fillRect(512 - (i + 1) * 18, 0, 14, 128);
+            }
+            // Lotus & geometric motif in center
+            dctx.strokeStyle = '#f3c65f';
+            dctx.lineWidth = 3;
+            for (let x = 110; x < 400; x += 58) {
+                dctx.beginPath();
+                dctx.arc(x, 64, 20, 0, Math.PI * 2);
+                dctx.stroke();
+                dctx.fillStyle = '#b8332a';
+                dctx.beginPath();
+                dctx.arc(x, 64, 10, 0, Math.PI * 2);
+                dctx.fill();
+            }
+            textures.dancheongBeam = new THREE.CanvasTexture(dcCanvas);
+
+            // 2. Kkot-sal-mun (꽃살문 - Floral Lattice Door Texture)
+            const doorCanvas = document.createElement('canvas');
+            doorCanvas.width = 256;
+            doorCanvas.height = 512;
+            const drCtx = doorCanvas.getContext('2d');
+            // Hanji paper warm backing
+            drCtx.fillStyle = '#f3ead8';
+            drCtx.fillRect(0, 0, 256, 512);
+            // Outer red wooden frame
+            drCtx.strokeStyle = '#9c2720';
+            drCtx.lineWidth = 22;
+            drCtx.strokeRect(11, 11, 234, 490);
+            // Lower solid panel (궁판) with Dancheong border
+            drCtx.fillStyle = '#9c2720';
+            drCtx.fillRect(16, 350, 224, 145);
+            drCtx.strokeStyle = '#2d8a6e';
+            drCtx.lineWidth = 8;
+            drCtx.strokeRect(30, 365, 196, 115);
+            // Diagonal & vertical floral lattice bars (솟을꽃살)
+            drCtx.strokeStyle = '#a82c24';
+            drCtx.lineWidth = 4;
+            for (let x = 32; x < 230; x += 28) {
+                drCtx.beginPath();
+                drCtx.moveTo(x, 20);
+                drCtx.lineTo(x, 348);
+                drCtx.stroke();
+            }
+            for (let y = 30; y < 340; y += 36) {
+                drCtx.beginPath();
+                drCtx.moveTo(20, y);
+                drCtx.lineTo(236, y + 36);
+                drCtx.moveTo(236, y);
+                drCtx.lineTo(20, y + 36);
+                drCtx.stroke();
+            }
+            // Carved floral medallions at lattice intersections
+            for (let x = 46; x < 220; x += 56) {
+                for (let y = 48; y < 330; y += 54) {
+                    drCtx.fillStyle = '#e6b84c';
+                    drCtx.beginPath();
+                    drCtx.arc(x, y, 7, 0, Math.PI * 2);
+                    drCtx.fill();
+                    drCtx.fillStyle = '#2d8a6e';
+                    drCtx.beginPath();
+                    drCtx.arc(x, y, 3, 0, Math.PI * 2);
+                    drCtx.fill();
+                }
+            }
+            textures.kkotsalmun = new THREE.CanvasTexture(doorCanvas);
+
+            // 3. Granite Stone Texture (화강석 기단·박석 텍스처)
+            const stoneCanvas = document.createElement('canvas');
+            stoneCanvas.width = 256;
+            stoneCanvas.height = 256;
+            const stCtx = stoneCanvas.getContext('2d');
+            stCtx.fillStyle = '#c8ccd0';
+            stCtx.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 4000; i++) {
+                const v = 165 + Math.floor(Math.random() * 75);
+                stCtx.fillStyle = `rgb(${v},${v},${v + 4})`;
+                stCtx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+            }
+            stCtx.strokeStyle = 'rgba(70,75,82,0.35)';
+            stCtx.lineWidth = 3;
+            stCtx.strokeRect(2, 2, 252, 252);
+            textures.granite = new THREE.CanvasTexture(stoneCanvas);
+
+            // 4. Ilwolobongdo Royal Folding Screen Texture (일월오봉도 - Sun, Moon, and Five Peaks)
+            const screenCanvas = document.createElement('canvas');
+            screenCanvas.width = 512;
+            screenCanvas.height = 256;
+            const scCtx = screenCanvas.getContext('2d');
+            // Deep royal navy sky
+            scCtx.fillStyle = '#0f2342';
+            scCtx.fillRect(0, 0, 512, 256);
+            // Red Sun (right) and White Moon (left)
+            scCtx.fillStyle = '#d93829';
+            scCtx.beginPath();
+            scCtx.arc(370, 58, 26, 0, Math.PI * 2);
+            scCtx.fill();
+            scCtx.fillStyle = '#f8fafc';
+            scCtx.beginPath();
+            scCtx.arc(142, 58, 24, 0, Math.PI * 2);
+            scCtx.fill();
+            // Five Majesty Peaks (오봉)
+            const peaks = [
+                { x: 95, h: 120, w: 90, c: '#1b6b52' },
+                { x: 175, h: 155, w: 105, c: '#238264' },
+                { x: 256, h: 195, w: 130, c: '#2ba17b' },
+                { x: 337, h: 155, w: 105, c: '#238264' },
+                { x: 417, h: 120, w: 90, c: '#1b6b52' }
+            ];
+            peaks.forEach(p => {
+                scCtx.fillStyle = p.c;
+                scCtx.beginPath();
+                scCtx.moveTo(p.x - p.w, 256);
+                scCtx.quadraticCurveTo(p.x, 256 - p.h * 1.4, p.x + p.w, 256);
+                scCtx.fill();
+                scCtx.strokeStyle = '#e6b84c';
+                scCtx.lineWidth = 2;
+                scCtx.stroke();
+            });
+            // Cascades & Pine trees at bottom
+            scCtx.fillStyle = '#1e3a8a';
+            scCtx.fillRect(0, 215, 512, 41);
+            scCtx.strokeStyle = '#f8fafc';
+            scCtx.lineWidth = 2;
+            for (let x = 20; x < 500; x += 32) {
+                scCtx.beginPath();
+                scCtx.arc(x, 235, 12, Math.PI, 0);
+                scCtx.stroke();
+            }
+            textures.ilwolobongdo = new THREE.CanvasTexture(screenCanvas);
+
+            return textures;
+        }
+
+        /* ============================================================================
+         * 4. BATCH & PART REGISTRATION ENGINE (최대 부품 수 고속 인스턴싱 엔진)
+         * ============================================================================ */
+        class ArchitecturalBatch {
+            constructor(key, geometry, baseMaterial, layerId, maxCount) {
+                this.key = key;
+                this.geometry = geometry;
+                this.dancheongMat = baseMaterial;
+                this.layerId = layerId;
+                this.parts = [];
+                this.maxCount = maxCount;
+                this.mesh = null;
+            }
+
+            addPart(config) {
+                const partIndex = allParts.length;
+                const localIndex = this.parts.length;
+                const layerMeta = ARCH_LAYERS[this.layerId];
+
+                const part = {
+                    id: partIndex,
+                    batch: this,
+                    instanceId: localIndex,
+                    layerId: this.layerId,
+                    nameKo: config.nameKo || layerMeta.nameKo,
+                    nameHanja: config.nameHanja || layerMeta.nameHanja,
+                    nameEn: config.nameEn || layerMeta.nameEn,
+                    subDesc: config.subDesc || layerMeta.desc,
+                    basePos: config.pos.clone(),
+                    baseRot: config.rot ? config.rot.clone() : new THREE.Euler(0, 0, 0),
+                    baseQuat: new THREE.Quaternion().setFromEuler(config.rot ? config.rot : new THREE.Euler(0, 0, 0)),
+                    baseScale: config.scale ? config.scale.clone() : new THREE.Vector3(1, 1, 1),
+                    explodeVec: config.explodeVec.clone(),
+                    explodeRot: config.explodeRot || new THREE.Euler(
+                        (Math.random() - 0.5) * 0.25,
+                        (Math.random() - 0.5) * 0.25,
+                        (Math.random() - 0.5) * 0.25
+                    ),
+                    staggerStart: config.staggerStart ?? layerMeta.staggerRange[0],
+                    staggerEnd: config.staggerEnd ?? layerMeta.staggerRange[1],
+                    radialNorm: config.radialNorm ?? 0.5,
+                    currentPos: config.pos.clone()
+                };
+
+                this.parts.push(part);
+                allParts.push(part);
+                layerPartCounts[this.layerId]++;
+                return part;
+            }
+
+            finalize(scene) {
+                const count = this.parts.length;
+                if (count === 0) return;
+                this.mesh = new THREE.InstancedMesh(this.geometry, this.dancheongMat.clone(), count);
+                this.mesh.castShadow = true;
+                this.mesh.receiveShadow = true;
+                this.mesh.userData = { batch: this };
+
+                const baseColor = new THREE.Color( 0xffffff );
+                for (let i = 0; i < count; i++) {
+                    const p = this.parts[i];
+                    dummyObj.position.copy(p.basePos);
+                    dummyObj.quaternion.copy(p.baseQuat);
+                    dummyObj.scale.copy(p.baseScale);
+                    dummyObj.updateMatrix();
+                    this.mesh.setMatrixAt(i, dummyObj.matrix);
+                    this.mesh.setColorAt(i, baseColor);
+                }
+                this.mesh.instanceMatrix.needsUpdate = true;
+                if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+                scene.add(this.mesh);
+                instancedBatches.push(this);
+            }
+        }
+
+        /* ============================================================================
+         * 5. PROCEDURAL GYEONGBOKGUNG GEUNJEONGJEON 3D BUILDER (3,680+ PARTS)
+         * ============================================================================ */
+        function buildGeunjeongjeonModel(scene, textures) {
+            // Materials Palette
+            const mats = {
+                granite: new THREE.MeshStandardMaterial({ map: textures.granite, roughness: 0.78, metalness: 0.08 }),
+                graniteDark: new THREE.MeshStandardMaterial({ color: 0x9aa1a9, map: textures.granite, roughness: 0.82, metalness: 0.1 }),
+                carvedStone: new THREE.MeshStandardMaterial({ color: 0xdbe0e6, roughness: 0.65, metalness: 0.12 }),
+                pillarRed: new THREE.MeshStandardMaterial({ color: 0xa82820, roughness: 0.42, metalness: 0.08 }),
+                dancheongGreen: new THREE.MeshStandardMaterial({ color: 0x26735b, roughness: 0.48, metalness: 0.1 }),
+                dancheongBeam: new THREE.MeshStandardMaterial({ map: textures.dancheongBeam, roughness: 0.45, metalness: 0.12 }),
+                gongpoRed: new THREE.MeshStandardMaterial({ color: 0xb8332a, roughness: 0.45, metalness: 0.1 }),
+                gongpoGold: new THREE.MeshStandardMaterial({ color: 0xd9a636, roughness: 0.32, metalness: 0.45 }),
+                rafterWood: new THREE.MeshStandardMaterial({ color: 0x29785f, roughness: 0.5, metalness: 0.08 }),
+                buyeonTip: new THREE.MeshStandardMaterial({ color: 0xe6b84c, roughness: 0.4, metalness: 0.25 }),
+                kkotsalmun: new THREE.MeshStandardMaterial({ map: textures.kkotsalmun, roughness: 0.5, metalness: 0.05 }),
+                roofBoarding: new THREE.MeshStandardMaterial({ color: 0x7c4728, roughness: 0.7, metalness: 0.05 }),
+                giwaTile: new THREE.MeshStandardMaterial({ color: 0x28303b, roughness: 0.52, metalness: 0.22 }),
+                giwaMaksae: new THREE.MeshStandardMaterial({ color: 0x364150, roughness: 0.46, metalness: 0.28 }),
+                ridgeLime: new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.65, metalness: 0.1 }),
+                royalGold: new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.22, metalness: 0.78 }),
+                screenMat: new THREE.MeshStandardMaterial({ map: textures.ilwolobongdo, roughness: 0.4, metalness: 0.1 })
+            };
+
+            // Geometries
+            const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+            const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
+            const octGeo = new THREE.CylinderGeometry(0.45, 0.52, 1, 8);
+            const sukiwaGeo = new THREE.CylinderGeometry(0.14, 0.14, 1, 8, 1, false, 0, Math.PI);
+            sukiwaGeo.rotateX(Math.PI / 2);
+            const sphereGeo = new THREE.SphereGeometry(0.5, 10, 10);
+
+            /* ------------------------------------------------------------------------
+             * LAYER 13: 상·하월대 기단석, 봉황 답도, 돌난간, 서수 (Woldae, Dapdo, Balustrades)
+             * ------------------------------------------------------------------------ */
+            const batchWoldaeStone = new ArchitecturalBatch('woldae_stone', boxGeo, mats.granite, 13, 450);
+            const batchBalustrade = new ArchitecturalBatch('balustrade', octGeo, mats.carvedStone, 13, 350);
+            const batchDapdo = new ArchitecturalBatch('dapdo', boxGeo, mats.carvedStone, 13, 120);
+
+            // 1. Hawoldae (하월대 - Lower Terrace Blocks: 7x7 grid + perimeter coping stones)
+            for (let ix = -4; ix <= 4; ix++) {
+                for (let iz = -3; iz <= 3; iz++) {
+                    const px = ix * 3.8;
+                    const pz = iz * 3.8;
+                    const py = 0.65;
+                    const radial = new THREE.Vector3(px * 0.45, -7.5 - Math.abs(ix + iz) * 0.35, pz * 0.45);
+                    batchWoldaeStone.addPart({
+                        nameKo: "하월대 장대석 및 박석 (下月臺 長臺石)",
+                        nameEn: "Hawoldae Lower Terrace Granite Block",
+                        subDesc: "근정전 기단의 1단 월대(하월대)를 구성하는 화강암 장대석과 방전 바닥석입니다.",
+                        pos: new THREE.Vector3(px, py, pz),
+                        scale: new THREE.Vector3(3.72, 1.3, 3.72),
+                        explodeVec: radial,
+                        staggerStart: 0.65,
+                        staggerEnd: 0.98
+                    });
+                }
+            }
+
+            // 2. Sangwoldae (상월대 - Upper Terrace Blocks: 5x5 grid)
+            for (let ix = -3; ix <= 3; ix++) {
+                for (let iz = -2; iz <= 2; iz++) {
+                    const px = ix * 3.9;
+                    const pz = iz * 4.1;
+                    const py = 1.95;
+                    const radial = new THREE.Vector3(px * 0.38, -4.8 - Math.hypot(ix, iz) * 0.25, pz * 0.38);
+                    batchWoldaeStone.addPart({
+                        nameKo: "상월대 면석 및 갑석 (上月臺 面石·甲石)",
+                        nameEn: "Sangwoldae Upper Terrace Granite Block",
+                        subDesc: "근정전 본채가 직접 올라서는 2단 상월대의 화강암 면석·갑석 기단 부재입니다.",
+                        pos: new THREE.Vector3(px, py, pz),
+                        scale: new THREE.Vector3(3.82, 1.3, 4.02),
+                        explodeVec: radial,
+                        staggerStart: 0.60,
+                        staggerEnd: 0.94
+                    });
+                }
+            }
+
+            // 3. Royal Stairway & Phoenix Dapdo (어계 계단석 & 봉황문 답도 조각석)
+            for (let s = 0; s < 10; s++) {
+                const sz = 10.6 + s * 0.55;
+                const sy = 2.45 - s * 0.24;
+                // Left & Right Steps
+                [-2.4, 2.4].forEach(sx => {
+                    batchDapdo.addPart({
+                        nameKo: "남측 어계 층계석 및 소맷돌 (御階 層階石)",
+                        nameEn: "Royal South Stairway Step Stone",
+                        subDesc: "상월대와 하월대를 연결하는 어계(왕의 계단)의 화강석 디딤돌과 소맷돌입니다.",
+                        pos: new THREE.Vector3(sx, sy, sz),
+                        scale: new THREE.Vector3(2.2, 0.24, 0.55),
+                        explodeVec: new THREE.Vector3(sx * 0.8, -5.0 - s * 0.2, 9.5 + s * 0.6),
+                        staggerStart: 0.56,
+                        staggerEnd: 0.90
+                    });
+                });
+                // Center Phoenix Carved Dapdo Slabs (봉황문 답도)
+                batchDapdo.addPart({
+                    nameKo: "봉황문 답도 조각석 (鳳凰紋 踏道)",
+                    nameEn: "Carved Phoenix Dapdo Centerpiece Slab",
+                    subDesc: "임금의 가마(연)가 지나가는 어계 중앙 경사석으로, 구름과 쌍봉황이 정교하게 부조되어 있습니다.",
+                    pos: new THREE.Vector3(0, sy + 0.06, sz),
+                    rot: new THREE.Euler(0.38, 0, 0),
+                    scale: new THREE.Vector3(2.4, 0.18, 0.62),
+                    explodeVec: new THREE.Vector3(0, -3.5 + s * 0.15, 13.0 + s * 0.7),
+                    staggerStart: 0.52,
+                    staggerEnd: 0.88
+                });
+            }
+
+            // 4. Carved Stone Balustrades (상·하월대 돌난간 엄지기둥·동자석·돌란대·석수)
+            const addBalustradeRing = (halfW, halfD, baseY, tierLabel, ringExpand) => {
+                const postsX = 12;
+                const postsZ = 8;
+                // Front & Back balustrade posts
+                for (let i = 0; i <= postsX; i++) {
+                    const px = -halfW + (i / postsX) * (halfW * 2);
+                    // Leave central stairway opening on front
+                    if (Math.abs(px) < 3.2) continue;
+                    [-halfD, halfD].forEach(pz => {
+                        const zSign = Math.sign(pz);
+                        // Eomji-gidung (엄지기둥)
+                        batchBalustrade.addPart({
+                            nameKo: `${tierLabel} 돌난간 엄지기둥·법수 (石欄干 柱)`,
+                            nameEn: `${tierLabel} Carved Stone Balustrade Pillar`,
+                            subDesc: "월대 가장자리를 두르는 돌난간의 기둥으로 상부에 서수(해치·사자) 및 연꽃 보주가 조각됩니다.",
+                            pos: new THREE.Vector3(px, baseY + 0.75, pz),
+                            scale: new THREE.Vector3(0.38, 1.5, 0.38),
+                            explodeVec: new THREE.Vector3(px * 0.45, -3.5, zSign * ringExpand),
+                            staggerStart: 0.55,
+                            staggerEnd: 0.88
+                        });
+                        // Top handrail (돌란대)
+                        batchDapdo.addPart({
+                            nameKo: `${tierLabel} 돌란대 및 풍혈석 (風穴石)`,
+                            nameEn: `${tierLabel} Stone Handrail & Cloud-Pierced Panel`,
+                            pos: new THREE.Vector3(px, baseY + 1.15, pz),
+                            scale: new THREE.Vector3(2.1, 0.22, 0.24),
+                            explodeVec: new THREE.Vector3(px * 0.5, -2.5, zSign * (ringExpand + 2.2)),
+                            staggerStart: 0.54,
+                            staggerEnd: 0.86
+                        });
+                    });
+                }
+                // Left & Right balustrade posts
+                for (let i = 1; i < postsZ; i++) {
+                    const pz = -halfD + (i / postsZ) * (halfD * 2);
+                    [-halfW, halfW].forEach(px => {
+                        const xSign = Math.sign(px);
+                        batchBalustrade.addPart({
+                            nameKo: `${tierLabel} 측면 돌난간 엄지기둥·석수 (瑞獸)`,
+                            nameEn: `${tierLabel} Side Stone Balustrade & Guardian Beast`,
+                            pos: new THREE.Vector3(px, baseY + 0.75, pz),
+                            scale: new THREE.Vector3(0.38, 1.5, 0.38),
+                            explodeVec: new THREE.Vector3(xSign * ringExpand, -3.5, pz * 0.45),
+                            staggerStart: 0.55,
+                            staggerEnd: 0.88
+                        });
+                        batchDapdo.addPart({
+                            nameKo: `${tierLabel} 측면 돌란대 난간석`,
+                            nameEn: `${tierLabel} Side Stone Balustrade Rail`,
+                            pos: new THREE.Vector3(px, baseY + 1.15, pz),
+                            scale: new THREE.Vector3(0.24, 0.22, 2.3),
+                            explodeVec: new THREE.Vector3(xSign * (ringExpand + 2.2), -2.5, pz * 0.5),
+                            staggerStart: 0.54,
+                            staggerEnd: 0.86
+                        });
+                    });
+                }
+            };
+            addBalustradeRing(16.8, 12.6, 1.3, "하월대", 9.0);
+            addBalustradeRing(13.2, 9.8, 2.6, "상월대", 6.5);
+
+            /* ------------------------------------------------------------------------
+             * LAYER 12: 화강석 주초석, 고막이석, 실내 방전 (Plinth Stones & Base Infills)
+             * ------------------------------------------------------------------------ */
+            const batchChoseok = new ArchitecturalBatch('choseok', octGeo, mats.graniteDark, 12, 120);
+
+            // Geunjeongjeon 5x5 Bay Grid Coordinates (정면 5칸, 측면 5칸)
+            const colX = [-10.0, -6.0, -2.0, 2.0, 6.0, 10.0];
+            const colZ = [-7.2, -4.32, -1.44, 1.44, 4.32, 7.2];
+            const baseHallY = 2.65;
+
+            colX.forEach((cx, ix) => {
+                colZ.forEach((cz, iz) => {
+                    const isOuter = (ix === 0 || ix === 5 || iz === 0 || iz === 5);
+                    const isHighInner = ((ix === 1 || ix === 4) && (iz >= 1 && iz <= 4)) ||
+                                        ((iz === 1 || iz === 4) && (ix >= 1 && ix <= 4));
+                    if (!isOuter && !isHighInner) return;
+
+                    // Plinth Stone (주초석)
+                    batchChoseok.addPart({
+                        nameKo: isOuter ? "외진 화강석 주초석 (外陣 柱礎石)" : "내진 고주 초석 (內陣 高柱礎)",
+                        nameEn: "Granite Column Plinth Stone (Choseok)",
+                        subDesc: "기둥 밑동을 받쳐 목재의 부식을 막고 상부 지붕의 막대한 하중을 월대 지반으로 전달하는 초석입니다.",
+                        pos: new THREE.Vector3(cx, baseHallY + 0.28, cz),
+                        scale: new THREE.Vector3(1.12, 0.56, 1.12),
+                        explodeVec: new THREE.Vector3(cx * 0.45, -2.6, cz * 0.45),
+                        staggerStart: 0.52,
+                        staggerEnd: 0.88
+                    });
+                });
+            });
+
+            // Gomagi-seok (고막이석 - Stone Base Infills between outer columns)
+            for (let i = 0; i < 5; i++) {
+                const midX = (colX[i] + colX[i + 1]) * 0.5;
+                [-7.2, 7.2].forEach(cz => {
+                    batchChoseok.addPart({
+                        nameKo: "기둥 사이 고막이석 (고막이石)",
+                        nameEn: "Perimeter Base Infill Stone (Gomagi)",
+                        pos: new THREE.Vector3(midX, baseHallY + 0.25, cz),
+                        scale: new THREE.Vector3(3.1, 0.42, 0.42),
+                        explodeVec: new THREE.Vector3(midX * 0.5, -2.2, Math.sign(cz) * 5.5),
+                        staggerStart: 0.54,
+                        staggerEnd: 0.88
+                    });
+                });
+                const midZ = (colZ[i] + colZ[i + 1]) * 0.5;
+                [-10.0, 10.0].forEach(cx => {
+                    batchChoseok.addPart({
+                        nameKo: "측면 기둥 사이 고막이석 (고막이石)",
+                        nameEn: "Side Base Infill Stone (Gomagi)",
+                        pos: new THREE.Vector3(cx, baseHallY + 0.25, midZ),
+                        scale: new THREE.Vector3(0.42, 0.42, 2.2),
+                        explodeVec: new THREE.Vector3(Math.sign(cx) * 5.5, -2.2, midZ * 0.5),
+                        staggerStart: 0.54,
+                        staggerEnd: 0.88
+                    });
+                });
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 11: 외진 평주, 모서리 우주, 내진 고주 기둥군 (Wooden Columns)
+             * ------------------------------------------------------------------------ */
+            const batchPillars = new ArchitecturalBatch('pillars', cylGeo, mats.pillarRed, 11, 100);
+
+            // 1. Lower Outer Perimeter Columns (1층 외진 평주 & 모서리 우주 - 20 columns)
+            const lowerColH = 5.2;
+            colX.forEach((cx, ix) => {
+                colZ.forEach((cz, iz) => {
+                    const isOuter = (ix === 0 || ix === 5 || iz === 0 || iz === 5);
+                    if (!isOuter) return;
+                    const isCorner = (ix === 0 || ix === 5) && (iz === 0 || iz === 5);
+                    // Subtle 귀솟음 (corner columns slightly taller)
+                    const h = isCorner ? lowerColH + 0.14 : lowerColH;
+                    const rad = isCorner ? 0.76 : 0.68;
+
+                    batchPillars.addPart({
+                        nameKo: isCorner ? "하층 모서리 우주 (下層 隅柱 - 귀솟음·안쏠림)" : "하층 외진 평주 (下層 外陣 平柱)",
+                        nameEn: isCorner ? "Lower Story Corner Column (Uju)" : "Lower Story Perimeter Column (Pyeongju)",
+                        subDesc: isCorner
+                            ? "건물 모서리에 세워진 기둥으로 착시를 교정하고 안정감을 주기 위해 귀솟음과 안쏠림 기법이 적용되었습니다."
+                            : "근정전 1층 외곽 주열을 형성하는 원형 붉은 기둥(석간주 가칠)입니다.",
+                        pos: new THREE.Vector3(cx, baseHallY + 0.55 + h * 0.5, cz),
+                        scale: new THREE.Vector3(rad, h, rad),
+                        explodeVec: new THREE.Vector3(cx * 0.85, 0.8, cz * 0.85),
+                        staggerStart: 0.46,
+                        staggerEnd: 0.82
+                    });
+                });
+            });
+
+            // 2. Interior High Pillars & Upper Story Columns (내진 고주 & 중층 외진주)
+            const upperX = [-7.2, -4.32, -1.44, 1.44, 4.32, 7.2];
+            const upperZ = [-4.8, -1.6, 1.6, 4.8];
+            const highColH = 9.4;
+            upperX.forEach((ux, ix) => {
+                upperZ.forEach((uz, iz) => {
+                    const isPerimeter = (ix === 0 || ix === 5 || iz === 0 || iz === 3);
+                    if (!isPerimeter) return;
+                    const isCorner = (ix === 0 || ix === 5) && (iz === 0 || iz === 3);
+
+                    // Continuous High Pillar (내진 고주 - rises from floor through 2nd story)
+                    batchPillars.addPart({
+                        nameKo: isCorner ? "중층 모서리 고주 (重層 隅高柱)" : "내진 통층 고주 (內陣 高柱)",
+                        nameEn: "Interior Two-Story High Column (Naejin Goju)",
+                        subDesc: "외부에서는 2층으로 보이나 내부가 하나로 트인 통층(通層) 구조를 지탱하기 위해 1층 바닥에서 상층 처마까지 곧게 솟은 대형 기둥입니다.",
+                        pos: new THREE.Vector3(ux, baseHallY + 0.55 + highColH * 0.5, uz),
+                        scale: new THREE.Vector3(0.74, highColH, 0.74),
+                        explodeVec: new THREE.Vector3(ux * 0.65, 3.6, uz * 0.65),
+                        staggerStart: 0.44,
+                        staggerEnd: 0.78
+                    });
+                });
+            });
+
+            /* ------------------------------------------------------------------------
+             * LAYER 10: 내부 어좌, 수미단, 일월오봉도, 보개천장 황룡 (Imperial Throne Hall)
+             * ------------------------------------------------------------------------ */
+            const batchThroneGold = new ArchitecturalBatch('throne_gold', boxGeo, mats.royalGold, 10, 90);
+            const batchThroneRed = new ArchitecturalBatch('throne_red', boxGeo, mats.pillarRed, 10, 60);
+            const batchScreen = new ArchitecturalBatch('throne_screen', boxGeo, mats.screenMat, 10, 10);
+
+            const throneZ = -1.8;
+            const throneY = baseHallY + 0.6;
+            // Sumidan Two-Tier Platform (수미단 좌대)
+            batchThroneRed.addPart({
+                nameKo: "어좌 수미단 하단 좌대 (須彌壇 下壇)",
+                nameEn: "Sumidan Royal Dais Lower Platform",
+                subDesc: "근정전 내부 북측 중앙에 놓인 임금의 보좌를 높이기 위한 당초문·모란문 조각 수미단입니다.",
+                pos: new THREE.Vector3(0, throneY + 0.4, throneZ),
+                scale: new THREE.Vector3(5.6, 0.8, 3.8),
+                explodeVec: new THREE.Vector3(0, 1.2, -3.2),
+                staggerStart: 0.45,
+                staggerEnd: 0.78
+            });
+            batchThroneGold.addPart({
+                nameKo: "어좌 수미단 상단 금장 좌대 (須彌壇 上壇)",
+                nameEn: "Sumidan Royal Dais Upper Gold Platform",
+                pos: new THREE.Vector3(0, throneY + 1.0, throneZ),
+                scale: new THREE.Vector3(4.2, 0.5, 2.8),
+                explodeVec: new THREE.Vector3(0, 2.0, -2.5),
+                staggerStart: 0.44,
+                staggerEnd: 0.77
+            });
+            // Eojwa Royal Throne Chair (어좌 용상)
+            batchThroneGold.addPart({
+                nameKo: "조선 국왕 어좌 용상 (御座 龍床)",
+                nameEn: "Imperial Joseon Dragon Throne (Eojwa)",
+                subDesc: "국왕이 즉위식·조회·외국 사신 접견 시 착석하던 황금빛 보좌입니다.",
+                pos: new THREE.Vector3(0, throneY + 1.65, throneZ + 0.2),
+                scale: new THREE.Vector3(1.8, 1.1, 1.3),
+                explodeVec: new THREE.Vector3(0, 3.2, 2.5),
+                staggerStart: 0.42,
+                staggerEnd: 0.75
+            });
+            // Ilwolobongdo Screen (일월오봉도 오첩 병풍)
+            batchScreen.addPart({
+                nameKo: "일월오봉도 대병풍 (日月五峯圖 屛風)",
+                nameEn: "Ilwolobongdo Royal Five-Peaks Folding Screen",
+                subDesc: "어좌 뒤에 항상 배치되어 해와 달, 다섯 봉우리와 폭포·소나무를 통해 왕권의 영원함과 천하 통치를 상징합니다.",
+                pos: new THREE.Vector3(0, throneY + 2.55, throneZ - 0.65),
+                scale: new THREE.Vector3(3.6, 2.4, 0.18),
+                explodeVec: new THREE.Vector3(0, 4.2, -4.5),
+                staggerStart: 0.40,
+                staggerEnd: 0.74
+            });
+            // Datjip Canopy Pillars & Miniature Roof (닫집 / 당가)
+            [-1.8, 1.8].forEach(dx => {
+                [-1.1, 1.1].forEach(dz => {
+                    batchThroneRed.addPart({
+                        nameKo: "어좌 닫집 네 기둥 (唐家 柱)",
+                        nameEn: "Datjip Royal Canopy Pillar",
+                        pos: new THREE.Vector3(dx, throneY + 3.1, throneZ + dz),
+                        scale: new THREE.Vector3(0.22, 3.6, 0.22),
+                        explodeVec: new THREE.Vector3(dx * 1.4, 4.8, dz * 1.4),
+                        staggerStart: 0.38,
+                        staggerEnd: 0.72
+                    });
+                });
+            });
+            // Datjip ornate multi-tier canopy crown
+            for (let t = 0; t < 3; t++) {
+                batchThroneGold.addPart({
+                    nameKo: `어좌 닫집 상부 운궁 공포·보개 (${t + 1}단)`,
+                    nameEn: `Datjip Ornate Canopy Crown Tier ${t + 1}`,
+                    subDesc: "어좌 상공에 집 속의 작은 궁전 형태로 정교하게 짜 올린 닫집(당가) 지붕과 운궁 공포입니다.",
+                    pos: new THREE.Vector3(0, throneY + 5.0 + t * 0.48, throneZ),
+                    scale: new THREE.Vector3(4.3 - t * 0.55, 0.42, 3.1 - t * 0.4),
+                    explodeVec: new THREE.Vector3(0, 6.2 + t * 1.1, 0),
+                    staggerStart: 0.36,
+                    staggerEnd: 0.70
+                });
+            }
+            // Bogae Ceiling Twin Seven-Toed Golden Dragons (보개천장 황룡 24절 조각)
+            for (let d = 0; d < 24; d++) {
+                const angle = (d / 24) * Math.PI * 4;
+                const r = 1.2 + (d % 2) * 0.45;
+                const gx = Math.cos(angle) * r;
+                const gz = Math.sin(angle) * r - 0.5;
+                const gy = baseHallY + 9.2 + Math.sin(d * 0.6) * 0.25;
+                batchThroneGold.addPart({
+                    nameKo: "보개천장 칠조룡(七爪龍) 황금 조각",
+                    nameEn: "Bogae Recessed Ceiling Seven-Clawed Golden Dragon",
+                    subDesc: "근정전 천장 한가운데 보개(寶蓋) 속에 여의주를 희롱하며 승천하는 한 쌍의 발가락 일곱 개 달린 황룡 조각입니다.",
+                    pos: new THREE.Vector3(gx, gy, gz),
+                    rot: new THREE.Euler(0, angle, 0.2),
+                    scale: new THREE.Vector3(0.55, 0.38, 0.55),
+                    explodeVec: new THREE.Vector3(gx * 1.8, 9.5 + (d % 4) * 0.5, gz * 1.8),
+                    staggerStart: 0.32,
+                    staggerEnd: 0.68
+                });
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 9: 삼분변작 꽃살문, 교살창, 화방벽 (Floral Lattice Doors & Windows)
+             * ------------------------------------------------------------------------ */
+            const batchDoors = new ArchitecturalBatch('doors', boxGeo, mats.kkotsalmun, 9, 180);
+
+            // Lower Story Doors & Windows across all 4 sides (5 bays per side, 4 panels per bay)
+            for (let bay = 0; bay < 5; bay++) {
+                const startX = colX[bay];
+                const spanX = colX[bay + 1] - startX;
+                for (let leaf = 0; leaf < 4; leaf++) {
+                    const lx = startX + (leaf + 0.5) * (spanX / 4);
+                    // Front (South) & Back (North) Kkot-sal-mun doors
+                    [-7.2, 7.2].forEach(lz => {
+                        const zDir = Math.sign(lz);
+                        batchDoors.addPart({
+                            nameKo: "하층 삼분변작 솟을꽃살문 (花살門 4분합문)",
+                            nameEn: "Lower Story Floral Lattice Door Leaf (Kkot-sal-mun)",
+                            subDesc: "기둥 사이 칸마다 4짝씩 달린 정교한 꽃살문으로, 하부는 궁판, 상부는 솟을꽃살 격자로 제작되었습니다.",
+                            pos: new THREE.Vector3(lx, baseHallY + 3.05, lz),
+                            scale: new THREE.Vector3(spanX / 4 - 0.14, 4.1, 0.14),
+                            explodeVec: new THREE.Vector3(lx * 0.6, 0.5, zDir * 11.5),
+                            staggerStart: 0.38,
+                            staggerEnd: 0.74
+                        });
+                    });
+                }
+
+                // East & West Side Doors
+                const startZ = colZ[bay];
+                const spanZ = colZ[bay + 1] - startZ;
+                for (let leaf = 0; leaf < 3; leaf++) {
+                    const lz = startZ + (leaf + 0.5) * (spanZ / 3);
+                    [-10.0, 10.0].forEach(lx => {
+                        const xDir = Math.sign(lx);
+                        batchDoors.addPart({
+                            nameKo: "측면 교살창 및 삼분변작 창호 (交살窓)",
+                            nameEn: "Side Lattice Window & Door Panel",
+                            pos: new THREE.Vector3(lx, baseHallY + 3.05, lz),
+                            scale: new THREE.Vector3(0.14, 4.1, spanZ / 3 - 0.14),
+                            explodeVec: new THREE.Vector3(xDir * 11.5, 0.5, lz * 0.6),
+                            staggerStart: 0.38,
+                            staggerEnd: 0.74
+                        });
+                    });
+                }
+            }
+
+            // Upper Story Windows (상층 교살창)
+            for (let bay = 0; bay < 5; bay++) {
+                const midX = (upperX[bay] + upperX[bay + 1]) * 0.5;
+                [-4.8, 4.8].forEach(uz => {
+                    const zDir = Math.sign(uz);
+                    [-0.65, 0.65].forEach(offset => {
+                        batchDoors.addPart({
+                            nameKo: "상층 어칸·협칸 교살창 (上層 交살窓)",
+                            nameEn: "Upper Story Lattice Window Panel",
+                            pos: new THREE.Vector3(midX + offset, baseHallY + 7.9, uz),
+                            scale: new THREE.Vector3(1.15, 2.5, 0.14),
+                            explodeVec: new THREE.Vector3((midX + offset) * 0.65, 4.5, zDir * 9.5),
+                            staggerStart: 0.34,
+                            staggerEnd: 0.68
+                        });
+                    });
+                });
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 8: 창방, 평방, 상·중·하인방 수장재 (Architraves, Flat Plates & Tie Beams)
+             * ------------------------------------------------------------------------ */
+            const batchChangbang = new ArchitecturalBatch('changbang', boxGeo, mats.dancheongBeam, 8, 160);
+
+            // Lower Story Changbang & Pyeongbang (하층 창방·평방)
+            for (let bay = 0; bay < 5; bay++) {
+                const midX = (colX[bay] + colX[bay + 1]) * 0.5;
+                [-7.2, 7.2].forEach(cz => {
+                    // Changbang
+                    batchChangbang.addPart({
+                        nameKo: "하층 창방 (下層 昌)",
+                        nameEn: "Lower Story Column-Head Tie Beam (Changbang)",
+                        subDesc: "기둥 상부를 가로질러 기둥들을 일체화시키고 상부 평방과 공포를 받치는 핵심 수평 수장재입니다.",
+                        pos: new THREE.Vector3(midX, baseHallY + 5.4, cz),
+                        scale: new THREE.Vector3(3.85, 0.38, 0.46),
+                        explodeVec: new THREE.Vector3(midX * 0.55, 2.2, Math.sign(cz) * 8.2),
+                        staggerStart: 0.35,
+                        staggerEnd: 0.70
+                    });
+                    // Pyeongbang
+                    batchChangbang.addPart({
+                        nameKo: "하층 평방 (下層 平)",
+                        nameEn: "Lower Story Flat Bracket Plate (Pyeongbang)",
+                        subDesc: "창방 위에 놓여 기둥 사이에도 다포식 주간포(공포)를 배열할 수 있도록 해주는 넓적한 수평 부재입니다.",
+                        pos: new THREE.Vector3(midX, baseHallY + 5.75, cz),
+                        scale: new THREE.Vector3(3.95, 0.28, 0.62),
+                        explodeVec: new THREE.Vector3(midX * 0.6, 2.9, Math.sign(cz) * 8.8),
+                        staggerStart: 0.34,
+                        staggerEnd: 0.68
+                    });
+                });
+
+                const midZ = (colZ[bay] + colZ[bay + 1]) * 0.5;
+                [-10.0, 10.0].forEach(cx => {
+                    batchChangbang.addPart({
+                        nameKo: "하층 측면 창방 (側面 昌)",
+                        nameEn: "Lower Side Architrave Beam (Changbang)",
+                        pos: new THREE.Vector3(cx, baseHallY + 5.4, midZ),
+                        scale: new THREE.Vector3(0.46, 0.38, 2.8),
+                        explodeVec: new THREE.Vector3(Math.sign(cx) * 8.2, 2.2, midZ * 0.55),
+                        staggerStart: 0.35,
+                        staggerEnd: 0.70
+                    });
+                    batchChangbang.addPart({
+                        nameKo: "하층 측면 평방 (側面 平)",
+                        nameEn: "Lower Side Flat Bracket Plate (Pyeongbang)",
+                        pos: new THREE.Vector3(cx, baseHallY + 5.75, midZ),
+                        scale: new THREE.Vector3(0.62, 0.28, 2.9),
+                        explodeVec: new THREE.Vector3(Math.sign(cx) * 8.8, 2.9, midZ * 0.6),
+                        staggerStart: 0.34,
+                        staggerEnd: 0.68
+                    });
+                });
+            }
+
+            // Upper Story Changbang & Pyeongbang (상층 창방·평방)
+            for (let bay = 0; bay < 5; bay++) {
+                const midX = (upperX[bay] + upperX[bay + 1]) * 0.5;
+                [-4.8, 4.8].forEach(uz => {
+                    batchChangbang.addPart({
+                        nameKo: "상층 창방 및 평방 (上層 昌·平)",
+                        nameEn: "Upper Story Architrave & Flat Plate",
+                        pos: new THREE.Vector3(midX, baseHallY + 9.65, uz),
+                        scale: new THREE.Vector3(2.85, 0.52, 0.56),
+                        explodeVec: new THREE.Vector3(midX * 0.6, 5.8, Math.sign(uz) * 7.5),
+                        staggerStart: 0.30,
+                        staggerEnd: 0.64
+                    });
+                });
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 6 & 7: 상층 및 하층 다포계 공포군 (Multi-Bracket Gongpo Systems)
+             * (주두, 소로, 살미, 첨차로 분해되는 수백 개의 정교한 브래킷 부재!)
+             * ------------------------------------------------------------------------ */
+            const batchLowerGongpoRed = new ArchitecturalBatch('lower_gongpo_red', boxGeo, mats.gongpoRed, 7, 360);
+            const batchLowerGongpoGreen = new ArchitecturalBatch('lower_gongpo_green', boxGeo, mats.dancheongGreen, 7, 360);
+            const batchUpperGongpoRed = new ArchitecturalBatch('upper_gongpo_red', boxGeo, mats.gongpoRed, 6, 320);
+            const batchUpperGongpoGold = new ArchitecturalBatch('upper_gongpo_gold', boxGeo, mats.gongpoGold, 6, 320);
+
+            // Helper to spawn a multi-piece Dapo Gongpo cluster (주두 + 첨차 + 살미 + 소로)
+            const spawnGongpoCluster = (gx, gy, gz, normalX, normalZ, isUpper) => {
+                const layerStagger = isUpper ? [0.24, 0.58] : [0.28, 0.64];
+                const batchA = isUpper ? batchUpperGongpoRed : batchLowerGongpoRed;
+                const batchB = isUpper ? batchUpperGongpoGold : batchLowerGongpoGreen;
+                const tierLabel = isUpper ? "상층" : "하층";
+                const rotY = normalX !== 0 ? Math.PI / 2 : 0;
+
+                // 1. Judu (주두 - Capital Base Block)
+                batchA.addPart({
+                    nameKo: `${tierLabel} 다포 주두 (柱頭 - 공포 주춧목)`,
+                    nameEn: `${tierLabel} Gongpo Capital Block (Judu)`,
+                    subDesc: "공포의 가장 맨 아래에 놓여 상부 첨차와 살미의 모든 하중을 평방으로 전달하는 사각 주두 부재입니다.",
+                    pos: new THREE.Vector3(gx, gy, gz),
+                    rot: new THREE.Euler(0, rotY, 0),
+                    scale: new THREE.Vector3(0.54, 0.24, 0.54),
+                    explodeVec: new THREE.Vector3(normalX * 5.2 + gx * 0.25, isUpper ? 6.2 : 3.2, normalZ * 5.2 + gz * 0.25),
+                    staggerStart: layerStagger[0] + 0.04,
+                    staggerEnd: layerStagger[1]
+                });
+
+                // 2. Three stepped Chulmok Tiers of Salmi (살미) & Cheomcha (첨차) & Soro (소로)
+                for (let step = 1; step <= 3; step++) {
+                    const stepY = gy + step * 0.24;
+                    const stepOut = step * 0.34;
+                    // Salmi (살미 - Projecting bracket arm with carved cloud/lotus tip)
+                    batchB.addPart({
+                        nameKo: `${tierLabel} 다포 ${step}출목 살미 (山彌 - 제공)`,
+                        nameEn: `${tierLabel} Gongpo Projecting Bracket Arm (Salmi Tier ${step})`,
+                        subDesc: "벽면과 직각 방향으로 뻗어 나가 처마 도리와 장여를 받치는 살미 부재로, 끝단이 앙서(昂舌)와 운공 형태로 조각됩니다.",
+                        pos: new THREE.Vector3(gx + normalX * (stepOut * 0.35), stepY, gz + normalZ * (stepOut * 0.35)),
+                        rot: new THREE.Euler(0, rotY, 0),
+                        scale: new THREE.Vector3(0.20, 0.20, 0.85 + step * 0.42),
+                        explodeVec: new THREE.Vector3(
+                            normalX * (6.2 + step * 1.4) + gx * 0.25,
+                            (isUpper ? 6.8 : 3.6) + step * 0.65,
+                            normalZ * (6.2 + step * 1.4) + gz * 0.25
+                        ),
+                        staggerStart: layerStagger[0] + (3 - step) * 0.015,
+                        staggerEnd: layerStagger[1] - (step * 0.01)
+                    });
+
+                    // Cheomcha & Soro (첨차 및 소로 - Transverse bracket arm & small bearing blocks)
+                    batchA.addPart({
+                        nameKo: `${tierLabel} 다포 ${step}출목 첨차 및 소로 (檐遮·小)`,
+                        nameEn: `${tierLabel} Gongpo Transverse Bracket & Soro Block (Tier ${step})`,
+                        subDesc: "도리 방향으로 살미와 직교하며 결구되는 첨차(소첨차·대첨차)와 그 위에 놓이는 작은 받침목 소로(小)입니다.",
+                        pos: new THREE.Vector3(gx + normalX * (stepOut * 0.5), stepY + 0.08, gz + normalZ * (stepOut * 0.5)),
+                        rot: new THREE.Euler(0, rotY, 0),
+                        scale: new THREE.Vector3(0.75 + step * 0.32, 0.22, 0.20),
+                        explodeVec: new THREE.Vector3(
+                            normalX * (7.0 + step * 1.6) + gx * 0.3,
+                            (isUpper ? 7.2 : 4.0) + step * 0.75,
+                            normalZ * (7.0 + step * 1.6) + gz * 0.3
+                        ),
+                        staggerStart: layerStagger[0],
+                        staggerEnd: layerStagger[1] - 0.02
+                    });
+                }
+            };
+
+            // Populate Lower Story Dapo Gongpo around entire perimeter (64 clusters * 7 parts = 448 parts)
+            const lowerGongpoY = baseHallY + 6.0;
+            for (let gx = -10.0; gx <= 10.01; gx += 1.25) {
+                spawnGongpoCluster(gx, lowerGongpoY, 7.2, 0, 1, false);
+                spawnGongpoCluster(gx, lowerGongpoY, -7.2, 0, -1, false);
+            }
+            for (let gz = -6.0; gz <= 6.01; gz += 1.2) {
+                spawnGongpoCluster(10.0, lowerGongpoY, gz, 1, 0, false);
+                spawnGongpoCluster(-10.0, lowerGongpoY, gz, -1, 0, false);
+            }
+
+            // Populate Upper Story Dapo Gongpo around entire perimeter (48 clusters * 7 parts = 336 parts)
+            const upperGongpoY = baseHallY + 10.05;
+            for (let gx = -7.2; gx <= 7.21; gx += 1.2) {
+                spawnGongpoCluster(gx, upperGongpoY, 4.8, 0, 1, true);
+                spawnGongpoCluster(gx, upperGongpoY, -4.8, 0, -1, true);
+            }
+            for (let gz = -3.6; gz <= 3.61; gz += 1.2) {
+                spawnGongpoCluster(7.2, upperGongpoY, gz, 1, 0, true);
+                spawnGongpoCluster(-7.2, upperGongpoY, gz, -1, 0, true);
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 5: 대들보, 종보, 충량, 주심도리, 중도리, 종도리, 대공 (Roof Timber Trusses)
+             * ------------------------------------------------------------------------ */
+            const batchTrusses = new ArchitecturalBatch('trusses', boxGeo, mats.dancheongBeam, 5, 220);
+
+            // Transverse Main Beams (대들보 & 중층 대들보 & 종보)
+            upperX.forEach((bx, ix) => {
+                // Lower-to-inner tie beams (퇴보 / 귓보)
+                [-6.0, 6.0].forEach(bz => {
+                    batchTrusses.addPart({
+                        nameKo: "하층 툇보 및 충량 (退樑·衝樑)",
+                        nameEn: "Lower Perimeter Tie Beam (Toetbo)",
+                        subDesc: "외진 기둥과 내진 고주를 연결하여 하층 지붕의 서까래 하중을 지지하는 툇보 부재입니다.",
+                        pos: new THREE.Vector3(bx, baseHallY + 6.45, bz),
+                        scale: new THREE.Vector3(0.62, 0.58, 2.8),
+                        explodeVec: new THREE.Vector3(bx * 0.5, 5.2, Math.sign(bz) * 6.5),
+                        staggerStart: 0.25,
+                        staggerEnd: 0.58
+                    });
+                });
+
+                // Upper Main Beam (대들보)
+                batchTrusses.addPart({
+                    nameKo: "상층 대들보 (大樑 - 금강송 대경목)",
+                    nameEn: "Main Transverse Timber Beam (Daedeulbo)",
+                    subDesc: "전후 기둥 열을 가로질러 상부 지붕 가구의 무게를 떠받치는 가장 굵고 핵심적인 수평 보 부재입니다.",
+                    pos: new THREE.Vector3(bx, baseHallY + 10.65, 0),
+                    scale: new THREE.Vector3(0.75, 0.72, 10.2),
+                    explodeVec: new THREE.Vector3(bx * 0.55, 8.2, 0),
+                    staggerStart: 0.22,
+                    staggerEnd: 0.54
+                });
+
+                // Upper Jongbo (종보)
+                batchTrusses.addPart({
+                    nameKo: "상부 종보 (宗樑 - 마루보)",
+                    nameEn: "Upper Ridge Support Beam (Jongbo)",
+                    subDesc: "대들보 위 동자주 위에 걸려 최상단 종도리와 파련대공을 받치는 최상층 보 부재입니다.",
+                    pos: new THREE.Vector3(bx, baseHallY + 12.15, 0),
+                    scale: new THREE.Vector3(0.62, 0.55, 5.6),
+                    explodeVec: new THREE.Vector3(bx * 0.6, 10.2, 0),
+                    staggerStart: 0.20,
+                    staggerEnd: 0.50
+                });
+
+                // Paryeon-daegong (파련대공 - Carved Strut supporting ridge purlin)
+                batchTrusses.addPart({
+                    nameKo: "종도리 받침 파련대공 (波蓮臺工)",
+                    nameEn: "Carved Ridge Strut Support (Daegong)",
+                    subDesc: "종보 중앙 위에서 최상단 마루도리(종도리)를 떠받치는 화초·당초문 조각 대공 부재입니다.",
+                    pos: new THREE.Vector3(bx, baseHallY + 13.0, 0),
+                    scale: new THREE.Vector3(0.52, 1.15, 0.52),
+                    explodeVec: new THREE.Vector3(bx * 0.65, 11.5, 0),
+                    staggerStart: 0.18,
+                    staggerEnd: 0.48
+                });
+            });
+
+            // Longitudinal Purlins (외목도리, 주심도리, 중도리, 종도리 & 장여)
+            const purlinConfigs = [
+                { y: baseHallY + 6.75, z: 8.1, w: 22.8, name: "하층 외목도리 및 장여 (下層 外目道里)" },
+                { y: baseHallY + 6.75, z: -8.1, w: 22.8, name: "하층 북측 외목도리 및 장여" },
+                { y: baseHallY + 10.85, z: 5.7, w: 17.2, name: "상층 외목도리 (上層 外目道里)" },
+                { y: baseHallY + 10.85, z: -5.7, w: 17.2, name: "상층 북측 외목도리" },
+                { y: baseHallY + 11.45, z: 4.8, w: 16.2, name: "상층 주심도리 (上層 柱心道里)" },
+                { y: baseHallY + 11.45, z: -4.8, w: 16.2, name: "상층 북측 주심도리" },
+                { y: baseHallY + 12.55, z: 2.6, w: 15.0, name: "상층 중도리 (上層 中道里)" },
+                { y: baseHallY + 12.55, z: -2.6, w: 15.0, name: "상층 북측 중도리" },
+                { y: baseHallY + 13.65, z: 0.0, w: 14.2, name: "최상단 종도리 및 마루장여 (宗道里)" }
+            ];
+            purlinConfigs.forEach(p => {
+                // Segment each purlin into 5 bay lengths for high part granularity
+                for (let s = -2; s <= 2; s++) {
+                    const segW = p.w / 5;
+                    const sx = s * segW;
+                    batchTrusses.addPart({
+                        nameKo: p.name,
+                        nameEn: "Longitudinal Roof Purlin & Jangyeo Beam (Dori)",
+                        subDesc: "보와 직교하여 서까래(연목)의 상·하단을 직접 받쳐주는 수평 도리와 장여 부재입니다.",
+                        pos: new THREE.Vector3(sx, p.y, p.z),
+                        scale: new THREE.Vector3(segW - 0.08, 0.42, 0.42),
+                        explodeVec: new THREE.Vector3(sx * 0.45, 9.2 + (p.y - baseHallY) * 0.35, p.z * 0.65),
+                        staggerStart: 0.21,
+                        staggerEnd: 0.52
+                    });
+                }
+            });
+
+            /* ------------------------------------------------------------------------
+             * LAYER 4: 상·하층 서까래(연목), 부연(초매기), 추녀, 선자연 (Rafters & Flying Rafters)
+             * (580+ radially arranged rafters across both tiers!)
+             * ------------------------------------------------------------------------ */
+            const batchRafters = new ArchitecturalBatch('rafters', cylGeo, mats.rafterWood, 4, 420);
+            const batchBuyeon = new ArchitecturalBatch('buyeon', boxGeo, mats.buyeonTip, 4, 420);
+
+            // Helper to generate Seokgarae + Buyeon along eaves
+            const buildRafterTier = (halfW, halfD, baseY, dropY, eaveOut, spacing, tierLabel, yExplodeBase) => {
+                // Front & Back Rafters
+                for (let x = -halfW; x <= halfW + 0.01; x += spacing) {
+                    [-1, 1].forEach(zSign => {
+                        const zMid = zSign * (halfD + eaveOut * 0.35);
+                        const tilt = zSign * 0.46;
+                        // Main Rafter (연목 / 서까래)
+                        batchRafters.addPart({
+                            nameKo: `${tierLabel} 원형 연목·서까래 (椽木)`,
+                            nameEn: `${tierLabel} Main Cylindrical Rafter (Seokgarae)`,
+                            subDesc: "도리 위에 걸쳐져 지붕의 기본 경사면과 처마 돌출을 만드는 원형 단면의 긴 서까래 부재입니다.",
+                            pos: new THREE.Vector3(x, baseY, zMid),
+                            rot: new THREE.Euler(tilt + Math.PI / 2, 0, 0),
+                            scale: new THREE.Vector3(0.22, eaveOut * 1.25, 0.22),
+                            explodeVec: new THREE.Vector3(x * 0.35, yExplodeBase, zSign * 8.5),
+                            staggerStart: 0.16,
+                            staggerEnd: 0.48
+                        });
+
+                        // Flying Rafter (각형 부연 - 겹처마)
+                        const zTip = zSign * (halfD + eaveOut * 0.92);
+                        batchBuyeon.addPart({
+                            nameKo: `${tierLabel} 각형 부연·마구리 단청 (附椽)`,
+                            nameEn: `${tierLabel} Square Flying Rafter (Buyeon)`,
+                            subDesc: "서까래 끝단 위에 덧대어 처마를 한 번 더 길게 빼내고 하늘로 경쾌하게 들려 올리는 겹처마 부연입니다.",
+                            pos: new THREE.Vector3(x, baseY - dropY, zTip),
+                            rot: new THREE.Euler(zSign * 0.26, 0, 0),
+                            scale: new THREE.Vector3(0.18, 0.18, 1.45),
+                            explodeVec: new THREE.Vector3(x * 0.42, yExplodeBase + 1.2, zSign * 11.2),
+                            staggerStart: 0.14,
+                            staggerEnd: 0.44
+                        });
+                    });
+                }
+
+                // Left & Right Rafters
+                for (let z = -halfD; z <= halfD + 0.01; z += spacing) {
+                    [-1, 1].forEach(xSign => {
+                        const xMid = xSign * (halfW + eaveOut * 0.35);
+                        const tilt = -xSign * 0.46;
+                        batchRafters.addPart({
+                            nameKo: `${tierLabel} 측면 연목·서까래 (側面 椽木)`,
+                            nameEn: `${tierLabel} Side Cylindrical Rafter`,
+                            pos: new THREE.Vector3(xMid, baseY, z),
+                            rot: new THREE.Euler(0, 0, tilt + Math.PI / 2),
+                            scale: new THREE.Vector3(0.22, eaveOut * 1.25, 0.22),
+                            explodeVec: new THREE.Vector3(xSign * 8.5, yExplodeBase, z * 0.35),
+                            staggerStart: 0.16,
+                            staggerEnd: 0.48
+                        });
+
+                        const xTip = xSign * (halfW + eaveOut * 0.92);
+                        batchBuyeon.addPart({
+                            nameKo: `${tierLabel} 측면 부연 (側面 附椽)`,
+                            nameEn: `${tierLabel} Side Square Flying Rafter`,
+                            pos: new THREE.Vector3(xTip, baseY - dropY, z),
+                            rot: new THREE.Euler(0, 0, -xSign * 0.26),
+                            scale: new THREE.Vector3(1.45, 0.18, 0.18),
+                            explodeVec: new THREE.Vector3(xSign * 11.2, yExplodeBase + 1.2, z * 0.42),
+                            staggerStart: 0.14,
+                            staggerEnd: 0.44
+                        });
+                    });
+                }
+
+                // 4 Corners: Chunyeo (추녀), Sarae (사래) & Fan-shaped Seonjayeon (선자연 8가닥씩)
+                [-1, 1].forEach(cxSign => {
+                    [-1, 1].forEach(czSign => {
+                        for (let f = 0; f < 7; f++) {
+                            const fanAngle = (f / 6) * (Math.PI / 2);
+                            const dirX = cxSign * Math.cos(fanAngle);
+                            const dirZ = czSign * Math.sin(fanAngle);
+                            const cornerX = cxSign * halfW + dirX * (eaveOut * 0.75);
+                            const cornerZ = czSign * halfD + dirZ * (eaveOut * 0.75);
+                            const yaw = Math.atan2(dirX, dirZ);
+
+                            batchBuyeon.addPart({
+                                nameKo: f === 3 ? `${tierLabel} 모서리 추녀 및 사래 (隅木·사래)` : `${tierLabel} 부채꼴 선자연 (扇子椽 ${f + 1}번)`,
+                                nameEn: f === 3 ? `${tierLabel} Corner Hip Rafter (Chunyeo & Sarae)` : `${tierLabel} Radial Fan Rafter (Seonjayeon)`,
+                                subDesc: "팔작지붕 네 귀퉁이 추녀 옆에서 부채살처럼 방사형으로 펼쳐지며 한국 건축 특유의 버선코 처마 곡선을 완성하는 선자연입니다.",
+                                pos: new THREE.Vector3(cornerX, baseY + 0.18, cornerZ),
+                                rot: new THREE.Euler(0.32, yaw, 0),
+                                scale: new THREE.Vector3(f === 3 ? 0.34 : 0.20, f === 3 ? 0.34 : 0.20, eaveOut * 1.45),
+                                explodeVec: new THREE.Vector3(dirX * 12.5, yExplodeBase + 2.0, dirZ * 12.5),
+                                staggerStart: 0.13,
+                                staggerEnd: 0.43
+                            });
+                        }
+                    });
+                });
+            };
+
+            // Lower & Upper Rafter Assemblies
+            buildRafterTier(10.2, 7.2, baseHallY + 6.5, 0.45, 2.8, 0.58, "하층", 6.5);
+            buildRafterTier(7.6, 4.8, baseHallY + 11.2, 0.42, 3.2, 0.55, "상층", 10.5);
+
+            /* ------------------------------------------------------------------------
+             * LAYER 3: 개판(지붕널), 평고대, 착고판 (Roof Boarding & Eave Curve Battens)
+             * ------------------------------------------------------------------------ */
+            const batchBoarding = new ArchitecturalBatch('boarding', boxGeo, mats.roofBoarding, 3, 140);
+
+            // Lower Roof Boarding Segments
+            for (let ix = -5; ix <= 5; ix++) {
+                [-8.4, 8.4].forEach(zPos => {
+                    const zSign = Math.sign(zPos);
+                    batchBoarding.addPart({
+                        nameKo: "하층 개판 및 평고대·초매기 (下層 蓋板·平高臺)",
+                        nameEn: "Lower Roof Decking Board & Eave Batten",
+                        subDesc: "서까래 상면을 덮어 보토(흙)와 기와를 받치는 개판(지붕널)과 처마 끝 곡선을 잡아주는 평고대입니다.",
+                        pos: new THREE.Vector3(ix * 2.05, baseHallY + 6.75, zPos),
+                        rot: new THREE.Euler(zSign * 0.38, 0, 0),
+                        scale: new THREE.Vector3(1.98, 0.12, 2.8),
+                        explodeVec: new THREE.Vector3(ix * 0.7, 7.8, zSign * 9.2),
+                        staggerStart: 0.12,
+                        staggerEnd: 0.40
+                    });
+                });
+            }
+            // Upper Roof Boarding Segments
+            for (let ix = -4; ix <= 4; ix++) {
+                for (let iz = -2; iz <= 2; iz++) {
+                    if (iz === 0) continue;
+                    const zSign = Math.sign(iz);
+                    const zPos = iz * 2.55;
+                    const yPos = baseHallY + 13.7 - Math.abs(iz) * 1.15;
+                    batchBoarding.addPart({
+                        nameKo: "상층 지붕 개판 및 적심목 (上層 蓋板·積心)",
+                        nameEn: "Upper Roof Decking & Cushion Timber (Jeoksim)",
+                        subDesc: "팔작지붕의 오목한 현수선 곡면을 형성하기 위해 서까래 위에 얹는 개판과 통나무 적심 구조입니다.",
+                        pos: new THREE.Vector3(ix * 2.0, yPos, zPos),
+                        rot: new THREE.Euler(zSign * 0.42, 0, 0),
+                        scale: new THREE.Vector3(1.92, 0.14, 2.35),
+                        explodeVec: new THREE.Vector3(ix * 0.75, 12.2 + (3 - Math.abs(iz)) * 0.8, zSign * 6.5),
+                        staggerStart: 0.11,
+                        staggerEnd: 0.38
+                    });
+                }
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 1 & 2: 상층 및 하층 본기와 (암키와·수키와·수막새·암막새)
+             * (1,100+ Individual Roof Tiles arranged in authentic Paljak curves!)
+             * ------------------------------------------------------------------------ */
+            const batchUpperTiles = new ArchitecturalBatch('upper_tiles', sukiwaGeo, mats.giwaTile, 1, 680);
+            const batchLowerTiles = new ArchitecturalBatch('lower_tiles', sukiwaGeo, mats.giwaMaksae, 2, 560);
+
+            // 1. Upper Roof Tiles (상층 팔작지붕 암·수키와 골 & 막새 - Layer 1)
+            const upperCols = 32;
+            const upperRows = 8;
+            for (let c = 0; c < upperCols; c++) {
+                const u = (c / (upperCols - 1)) * 2 - 1; // -1 to 1
+                const tx = u * 9.8;
+                // Anheorim & Angok curve at corners (안허리곡·앙곡)
+                const cornerLift = Math.pow(Math.abs(u), 2.6) * 0.68;
+
+                for (let r = 0; r < upperRows; r++) {
+                    const v = (r + 0.5) / upperRows; // 0 (ridge) to 1 (eave)
+                    // Paljak hip slope narrowing near top
+                    const maxSpanAtV = 6.8 + v * 3.4;
+                    if (Math.abs(tx) > maxSpanAtV) continue;
+
+                    // Authentic Korean concave catenary roof curve
+                    const ty = baseHallY + 13.95 - (v * 2.85) + Math.pow(1 - v, 2.2) * 0.45 + v * cornerLift;
+                    const tzMag = 0.35 + v * 7.45;
+                    const pitch = 0.54 - v * 0.24;
+
+                    [-1, 1].forEach(zSign => {
+                        const isEaveMaksae = (r === upperRows - 1);
+                        batchUpperTiles.addPart({
+                            nameKo: isEaveMaksae ? "상층 처마 끝 용문 수막새·암막새 (瓦當)" : `상층 팔작지붕 본기와 (${c + 1}열 ${r + 1}단 수키와·암키와)`,
+                            nameEn: isEaveMaksae ? "Upper Roof Eave End Tile (Sumaksae)" : "Upper Paljak Roof Tile (Giwa)",
+                            subDesc: isEaveMaksae
+                                ? "처마 끝 기와골을 마감하며 빗물의 침투를 막고 용문·연화문 문양으로 권위를 드러내는 막새기와입니다."
+                                : "팔작지붕 상층부를 빈틈없이 덮어 우수를 배출하고 아름다운 지붕 현수선을 완성하는 전통 한와(암키와·수키와)입니다.",
+                            pos: new THREE.Vector3(tx, ty, zSign * tzMag),
+                            rot: new THREE.Euler(zSign * pitch, 0, 0),
+                            scale: new THREE.Vector3(1.15, 1.15, 1.05),
+                            explodeVec: new THREE.Vector3(
+                                tx * (0.45 + v * 0.35),
+                                13.5 + (1 - v) * 5.2 + Math.abs(u) * 1.4,
+                                zSign * (4.0 + v * 7.8)
+                            ),
+                            staggerStart: 0.03 + v * 0.06,
+                            staggerEnd: 0.28 + v * 0.06
+                        });
+                    });
+                }
+            }
+
+            // Upper Left & Right Hip Slope Tiles (상층 좌우 추녀·합각 하단 기와)
+            for (let sRow = 2; sRow < upperRows; sRow++) {
+                const v = (sRow + 0.5) / upperRows;
+                const xPosMag = 6.6 + v * 3.4;
+                const ty = baseHallY + 13.85 - (v * 2.8) + v * 0.45;
+                const zSpan = v * 7.2;
+                for (let sz = -zSpan; sz <= zSpan + 0.01; sz += 0.85) {
+                    [-1, 1].forEach(xSign => {
+                        batchUpperTiles.addPart({
+                            nameKo: "상층 측면 추녀 경사면 본기와 (側面 韓瓦)",
+                            nameEn: "Upper Hip Slope Roof Tile",
+                            pos: new THREE.Vector3(xSign * xPosMag, ty, sz),
+                            rot: new THREE.Euler(0, Math.PI / 2, -xSign * (0.48 - v * 0.2)),
+                            scale: new THREE.Vector3(1.1, 1.1, 0.95),
+                            explodeVec: new THREE.Vector3(xSign * (6.5 + v * 6.5), 13.8 + (1 - v) * 4.5, sz * 0.65),
+                            staggerStart: 0.04,
+                            staggerEnd: 0.31
+                        });
+                    });
+                }
+            }
+
+            // 2. Lower Tier Roof Tiles (하층 처마 지붕 암·수키와 & 막새 - Layer 2)
+            const lowerCols = 38;
+            const lowerRows = 5;
+            for (let c = 0; c < lowerCols; c++) {
+                const u = (c / (lowerCols - 1)) * 2 - 1;
+                const tx = u * 12.6;
+                const cornerLift = Math.pow(Math.abs(u), 2.6) * 0.58;
+
+                for (let r = 0; r < lowerRows; r++) {
+                    const v = (r + 0.5) / lowerRows;
+                    const ty = baseHallY + 7.85 - (v * 1.55) + v * cornerLift;
+                    const tzMag = 7.2 + v * 3.1;
+                    const pitch = 0.44 - v * 0.18;
+
+                    [-1, 1].forEach(zSign => {
+                        const isEave = (r === lowerRows - 1);
+                        batchLowerTiles.addPart({
+                            nameKo: isEave ? "하층 처마 수막새·암막새 (下層 瓦當)" : `하층 지붕 본기와 (${c + 1}열 ${r + 1}단)`,
+                            nameEn: isEave ? "Lower Eave End Tile (Maksae)" : "Lower Tier Roof Tile (Giwa)",
+                            subDesc: "1층과 2층 사이 중층 치마지붕(하층 처마)을 형성하는 기와 및 막새 부재입니다.",
+                            pos: new THREE.Vector3(tx, ty, zSign * tzMag),
+                            rot: new THREE.Euler(zSign * pitch, 0, 0),
+                            scale: new THREE.Vector3(1.15, 1.15, 0.72),
+                            explodeVec: new THREE.Vector3(
+                                tx * 0.55,
+                                8.2 + (1 - v) * 2.5,
+                                zSign * (7.5 + v * 6.2)
+                            ),
+                            staggerStart: 0.07 + v * 0.05,
+                            staggerEnd: 0.34 + v * 0.05
+                        });
+                    });
+                }
+            }
+
+            // Lower Left & Right Side Eave Tiles (하층 좌우 측면 기와)
+            for (let c = 0; c < 24; c++) {
+                const u = (c / 23) * 2 - 1;
+                const tz = u * 9.6;
+                const cornerLift = Math.pow(Math.abs(u), 2.5) * 0.48;
+                for (let r = 0; r < 4; r++) {
+                    const v = (r + 0.5) / 4;
+                    const ty = baseHallY + 7.75 - (v * 1.45) + v * cornerLift;
+                    const txMag = 9.8 + v * 2.9;
+                    [-1, 1].forEach(xSign => {
+                        batchLowerTiles.addPart({
+                            nameKo: "하층 측면 처마 본기와 및 막새",
+                            nameEn: "Lower Side Eave Roof Tile",
+                            pos: new THREE.Vector3(xSign * txMag, ty, tz),
+                            rot: new THREE.Euler(0, Math.PI / 2, -xSign * (0.42 - v * 0.16)),
+                            scale: new THREE.Vector3(1.1, 1.1, 0.78),
+                            explodeVec: new THREE.Vector3(xSign * (8.5 + v * 6.0), 8.2 + (1 - v) * 2.2, tz * 0.55),
+                            staggerStart: 0.08,
+                            staggerEnd: 0.36
+                        });
+                    });
+                }
+            }
+
+            /* ------------------------------------------------------------------------
+             * LAYER 0: 용마루, 내림마루, 추녀마루, 취두, 용두, 7종 잡상 (Roof Ridges & Japsang)
+             * ------------------------------------------------------------------------ */
+            const batchRidge = new ArchitecturalBatch('ridge', boxGeo, mats.ridgeLime, 0, 120);
+            const batchJapsang = new ArchitecturalBatch('japsang', sphereGeo, mats.gongpoGold, 0, 80);
+
+            // 1. Yongmaru Main Ridge Segments (용마루 양성바름 & 착고·부고 기와 24단)
+            const ridgeY = baseHallY + 14.38;
+            for (let i = -11; i <= 11; i++) {
+                const rx = i * 0.58;
+                const lift = Math.pow(Math.abs(i / 11), 2.2) * 0.35;
+                batchRidge.addPart({
+                    nameKo: `최상단 용마루 양성바름 및 적새 (${i + 12}구간)`,
+                    nameEn: "Main Roof Ridge (Yongmaru Lime Plaster & Tiles)",
+                    subDesc: "지붕 가장 높은 마루를 따라 암키와·수키와를 쌓고 백회(양성바름)로 마감하여 왕실 정전의 위엄을 상징하는 용마루입니다.",
+                    pos: new THREE.Vector3(rx, ridgeY + lift, 0),
+                    scale: new THREE.Vector3(0.56, 0.58, 0.52),
+                    explodeVec: new THREE.Vector3(rx * 0.65, 20.5 + Math.abs(i) * 0.25, 0),
+                    staggerStart: 0.00,
+                    staggerEnd: 0.20
+                });
+            }
+
+            // 2. Chwidu (취두 - Twin Dragon-Head Ridge Finials at East & West ends of Yongmaru)
+            [-6.8, 6.8].forEach(cx => {
+                const xSign = Math.sign(cx);
+                batchJapsang.addPart({
+                    nameKo: "용마루 양단 취두 (鷲頭 - 용머리 장식기와)",
+                    nameEn: "Chwidu Dragon-Head Main Ridge Finial",
+                    subDesc: "용마루 양 끝단에 설치되는 대형 용머리 형상의 장식기와로 화재와 벽사(辟邪)를 기원하는 상징물입니다.",
+                    pos: new THREE.Vector3(cx, ridgeY + 0.68, 0),
+                    scale: new THREE.Vector3(0.75, 1.25, 0.72),
+                    explodeVec: new THREE.Vector3(xSign * 14.5, 23.0, 0),
+                    staggerStart: 0.00,
+                    staggerEnd: 0.18
+                });
+            });
+
+            // 3. Upper & Lower Chunyeomaru (추녀마루) + Yongdu (용두) + 7 Japsang (잡상 7종: 대당사부·손행자·저팔계 등)
+            const japsangNames = [
+                "제1잡상 대당사부(삼장법사)",
+                "제2잡상 손행자(손오공)",
+                "제3잡상 저팔계",
+                "제4잡상 사화상(사오정)",
+                "제5잡상 이귀박",
+                "제6잡상 이구룡",
+                "제7잡상 마화상·천산갑",
+                "추녀마루 끝 용두(龍頭) 및 토수"
+            ];
+
+            [-1, 1].forEach(xSign => {
+                [-1, 1].forEach(zSign => {
+                    // Upper Roof Hip Ridge & 8 Japsang figures per corner
+                    for (let j = 0; j < 8; j++) {
+                        const t = (j + 1) / 8;
+                        const hx = xSign * (6.6 + t * 3.8);
+                        const hz = zSign * (0.2 + t * 7.6);
+                        const hy = baseHallY + 14.15 - t * 2.35 + Math.pow(t, 2.2) * 0.62;
+                        const yaw = Math.atan2(xSign * 3.8, zSign * 7.6);
+
+                        // Hip Ridge segment (추녀마루)
+                        batchRidge.addPart({
+                            nameKo: "상층 팔작지붕 추녀마루·내림마루 (隅棟)",
+                            nameEn: "Upper Hip & Gable Roof Ridge (Chunyeomaru)",
+                            pos: new THREE.Vector3(hx, hy - 0.18, hz),
+                            rot: new THREE.Euler(0.35, yaw, 0),
+                            scale: new THREE.Vector3(0.38, 0.36, 1.05),
+                            explodeVec: new THREE.Vector3(xSign * (8.0 + t * 7.5), 18.5 + (1 - t) * 2.5, zSign * (4.0 + t * 8.5)),
+                            staggerStart: 0.01,
+                            staggerEnd: 0.21
+                        });
+
+                        // Japsang Guardian Figure (잡상 & 용두)
+                        batchJapsang.addPart({
+                            nameKo: `상층 추녀마루 ${japsangNames[j]} (雜像)`,
+                            nameEn: `Roof Ridge Guardian Figure (${japsangNames[j]})`,
+                            subDesc: "『서유기』의 등장인물과 신수(神獸)를 형상화하여 궁궐 추녀마루 위에 일렬로 세운 벽사 장식기와(잡상)입니다.",
+                            pos: new THREE.Vector3(hx, hy + 0.22, hz),
+                            scale: new THREE.Vector3(0.32, 0.48, 0.32),
+                            explodeVec: new THREE.Vector3(xSign * (10.0 + t * 9.0), 21.0 + (8 - j) * 0.4, zSign * (6.0 + t * 10.0)),
+                            staggerStart: 0.00,
+                            staggerEnd: 0.19
+                        });
+                    }
+
+                    // Lower Roof Hip Ridge & 5 Japsang figures per corner
+                    for (let j = 0; j < 5; j++) {
+                        const t = (j + 1) / 5;
+                        const hx = xSign * (9.8 + t * 3.2);
+                        const hz = zSign * (7.0 + t * 3.3);
+                        const hy = baseHallY + 7.95 - t * 1.15 + Math.pow(t, 2.0) * 0.42;
+
+                        batchRidge.addPart({
+                            nameKo: "하층 추녀마루 양성바름",
+                            nameEn: "Lower Tier Hip Ridge Segment",
+                            pos: new THREE.Vector3(hx, hy - 0.15, hz),
+                            scale: new THREE.Vector3(0.36, 0.32, 0.85),
+                            explodeVec: new THREE.Vector3(xSign * (11.0 + t * 6.5), 10.5, zSign * (9.0 + t * 6.5)),
+                            staggerStart: 0.05,
+                            staggerEnd: 0.26
+                        });
+
+                        batchJapsang.addPart({
+                            nameKo: `하층 추녀마루 잡상 (${japsangNames[j]})`,
+                            nameEn: "Lower Tier Guardian Japsang Figure",
+                            pos: new THREE.Vector3(hx, hy + 0.20, hz),
+                            scale: new THREE.Vector3(0.28, 0.42, 0.28),
+                            explodeVec: new THREE.Vector3(xSign * (12.5 + t * 7.5), 12.0 + (5 - j) * 0.3, zSign * (10.5 + t * 7.5)),
+                            staggerStart: 0.04,
+                            staggerEnd: 0.24
+                        });
+                    }
+                });
+            });
+
+            // Finalize all batches and add to Three.js scene
+            const allBatches = [
+                batchWoldaeStone, batchBalustrade, batchDapdo,
+                batchChoseok, batchPillars,
+                batchThroneGold, batchThroneRed, batchScreen,
+                batchDoors, batchChangbang,
+                batchLowerGongpoRed, batchLowerGongpoGreen,
+                batchUpperGongpoRed, batchUpperGongpoGold,
+                batchTrusses, batchRafters, batchBuyeon,
+                batchBoarding, batchUpperTiles, batchLowerTiles,
+                batchRidge, batchJapsang
+            ];
+            allBatches.forEach(b => b.finalize(scene));
+
+            // Update Total Parts Counter in HUD
+            document.getElementById('hud-total-parts').textContent = allParts.length.toLocaleString();
+            document.getElementById('hud-active-parts').textContent = allParts.length.toLocaleString();
+        }
+
+        /* ============================================================================
+         * 6. MOTION GRAPHICS TRAJECTORY LINES & 3D CALLOUT PINS
+         * ============================================================================ */
+        const CALLOUT_PIN_DEFS = [
+            { layerId: 0, code: "01", title: "용마루·취두·7잡상", sub: "Chwidu & Japsang", anchorPos: new THREE.Vector3(6.8, 17.5, 0), explodeVec: new THREE.Vector3(11.5, 21.5, 0) },
+            { layerId: 1, code: "02", title: "상층 팔작 한와·막새", sub: "Upper Paljak Giwa", anchorPos: new THREE.Vector3(0, 15.2, 5.2), explodeVec: new THREE.Vector3(0, 15.5, 9.0) },
+            { layerId: 4, code: "05", title: "겹처마 서까래·부연·선자연", sub: "Rafters & Seonjayeon", anchorPos: new THREE.Vector3(-8.8, 13.5, 6.2), explodeVec: new THREE.Vector3(-10.5, 11.5, 10.5) },
+            { layerId: 5, code: "06", title: "대들보·종보·마루도리", sub: "Main Timber Trusses", anchorPos: new THREE.Vector3(0, 13.6, 0), explodeVec: new THREE.Vector3(0, 9.8, 0) },
+            { layerId: 6, code: "07", title: "상·하층 다포계 공포군", sub: "Multi-Bracket Gongpo", anchorPos: new THREE.Vector3(7.2, 12.6, 4.8), explodeVec: new THREE.Vector3(6.5, 7.2, 8.2) },
+            { layerId: 9, code: "10", title: "삼분변작 솟을꽃살문", sub: "Kkot-sal-mun Lattice", anchorPos: new THREE.Vector3(-4.0, 5.8, 7.2), explodeVec: new THREE.Vector3(-2.5, 0.5, 11.5) },
+            { layerId: 10, code: "11", title: "어좌·일월오봉도·보개황룡", sub: "Royal Throne & Screen", anchorPos: new THREE.Vector3(0, 6.2, -1.8), explodeVec: new THREE.Vector3(0, 3.8, -2.5) },
+            { layerId: 11, code: "12", title: "외진 평주·우주·내진 고주", sub: " Goju & Uju Pillars", anchorPos: new THREE.Vector3(10.0, 6.0, 7.2), explodeVec: new THREE.Vector3(8.5, 1.0, 6.2) },
+            { layerId: 13, code: "14", title: "상·하월대·봉황답도·돌난간", sub: "Woldae & Phoenix Dapdo", anchorPos: new THREE.Vector3(0, 1.8, 12.8), explodeVec: new THREE.Vector3(0, -3.5, 14.5) }
+        ];
+        const calloutDomElements = [];
+
+        function createTrajectoryAndCallouts(scene) {
+            // 1. Sampled Trajectory Vector Lines (분해 궤적 가이드라인)
+            const sampledParts = [];
+            for (let i = 0; i < allParts.length; i += 8) {
+                sampledParts.push(allParts[i]);
+            }
+            const linePositions = new Float32Array(sampledParts.length * 6);
+            const lineColors = new Float32Array(sampledParts.length * 6);
+            const cStart = new THREE.Color(0xe6b84c);
+            const cEnd = new THREE.Color(0x38bdf8);
+
+            for (let i = 0; i < sampledParts.length; i++) {
+                lineColors[i * 6 + 0] = cStart.r;
+                lineColors[i * 6 + 1] = cStart.g;
+                lineColors[i * 6 + 2] = cStart.b;
+                lineColors[i * 6 + 3] = cEnd.r;
+                lineColors[i * 6 + 4] = cEnd.g;
+                lineColors[i * 6 + 5] = cEnd.b;
+            }
+
+            const lineGeo = new THREE.BufferGeometry();
+            lineGeo.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+            lineGeo.setAttribute('color', new THREE.BufferAttribute(lineColors, 3));
+            const lineMat = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.28
+            });
+            trajectoryLinesMesh = new THREE.LineSegments(lineGeo, lineMat);
+            trajectoryLinesMesh.userData.sampledParts = sampledParts;
+            scene.add(trajectoryLinesMesh);
+
+            // 2. Highlight Wireframe Box & Selected Part Trajectory Line
+            const hlGeo = new THREE.BoxGeometry(1.04, 1.04, 1.04);
+            const hlEdges = new THREE.EdgesGeometry(hlGeo);
+            highlightBoxMesh = new THREE.LineSegments(
+                hlEdges,
+                new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 })
+            );
+            highlightBoxMesh.visible = false;
+            scene.add(highlightBoxMesh);
+
+            const selLineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+            selectedTrajectoryLine = new THREE.Line(
+                selLineGeo,
+                new THREE.LineBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.9 })
+            );
+            selectedTrajectoryLine.visible = false;
+            scene.add(selectedTrajectoryLine);
+
+            // 3. Create Floating HTML Callout Pins
+            const container = document.getElementById('callouts-container');
+            container.innerHTML = '';
+            CALLOUT_PIN_DEFS.forEach((def) => {
+                const pin = document.createElement('div');
+                pin.className = 'callout-pin';
+                pin.innerHTML = `
+                    <div class="callout-card flex items-center gap-2">
+                        <span class="px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 font-mono-tech text-[10px] font-bold">
+                            L${def.code}
+                        </span>
+                        <div>
+                            <div class="text-[11px] font-bold text-white leading-tight">${def.title}</div>
+                            <div class="text-[9px] font-mono-tech text-slate-400 leading-none mt-0.5">${def.sub}</div>
+                        </div>
+                    </div>
+                `;
+                pin.onclick = (e) => {
+                    e.stopPropagation();
+                    focusLayer(def.layerId);
+                };
+                container.appendChild(pin);
+                calloutDomElements.push({ el: pin, def, currentWorldPos: new THREE.Vector3() });
+            });
+        }
+
+        /* ============================================================================
+         * 7. CHOREOGRAPHED EXPLOSION ANIMATION ENGINE (모션 그래픽스 코어 엔진)
+         * ============================================================================ */
+        function smoothstep(edge0, edge1, x) {
+            const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+            return t * t * (3 - 2 * t);
+        }
+
+        function easeOutBackCubic(t) {
+            const c1 = 0.65;
+            const c3 = c1 + 1;
+            return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        }
+
+        // Compute the local progress (0..1) and custom vector modifier for a part based on choreography mode
+        function updateExplodedParts(globalT, timeSec) {
+            const amp = state.explosionAmp;
+            const mode = state.choreographyMode;
+
+            for (let bIdx = 0; bIdx < instancedBatches.length; bIdx++) {
+                const batch = instancedBatches[bIdx];
+                const parts = batch.parts;
+                const mesh = batch.mesh;
+                if (!mesh) continue;
+
+                const isLayerIsolated = (state.isolatedLayer !== -1 && batch.layerId !== state.isolatedLayer);
+                const isLayerFocused = (state.isolatedLayer === batch.layerId);
+
+                for (let i = 0; i < parts.length; i++) {
+                    const p = parts[i];
+                    let localT = 0;
+
+                    if (mode === 'cascade') {
+                        // Staggered top-to-bottom architectural sequence
+                        localT = smoothstep(p.staggerStart, p.staggerEnd, globalT);
+                        localT = easeOutBackCubic(localT);
+                    } else if (mode === 'radial') {
+                        // Uniform radial explosion with slight radial wave
+                        localT = smoothstep(0.0, 0.92, globalT);
+                    } else if (mode === 'cutaway') {
+                        // Split front façade and upper roof halves open to expose Royal Throne inside
+                        if (p.layerId === 10 || p.layerId === 12 || p.layerId === 13) {
+                            localT = globalT * 0.12; // Keep throne & Woldae grounded!
+                        } else if (p.basePos.z > 0.5 || p.layerId <= 4) {
+                            localT = smoothstep(0.05, 0.85, globalT) * 1.25;
+                        } else {
+                            localT = smoothstep(0.15, 0.95, globalT) * 0.45;
+                        }
+                    } else if (mode === 'timber') {
+                        // Push roof tiles & stones far away so timber joinery (Gongpo, Beams, Rafters) takes center stage
+                        if (p.layerId <= 3 || p.layerId === 9 || p.layerId === 13) {
+                            localT = smoothstep(0.0, 0.55, globalT) * 1.45;
+                        } else {
+                            localT = smoothstep(0.25, 0.95, globalT) * 0.72;
+                        }
+                    } else if (mode === 'wave') {
+                        // Continuous sinusoidal motion graphics wave across all 3,680 parts
+                        const wavePhase = (p.basePos.x * 0.18) + (p.basePos.y * 0.25) - timeSec * 2.4;
+                        const waveFactor = (Math.sin(wavePhase) * 0.5 + 0.5);
+                        localT = globalT * (0.35 + 0.65 * waveFactor);
+                    }
+
+                    // If user isolated a specific layer, emphasize its explosion or ghost others
+                    if (isLayerFocused) {
+                        localT = Math.max(localT, globalT * 0.95);
+                    }
+
+                    const effAmp = localT * amp;
+
+                    // Compute animated position
+                    tempVec.copy(p.basePos).addScaledVector(p.explodeVec, effAmp);
+
+                    // Cutaway lateral parting enhancement
+                    if (mode === 'cutaway' && p.layerId !== 10 && p.basePos.z > 0) {
+                        tempVec.x += Math.sign(p.basePos.x || 1) * localT * 6.5;
+                        tempVec.z += localT * 5.0;
+                    }
+
+                    p.currentPos.copy(tempVec);
+                    dummyObj.position.copy(tempVec);
+
+                    // Compute subtle rotational float during explosion
+                    tempEuler.set(
+                        p.baseRot.x + p.explodeRot.x * localT,
+                        p.baseRot.y + p.explodeRot.y * localT,
+                        p.baseRot.z + p.explodeRot.z * localT
+                    );
+                    dummyObj.quaternion.setFromEuler(tempEuler);
+
+                    // Scale down non-isolated layers if a layer filter is active
+                    if (isLayerIsolated) {
+                        dummyObj.scale.set(
+                            p.baseScale.x * 0.18,
+                            p.baseScale.y * 0.18,
+                            p.baseScale.z * 0.18
+                        );
+                    } else {
+                        dummyObj.scale.copy(p.baseScale);
+                    }
+
+                    dummyObj.updateMatrix();
+                    mesh.setMatrixAt(i, dummyObj.matrix);
+                }
+
+                mesh.instanceMatrix.needsUpdate = true;
+            }
+
+            // Update Trajectory Guide Lines
+            if (trajectoryLinesMesh) {
+                const showLines = state.showTrajectoryVectors && globalT > 0.015;
+                trajectoryLinesMesh.visible = showLines;
+                if (showLines) {
+                    const sampled = trajectoryLinesMesh.userData.sampledParts;
+                    const posAttr = trajectoryLinesMesh.geometry.attributes.position;
+                    const arr = posAttr.array;
+                    for (let i = 0; i < sampled.length; i++) {
+                        const sp = sampled[i];
+                        arr[i * 6 + 0] = sp.basePos.x;
+                        arr[i * 6 + 1] = sp.basePos.y;
+                        arr[i * 6 + 2] = sp.basePos.z;
+                        arr[i * 6 + 3] = sp.currentPos.x;
+                        arr[i * 6 + 4] = sp.currentPos.y;
+                        arr[i * 6 + 5] = sp.currentPos.z;
+                    }
+                    posAttr.needsUpdate = true;
+                }
+            }
+
+            // Update Highlight Box & Selected Part Trajectory Line
+            const activePart = state.hoveredPart || state.selectedPart;
+            if (activePart && highlightBoxMesh) {
+                highlightBoxMesh.visible = true;
+                highlightBoxMesh.position.copy(activePart.currentPos);
+                highlightBoxMesh.rotation.copy(activePart.baseRot);
+                highlightBoxMesh.scale.copy(activePart.baseScale);
+
+                selectedTrajectoryLine.visible = true;
+                const posArr = selectedTrajectoryLine.geometry.attributes.position.array;
+                posArr[0] = activePart.basePos.x;
+                posArr[1] = activePart.basePos.y;
+                posArr[2] = activePart.basePos.z;
+                posArr[3] = activePart.currentPos.x;
+                posArr[4] = activePart.currentPos.y;
+                posArr[5] = activePart.currentPos.z;
+                selectedTrajectoryLine.geometry.attributes.position.needsUpdate = true;
+
+                // Update displacement telemetry in right HUD
+                const dist = activePart.currentPos.distanceTo(activePart.basePos);
+                document.getElementById('inspect-disp').textContent = `${dist.toFixed(2)}m`;
+            } else if (highlightBoxMesh) {
+                highlightBoxMesh.visible = false;
+                selectedTrajectoryLine.visible = false;
+            }
+
+            // Update 3D Pinned Callout Labels
+            updateCalloutPinPositions(globalT);
+        }
+
+        function updateCalloutPinPositions(globalT) {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const amp = state.explosionAmp;
+
+            calloutDomElements.forEach(item => {
+                if (!state.showCalloutPins) {
+                    item.el.style.display = 'none';
+                    return;
+                }
+                if (state.isolatedLayer !== -1 && state.isolatedLayer !== item.def.layerId) {
+                    item.el.style.opacity = '0.18';
+                } else {
+                    item.el.style.opacity = '1';
+                }
+
+                const layerMeta = ARCH_LAYERS[item.def.layerId];
+                const localT = smoothstep(layerMeta.staggerRange[0], layerMeta.staggerRange[1], globalT);
+                item.currentWorldPos.copy(item.def.anchorPos).addScaledVector(item.def.explodeVec, localT * amp * 0.75);
+
+                const proj = item.currentWorldPos.clone().project(camera);
+                if (proj.z > 1.0 || proj.z < -1.0) {
+                    item.el.style.display = 'none';
+                } else {
+                    item.el.style.display = 'block';
+                    const sx = (proj.x * 0.5 + 0.5) * width;
+                    const sy = (-proj.y * 0.5 + 0.5) * height;
+                    item.el.style.left = `${sx}px`;
+                    item.el.style.top = `${sy}px`;
+                }
+            });
+        }
+
+        /* ============================================================================
+         * 8. UI CONTROLS, LAYER ISOLATION & RENDERING MODES
+         * ============================================================================ */
+        function buildLayerUI() {
+            const listContainer = document.getElementById('layer-list-container');
+            const segContainer = document.getElementById('timeline-segments');
+            listContainer.innerHTML = '';
+            segContainer.innerHTML = '';
+
+            ARCH_LAYERS.forEach((layer) => {
+                const count = layerPartCounts[layer.id];
+
+                // Sidebar Item
+                const btn = document.createElement('button');
+                btn.id = `layer-btn-${layer.id}`;
+                btn.className = 'w-full text-left px-2.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition flex items-center justify-between group';
+                btn.onclick = () => focusLayer(layer.id);
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color: ${layer.colorHex}"></span>
+                        <div class="truncate">
+                            <div class="text-xs font-medium text-slate-100 group-hover:text-amber-300 truncate">
+                                <span class="font-mono-tech text-[10px] text-slate-400 mr-1">${layer.code}</span>${layer.nameKo}
+                            </div>
+                        </div>
+                    </div>
+                    <span class="font-mono-tech text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-amber-300 shrink-0 ml-1">
+                        ${count}
+                    </span>
+                `;
+                listContainer.appendChild(btn);
+
+                // Bottom Micro-Timeline Segment
+                const seg = document.createElement('div');
+                seg.className = 'h-1.5 rounded-full bg-white/10 overflow-hidden cursor-pointer relative';
+                seg.title = `${layer.code} ${layer.nameKo} (${count}개 부품)`;
+                seg.onclick = () => focusLayer(layer.id);
+                seg.innerHTML = `<div id="seg-fill-${layer.id}" class="h-full transition-all duration-75" style="width: 0%; background-color: ${layer.colorHex}"></div>`;
+                segContainer.appendChild(seg);
+            });
+        }
+
+        function focusLayer(layerId) {
+            if (state.isolatedLayer === layerId) {
+                resetLayerFilter();
+                return;
+            }
+            state.isolatedLayer = layerId;
+            document.getElementById('btn-reset-layer').classList.remove('hidden');
+
+            const layer = ARCH_LAYERS[layerId];
+            updateInspectorWithLayer(layer);
+            document.getElementById('hud-active-parts').textContent = layerPartCounts[layerId].toLocaleString();
+
+            // Highlight active layer button
+            ARCH_LAYERS.forEach(l => {
+                const btn = document.getElementById(`layer-btn-${l.id}`);
+                if (l.id === layerId) {
+                    btn.className = 'w-full text-left px-2.5 py-2 rounded-lg bg-amber-500/25 border border-amber-400/50 transition flex items-center justify-between group';
+                } else {
+                    btn.className = 'w-full text-left px-2.5 py-2 rounded-lg bg-white/5 opacity-50 hover:opacity-90 border border-white/5 transition flex items-center justify-between group';
+                }
+            });
+
+            // Ensure model is somewhat exploded so user sees the isolated layer clearly
+            if (state.targetProgress < 0.35) {
+                state.targetProgress = 0.55;
+            }
+            playUiTone(520, 0.08);
+        }
+
+        function resetLayerFilter() {
+            state.isolatedLayer = -1;
+            document.getElementById('btn-reset-layer').classList.add('hidden');
+            document.getElementById('hud-active-parts').textContent = allParts.length.toLocaleString();
+
+            ARCH_LAYERS.forEach(l => {
+                const btn = document.getElementById(`layer-btn-${l.id}`);
+                btn.className = 'w-full text-left px-2.5 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition flex items-center justify-between group';
+            });
+            playUiTone(380, 0.07);
+        }
+
+        function updateInspectorWithLayer(layer) {
+            document.getElementById('inspect-badge').textContent = `${layer.code} · 구조 계층`;
+            document.getElementById('inspect-id').textContent = `LAYER-${layer.id + 1}/14`;
+            document.getElementById('inspect-title').textContent = `${layer.nameKo} (${layer.nameHanja})`;
+            document.getElementById('inspect-subtitle').textContent = layer.nameEn;
+            document.getElementById('inspect-desc').textContent = layer.desc;
+            document.getElementById('inspect-count').textContent = `${layerPartCounts[layer.id]}개`;
+            document.getElementById('inspect-mat').textContent = layer.materialName;
+        }
+
+        function updateInspectorWithPart(part) {
+            const layer = ARCH_LAYERS[part.layerId];
+            document.getElementById('inspect-badge').textContent = `${layer.code} · ${layer.nameKo}`;
+            document.getElementById('inspect-id').textContent = `#PART-${String(part.id + 1).padStart(4, '0')}`;
+            document.getElementById('inspect-title').textContent = part.nameKo;
+            document.getElementById('inspect-subtitle').textContent = part.nameEn;
+            document.getElementById('inspect-desc').textContent = part.subDesc;
+            document.getElementById('inspect-count').textContent = `${layerPartCounts[part.layerId]}개`;
+            document.getElementById('inspect-mat').textContent = layer.materialName;
+        }
+
+        function setRenderStyle(style) {
+            state.renderStyle = style;
+            ['dancheong', 'spectrum', 'blueprint'].forEach(s => {
+                const btn = document.getElementById(`btn-style-${s}`);
+                if (s === style) {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/25 text-amber-300 border border-amber-400/40 transition';
+                } else {
+                    btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/10 transition';
+                }
+            });
+
+            instancedBatches.forEach(batch => {
+                const mesh = batch.mesh;
+                if (!mesh) return;
+                const layerColor = new THREE.Color(ARCH_LAYERS[batch.layerId].colorHex);
+                const white = new THREE.Color(0xffffff);
+
+                if (style === 'dancheong') {
+                    mesh.material = batch.dancheongMat.clone();
+                    for (let i = 0; i < batch.parts.length; i++) mesh.setColorAt(i, white);
+                } else if (style === 'spectrum') {
+                    mesh.material = new THREE.MeshStandardMaterial({
+                        color: 0xffffff,
+                        roughness: 0.42,
+                        metalness: 0.18
+                    });
+                    for (let i = 0; i < batch.parts.length; i++) mesh.setColorAt(i, layerColor);
+                } else if (style === 'blueprint') {
+                    mesh.material = new THREE.MeshStandardMaterial({
+                        color: layerColor,
+                        emissive: layerColor,
+                        emissiveIntensity: 0.35,
+                        wireframe: true,
+                        transparent: true,
+                        opacity: 0.72
+                    });
+                }
+                if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            });
+            playUiTone(620, 0.08);
+        }
+
+        function setChoreographyMode(mode) {
+            state.choreographyMode = mode;
+            const modes = ['cascade', 'radial', 'cutaway', 'timber', 'wave'];
+            const labels = {
+                cascade: '시퀀셜 계층 분해 (Cascade)',
+                radial: '방사형 최대 분해 (Radial)',
+                cutaway: '내부 어좌 단면 개방 (Cutaway)',
+                timber: '목구조·공포 결구 해부 (Timber)',
+                wave: '하모닉 파동 (Harmonic Wave)'
+            };
+            modes.forEach(m => {
+                const btn = document.getElementById(`mode-${m}`);
+                if (m === mode) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 text-slate-200 hover:bg-white/15 border border-white/10 transition';
+                }
+            });
+
+            // Adjust camera or target progress for specific showcase modes
+            if (mode === 'cutaway') {
+                setCameraPreset('throne');
+                if (state.targetProgress < 0.65) state.targetProgress = 0.85;
+            } else if (mode === 'timber') {
+                setCameraPreset('gongpo');
+                if (state.targetProgress < 0.65) state.targetProgress = 0.82;
+            } else if (mode === 'wave') {
+                state.isPlaying = false;
+                updatePlayButtonUI();
+                if (state.targetProgress < 0.5) state.targetProgress = 0.75;
+            }
+            playUiTone(480, 0.1);
+        }
+
+        function togglePlayAnimation() {
+            state.isPlaying = !state.isPlaying;
+            updatePlayButtonUI();
+            playUiTone(state.isPlaying ? 540 : 340, 0.08);
+        }
+
+        function updatePlayButtonUI() {
+            const icon = document.getElementById('play-icon');
+            const text = document.getElementById('play-text');
+            const btn = document.getElementById('btn-play-pause');
+            if (state.isPlaying) {
+                icon.textContent = '❚❚';
+                text.textContent = '모션 일시정지';
+                btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20';
+            } else {
+                icon.textContent = '▶';
+                text.textContent = '모션 자동재생';
+                btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300 transition flex items-center gap-1.5 shadow-lg shadow-amber-400/20';
+            }
+        }
+
+        function triggerFullAssemble() {
+            state.isPlaying = false;
+            updatePlayButtonUI();
+            state.targetProgress = 0.0;
+            playUiTone(300, 0.12);
+        }
+
+        function triggerFullExplode() {
+            state.isPlaying = false;
+            updatePlayButtonUI();
+            state.targetProgress = 1.0;
+            playUiTone(720, 0.15);
+        }
+
+        function onSliderScrub(val) {
+            state.isPlaying = false;
+            updatePlayButtonUI();
+            state.targetProgress = parseFloat(val) / 1000;
+        }
+
+        function setExplosionAmplitude(val) {
+            state.explosionAmp = parseFloat(val);
+            playUiTone(580, 0.08);
+        }
+
+        function toggleCalloutPins() {
+            state.showCalloutPins = !state.showCalloutPins;
+            const btn = document.getElementById('btn-toggle-pins');
+            btn.textContent = state.showCalloutPins ? '지시선 ON' : '지시선 OFF';
+            btn.className = state.showCalloutPins
+                ? 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 transition'
+                : 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-white/10 transition';
+        }
+
+        function toggleTrajectoryVectors() {
+            state.showTrajectoryVectors = !state.showTrajectoryVectors;
+            const btn = document.getElementById('btn-toggle-vectors');
+            btn.textContent = state.showTrajectoryVectors ? '궤적선 ON' : '궤적선 OFF';
+            btn.className = state.showTrajectoryVectors
+                ? 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-sky-500/20 text-sky-300 border border-sky-400/30 transition'
+                : 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:bg-white/10 transition';
+        }
+
+        function setCameraPreset(preset) {
+            if (preset === 'orbitAuto') {
+                state.autoOrbit = !state.autoOrbit;
+                const btn = document.getElementById('btn-auto-orbit');
+                btn.textContent = state.autoOrbit ? '06. 360° 자동 공전 ON' : '06. 360° 자동 공전 OFF';
+                btn.className = state.autoOrbit
+                    ? 'px-2.5 py-1.5 rounded-lg text-xs bg-amber-500/20 text-amber-300 border border-amber-400/30 transition text-left'
+                    : 'px-2.5 py-1.5 rounded-lg text-xs bg-white/5 text-slate-300 border border-white/10 transition text-left';
+                return;
+            }
+
+            state.autoOrbit = false;
+            document.getElementById('btn-auto-orbit').textContent = '06. 360° 자동 공전 OFF';
+            document.getElementById('btn-auto-orbit').className = 'px-2.5 py-1.5 rounded-lg text-xs bg-white/5 text-slate-300 border border-white/10 transition text-left';
+
+            if (preset === 'isometric') {
+                camSpherical.targetRadius = 56;
+                camSpherical.targetTheta = 0.62;
+                camSpherical.targetPhi = 1.12;
+                camSpherical.targetLookAt.set(0, 8.0, 0);
+            } else if (preset === 'front') {
+                camSpherical.targetRadius = 46;
+                camSpherical.targetTheta = 0.0;
+                camSpherical.targetPhi = 1.36;
+                camSpherical.targetLookAt.set(0, 7.5, 0);
+            } else if (preset === 'gongpo') {
+                camSpherical.targetRadius = 28;
+                camSpherical.targetTheta = 0.55;
+                camSpherical.targetPhi = 1.28;
+                camSpherical.targetLookAt.set(5.5, 11.0, 4.5);
+            } else if (preset === 'throne') {
+                camSpherical.targetRadius = 25;
+                camSpherical.targetTheta = 0.12;
+                camSpherical.targetPhi = 1.28;
+                camSpherical.targetLookAt.set(0, 6.5, -1.0);
+            } else if (preset === 'roofTop') {
+                camSpherical.targetRadius = 64;
+                camSpherical.targetTheta = 0.35;
+                camSpherical.targetPhi = 0.42;
+                camSpherical.targetLookAt.set(0, 10.0, 0);
+            }
+            playUiTone(440, 0.08);
+        }
+
+        /* ============================================================================
+         * 9. WEB AUDIO API PROCEDURAL MOTION GRAPHICS SOUND SYNTHESIZER
+         * ============================================================================ */
+        let audioCtx = null;
+        function toggleSoundEngine() {
+            state.soundEnabled = !state.soundEnabled;
+            if (state.soundEnabled && !audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioCtx = new AudioContextClass();
+            }
+            const btn = document.getElementById('btn-toggle-sound');
+            btn.textContent = state.soundEnabled ? '사운드 ON' : '사운드 OFF';
+            btn.className = state.soundEnabled
+                ? 'px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-300 border border-amber-400/30 transition'
+                : 'px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/10 transition';
+            if (state.soundEnabled) playUiTone(587.33, 0.12);
+        }
+
+        function playUiTone(freq, duration = 0.08) {
+            if (!state.soundEnabled || !audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                // Ignore audio context state errors
+            }
+        }
+
+        /* ============================================================================
+         * 10. THREE.JS SCENE INITIALIZATION, CAMERA CONTROLS & RAYCASTING
+         * ============================================================================ */
+        function initScene() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070a0f);
+            scene.fog = new THREE.FogExp2(0x070a0f, 0.0065);
+
+            camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 350);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Studio & Palace Lighting Setup
+            const hemiLight = new THREE.HemisphereLight(0xfff4e0, 0x1e293b, 0.78);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xfff0d4, 1.35);
+            dirLight.position.set(38, 62, 42);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.camera.near = 10;
+            dirLight.shadow.camera.far = 160;
+            const d = 32;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            scene.add(dirLight);
+
+            const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.55);
+            rimLight.position.set(-40, 28, -36);
+            scene.add(rimLight);
+
+            // Interior Warm Illumination for the Royal Throne (어좌 조명)
+            const throneLight = new THREE.PointLight(0xfbbf24, 1.4, 24);
+            throneLight.position.set(0, 7.5, 0.5);
+            scene.add(throneLight);
+
+            // Architectural Ground Reference Grid & Courtyard Plane (근정전 조정 박석 마당)
+            const groundGrid = new THREE.GridHelper(140, 70, 0xd9a636, 0x1e293b);
+            groundGrid.position.y = -0.02;
+            groundGrid.material.opacity = 0.25;
+            groundGrid.material.transparent = true;
+            scene.add(groundGrid);
+
+            // Decorative Circular Telemetry Rings on Ground
+            [24, 36, 48].forEach((r, idx) => {
+                const ringGeo = new THREE.RingGeometry(r - 0.08, r, 96);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: idx === 0 ? 0xe6b84c : 0x38bdf8,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.18 - idx * 0.04
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.position.y = 0.01;
+                scene.add(ringMesh);
+            });
+
+            // Build Procedural Textures & 3,680+ Part Geunjeongjeon Model
+            const textures = createProceduralTextures();
+            buildGeunjeongjeonModel(scene, textures);
+            createTrajectoryAndCallouts(scene);
+            buildLayerUI();
+
+            // Setup Mouse / Touch Orbit & Raycasting Interactions
+            setupInteractionListeners(renderer.domElement);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function setupInteractionListeners(domEl) {
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            let downX = 0, downY = 0;
+
+            domEl.addEventListener('mousedown', (e) => {
+                camSpherical.isDragging = true;
+                camSpherical.isPanning = (e.button === 2 || e.shiftKey);
+                camSpherical.prevX = e.clientX;
+                camSpherical.prevY = e.clientY;
+                downX = e.clientX;
+                downY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                camSpherical.isDragging = false;
+                const moveDist = Math.hypot(e.clientX - downX, e.clientY - downY);
+                if (moveDist < 5 && e.target === domEl) {
+                    // Click to select/lock part inspection
+                    const hitPart = performRaycast(e.clientX, e.clientY, raycaster, mouse);
+                    if (hitPart) {
+                        state.selectedPart = hitPart;
+                        updateInspectorWithPart(hitPart);
+                        playUiTone(660, 0.06);
+                    } else {
+                        state.selectedPart = null;
+                    }
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (camSpherical.isDragging) {
+                    const dx = e.clientX - camSpherical.prevX;
+                    const dy = e.clientY - camSpherical.prevY;
+                    camSpherical.prevX = e.clientX;
+                    camSpherical.prevY = e.clientY;
+
+                    if (camSpherical.isPanning) {
+                        camSpherical.targetLookAt.y = Math.max(0, Math.min(24, camSpherical.targetLookAt.y + dy * 0.04));
+                    } else {
+                        state.autoOrbit = false;
+                        document.getElementById('btn-auto-orbit').textContent = '06. 360° 자동 공전 OFF';
+                        camSpherical.targetTheta -= dx * 0.0065;
+                        camSpherical.targetPhi = Math.max(0.18, Math.min(Math.PI / 2 - 0.04, camSpherical.targetPhi - dy * 0.0065));
+                    }
+                } else if (e.target === domEl) {
+                    // Hover Raycasting for real-time part inspection
+                    const hitPart = performRaycast(e.clientX, e.clientY, raycaster, mouse);
+                    state.hoveredPart = hitPart;
+                    if (hitPart) {
+                        updateInspectorWithPart(hitPart);
+                    }
+                }
+            });
+
+            domEl.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                camSpherical.targetRadius = Math.max(16, Math.min(115, camSpherical.targetRadius + e.deltaY * 0.04));
+            }, { passive: false });
+
+            domEl.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            // Touch Support for Mobile/Tablet
+            let lastTouchDist = 0;
+            domEl.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    camSpherical.isDragging = true;
+                    camSpherical.prevX = e.touches[0].clientX;
+                    camSpherical.prevY = e.touches[0].clientY;
+                } else if (e.touches.length === 2) {
+                    lastTouchDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                }
+            }, { passive: true });
+
+            domEl.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1 && camSpherical.isDragging) {
+                    const dx = e.touches[0].clientX - camSpherical.prevX;
+                    const dy = e.touches[0].clientY - camSpherical.prevY;
+                    camSpherical.prevX = e.touches[0].clientX;
+                    camSpherical.prevY = e.touches[0].clientY;
+                    state.autoOrbit = false;
+                    camSpherical.targetTheta -= dx * 0.0065;
+                    camSpherical.targetPhi = Math.max(0.2, Math.min(Math.PI / 2 - 0.05, camSpherical.targetPhi - dy * 0.0065));
+                } else if (e.touches.length === 2) {
+                    const dist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    const delta = lastTouchDist - dist;
+                    lastTouchDist = dist;
+                    camSpherical.targetRadius = Math.max(18, Math.min(115, camSpherical.targetRadius + delta * 0.08));
+                }
+            }, { passive: true });
+
+            domEl.addEventListener('touchend', () => {
+                camSpherical.isDragging = false;
+            });
+        }
+
+        function performRaycast(clientX, clientY, raycaster, mouse) {
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const meshes = instancedBatches.map(b => b.mesh).filter(Boolean);
+            const intersects = raycaster.intersectObjects(meshes, false);
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const batch = hit.object.userData.batch;
+                if (batch && hit.instanceId !== undefined) {
+                    return batch.parts[hit.instanceId] || null;
+                }
+            }
+            return null;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* ============================================================================
+         * 11. MAIN ANIMATION LOOP (60FPS MOTION GRAPHICS RENDER LOOP)
+         * ============================================================================ */
+        let lastFrameTime = performance.now();
+
+        function animate(now = performance.now()) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+            lastFrameTime = now;
+            state.clockTime += dt;
+
+            // 1. Update Timeline Progression when Auto-Playing
+            if (state.isPlaying) {
+                state.targetProgress += state.playDirection * state.playSpeed * dt;
+                if (state.targetProgress >= 1.08) {
+                    state.targetProgress = 1.08;
+                    state.playDirection = -1;
+                } else if (state.targetProgress <= -0.06) {
+                    state.targetProgress = -0.06;
+                    state.playDirection = 1;
+                }
+            }
+
+            const clampedTarget = Math.max(0.0, Math.min(1.0, state.targetProgress));
+            state.explodeProgress += (clampedTarget - state.explodeProgress) * Math.min(1.0, dt * 7.5);
+
+            // Sync Timeline Slider & HUD Percentage
+            const pct = (state.explodeProgress * 100).toFixed(1);
+            document.getElementById('hud-explode-pct').textContent = `${pct}%`;
+            const sliderEl = document.getElementById('timeline-slider');
+            if (document.activeElement !== sliderEl) {
+                sliderEl.value = Math.round(state.explodeProgress * 1000);
+            }
+
+            // Update 14-Stage Micro-Timeline Progress Bars
+            for (let l = 0; l < 14; l++) {
+                const range = ARCH_LAYERS[l].staggerRange;
+                const segPct = smoothstep(range[0], range[1], state.explodeProgress) * 100;
+                const fillEl = document.getElementById(`seg-fill-${l}`);
+                if (fillEl) fillEl.style.width = `${segPct}%`;
+            }
+
+            // 2. Update Camera Spherical Orbit with Smooth Damping
+            if (state.autoOrbit && !camSpherical.isDragging) {
+                camSpherical.targetTheta += dt * 0.16;
+            }
+            camSpherical.radius += (camSpherical.targetRadius - camSpherical.radius) * 0.08;
+            camSpherical.theta += (camSpherical.targetTheta - camSpherical.theta) * 0.08;
+            camSpherical.phi += (camSpherical.targetPhi - camSpherical.phi) * 0.08;
+            camSpherical.lookAt.lerp(camSpherical.targetLookAt, 0.08);
+
+            camera.position.x = camSpherical.lookAt.x + camSpherical.radius * Math.sin(camSpherical.phi) * Math.sin(camSpherical.theta);
+            camera.position.y = camSpherical.lookAt.y + camSpherical.radius * Math.cos(camSpherical.phi);
+            camera.position.z = camSpherical.lookAt.z + camSpherical.radius * Math.sin(camSpherical.phi) * Math.cos(camSpherical.theta);
+            camera.lookAt(camSpherical.lookAt);
+
+            // 3. Update All 3,680+ Exploded Parts & Motion Graphics Overlays
+            updateExplodedParts(state.explodeProgress, state.clockTime);
+
+            // 4. Render 3D Scene
+            renderer.render(scene, camera);
+        }
+
+        // Start Application on Window Load
+        window.onload = function () {
+            initScene();
+            animate();
+        };
+    </script>
+</body>
+</html>

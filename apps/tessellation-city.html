@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TESSELLATION CITY | 빈틈없이 이어지는 패턴 도시</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-deep: #05091a;
+      --bg-panel: rgba(9, 16, 38, 0.86);
+      --border-glow: rgba(96, 165, 250, 0.34);
+      --text-main: #f1f5f9;
+      --text-sub: #94a3b8;
+      --accent-cyan: #38bdf8;
+      --accent-gold: #fbbf24;
+      --accent-rose: #fb7185;
+      --safe-bottom: 116px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #0f2147 0%, #060b1e 65%, #030611 100%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    }
+
+    #app-shell {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - var(--safe-bottom));
+      min-height: 420px;
+      overflow: hidden;
+    }
+    #stage-wrap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    canvas.stage-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+    canvas.stage-canvas:active { cursor: grabbing; }
+
+    .top-bar {
+      position: absolute;
+      top: 12px; left: 14px; right: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .brand-box {
+      pointer-events: auto;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      backdrop-filter: blur(12px);
+      padding: 10px 16px;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+    .brand-title {
+      font-size: 1.02rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #e0f2fe;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+    .brand-note {
+      margin-top: 4px;
+      font-size: 0.76rem;
+      color: var(--text-sub);
+    }
+    .brand-note strong { color: var(--accent-gold); font-weight: 600; }
+
+    .hud-stack {
+      pointer-events: auto;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: stretch;
+    }
+    .hud-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      backdrop-filter: blur(12px);
+      padding: 9px 13px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+    }
+    .hud-text { font-size: 0.76rem; line-height: 1.38; }
+    .hud-text .math-eq {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--accent-gold);
+      margin-top: 1px;
+    }
+    .hud-text .sub-hint {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+    }
+    .mini-svg {
+      width: 44px; height: 44px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+    }
+
+    .control-dock {
+      position: absolute;
+      left: 50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      width: min(96vw, 1080px);
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      backdrop-filter: blur(14px);
+      border-radius: 16px;
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: repeat(6, auto);
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      z-index: 12;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
+    }
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .ctrl-label {
+      font-size: 0.71rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .ctrl-val { color: var(--accent-cyan); font-weight: 800; }
+    .seg-row {
+      display: flex;
+      gap: 4px;
+      background: rgba(15, 23, 42, 0.75);
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    button.seg-btn, button.action-btn {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-sub);
+      font-family: inherit;
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 5px 9px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+      white-space: nowrap;
+    }
+    button.seg-btn:hover, button.action-btn:hover { color: #fff; background: rgba(56, 189, 248, 0.14); }
+    button.seg-btn.active {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      border-color: rgba(125, 211, 252, 0.55);
+      box-shadow: 0 2px 10px rgba(2, 132, 199, 0.45);
+    }
+    button.action-btn {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(148, 163, 184, 0.35);
+      color: #e2e8f0;
+      padding: 7px 11px;
+    }
+    button.action-btn.primary-toggle.active {
+      background: linear-gradient(135deg, #0d9488, #0284c7);
+      border-color: rgba(94, 234, 212, 0.6);
+      color: #fff;
+    }
+    input[type="range"] {
+      width: 118px;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    #fallback-banner {
+      display: none;
+      position: absolute;
+      top: 90px; left: 14px;
+      background: rgba(127, 29, 29, 0.88);
+      border: 1px solid rgba(252, 165, 165, 0.5);
+      color: #fee2e2;
+      font-size: 0.74rem;
+      padding: 6px 12px;
+      border-radius: 10px;
+      z-index: 15;
+    }
+    @media (max-width: 960px) {
+      .control-dock {
+        grid-template-columns: repeat(3, 1fr);
+        padding: 8px 10px;
+        gap: 7px;
+      }
+      input[type="range"] { width: 100%; }
+      .top-bar { top: 8px; left: 8px; right: 8px; }
+    }
+    @media (max-width: 600px) {
+      :root { --safe-bottom: 112px; }
+      .control-dock { grid-template-columns: repeat(2, 1fr); }
+      .brand-note { font-size: 0.7rem; }
+      .hud-card { padding: 7px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell">
+    <div id="stage-wrap"></div>
+    <div id="fallback-banner">WebGL 가속을 사용할 수 없어 동일한 실제 정점·중심 좌표 기반 2D 테셀레이션 캔버스로 동작 중입니다.</div>
+
+    <header class="top-bar">
+      <div class="brand-box">
+        <div class="brand-title">
+          <span>TESSELLATION CITY</span>
+          <span class="brand-badge">빈틈없이 이어지는 패턴 도시</span>
+        </div>
+        <p class="brand-note">
+          ※ 색 유리 건물의 <strong>높이는 시각 장식</strong>이며, 바닥을 빈틈·겹침 없이 채우는 <strong>평면 정다각형 테셀레이션(이동·회전 대칭)</strong>이 핵심입니다.
+        </p>
+      </div>
+
+      <div class="hud-stack">
+        <div class="hud-card" id="vertex-hud" title="타일을 클릭하면 해당 꼭짓점 주변 타일과 내각의 합을 계산합니다.">
+          <svg class="mini-svg" id="vertex-svg" viewBox="-24 -24 48 48" aria-label="꼭짓점 모임 도식"></svg>
+          <div class="hud-text">
+            <div id="hud-vertex-title">꼭짓점 내각 합 탐구 (타일 클릭)</div>
+            <div class="math-eq" id="hud-vertex-math">60° × 6개 = 360° (빈틈 0°)</div>
+            <div class="sub-hint" id="hud-vertex-coord">선택 정점: (0.00, 0.00) · 전체 타일 54개</div>
+          </div>
+        </div>
+
+        <div class="hud-card" title="정오각형(한 내각 108°)이 평면을 정규 반복으로 채우지 못하는 이유">
+          <svg class="mini-svg" viewBox="-24 -24 48 48" aria-label="정오각형 36도 빈틈 도식">
+            <circle cx="0" cy="0" r="19" fill="none" stroke="#334155" stroke-dasharray="2 2" />
+            <path d="M0,0 L18,0 A18,18 0 0,1 -5.56,17.12 Z" fill="rgba(56,189,248,0.28)" stroke="#38bdf8" stroke-width="1.2"/>
+            <path d="M0,0 L-5.56,17.12 A18,18 0 0,1 -14.56,-10.58 Z" fill="rgba(99,102,241,0.28)" stroke="#818cf8" stroke-width="1.2"/>
+            <path d="M0,0 L-14.56,-10.58 A18,18 0 0,1 14.56,-10.58 Z" fill="rgba(52,211,153,0.28)" stroke="#34d399" stroke-width="1.2"/>
+            <path d="M0,0 L14.56,-10.58 A18,18 0 0,1 18,0 Z" fill="rgba(251,113,133,0.45)" stroke="#fb7185" stroke-width="1.5"/>
+            <circle cx="0" cy="0" r="2.4" fill="#fbbf24" />
+          </svg>
+          <div class="hud-text">
+            <div>왜 <strong>정오각형(108°)</strong>은 안 될까?</div>
+            <div class="math-eq" style="color:var(--accent-rose);">108°×3 = 324° (36° 빈틈)</div>
+            <div class="sub-hint">4개면 432°로 겹침 → 360°의 약수만 가능</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="control-dock" aria-label="테셀레이션 도시 핵심 조작부">
+      <!-- 1. 타일 종류 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>① 타일 종류 (정다각형)</span></div>
+        <div class="seg-row" role="group" aria-label="타일 종류 선택">
+          <button type="button" class="seg-btn active" data-sides="3">정삼각형(3)</button>
+          <button type="button" class="seg-btn" data-sides="4">정사각형(4)</button>
+          <button type="button" class="seg-btn" data-sides="6">정육각형(6)</button>
+        </div>
+      </div>
+
+      <!-- 2. 타일 크기 -->
+      <div class="ctrl-group">
+        <label class="ctrl-label" for="slider-size">
+          <span>② 타일 크기(반지름)</span>
+          <span class="ctrl-val" id="val-size">1.80</span>
+        </label>
+        <input id="slider-size" type="range" min="1.10" max="2.80" step="0.10" value="1.80" />
+      </div>
+
+      <!-- 3. 반복 범위 -->
+      <div class="ctrl-group">
+        <label class="ctrl-label" for="slider-range">
+          <span>③ 반복 범위(격자 단계)</span>
+          <span class="ctrl-val" id="val-range">3단계</span>
+        </label>
+        <input id="slider-range" type="range" min="1" max="6" step="1" value="3" />
+      </div>
+
+      <!-- 4. 색 규칙 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>④ 색 규칙 (좌표 기반)</span></div>
+        <div class="seg-row" role="group" aria-label="색 규칙 선택">
+          <button type="button" class="seg-btn active" data-color="stripe">줄무늬</button>
+          <button type="button" class="seg-btn" data-color="checker">체커</button>
+          <button type="button" class="seg-btn" data-color="radial">중심 거리</button>
+        </div>
+      </div>
+
+      <!-- 5. 평면/입체 시점 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>⑤ 카메라 시점 전환</span></div>
+        <button type="button" id="btn-view" class="action-btn primary-toggle">입체 도시 시점 (3D)</button>
+      </div>
+
+      <!-- 6. 초기화·홈 -->
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>⑥ 기준 상태 복귀</span></div>
+        <button type="button" id="btn-reset" class="action-btn">초기화 · 홈</button>
+      </div>
+    </nav>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const DEFAULTS = {
+        sides: 3,
+        tileRadius: 1.80,
+        gridRange: 3,
+        colorRule: 'stripe',
+        isPlanar2DView: false
+      };
+
+      const state = {
+        sides: DEFAULTS.sides,
+        tileRadius: DEFAULTS.tileRadius,
+        gridRange: DEFAULTS.gridRange,
+        colorRule: DEFAULTS.colorRule,
+        isPlanar2DView: DEFAULTS.isPlanar2DView,
+        tiles: [],
+        vertexClusters: new Map(),
+        selectedVertexKey: null,
+        selectedVertex: { x: 0, z: 0 },
+        highlightedTileIds: new Set(),
+        measuredAngleDeg: 60,
+        theoreticalAngleDeg: 60,
+        expectedMeetCount: 6,
+        actualMeetCount: 6,
+        citySpanRadius: 12,
+        webglActive: false,
+        checksum: 0
+      };
+
+      const PALETTES = {
+        stripe: ['#38bdf8', '#818cf8', '#34d399', '#f472b6'],
+        checker: ['#2dd4bf', '#f59e0b', '#60a5fa'],
+        radial: ['#fbbf24', '#f472b6', '#a78bfa', '#38bdf8', '#2dd4bf']
+      };
+
+      function quantizeKey(x, z) {
+        const qx = Math.round(x * 100) / 100;
+        const qz = Math.round(z * 100) / 100;
+        return `${qx.toFixed(2)},${qz.toFixed(2)}`;
+      }
+
+      function computePolygonVertices(cx, cz, radius, sides, startAngle) {
+        const verts = [];
+        const step = (Math.PI * 2) / sides;
+        for (let k = 0; k < sides; k++) {
+          const ang = startAngle + k * step;
+          verts.push({
+            x: cx + radius * Math.cos(ang),
+            z: cz + radius * Math.sin(ang)
+          });
+        }
+        return verts;
+      }
+
+      function computeTileColor(tile, maxDist) {
+        const { u, v, parity, dist, cx, cz } = tile;
+        if (state.colorRule === 'stripe') {
+          const stripeIdx = Math.abs(Math.floor(u + v * 2 + 100)) % PALETTES.stripe.length;
+          return PALETTES.stripe[stripeIdx];
+        }
+        if (state.colorRule === 'checker') {
+          if (state.sides === 3) {
+            return parity === 1 ? PALETTES.checker[0] : PALETTES.checker[1];
+          }
+          if (state.sides === 4) {
+            const idx = Math.abs(u + v) % 2;
+            return PALETTES.checker[idx];
+          }
+          const hexColorIdx = ((u - v) % 3 + 3) % 3;
+          return PALETTES.checker[hexColorIdx];
+        }
+        const norm = maxDist > 0.001 ? Math.min(0.999, dist / maxDist) : 0;
+        const rIdx = Math.floor(norm * PALETTES.radial.length);
+        return PALETTES.radial[rIdx];
+      }
+
+      function rebuildTessellationData() {
+        const R = state.tileRadius;
+        const K = state.gridRange;
+        const n = state.sides;
+        const rawTiles = [];
+        let idCounter = 0;
+
+        if (n === 4) {
+          const halfSide = R / Math.SQRT2;
+          const step = halfSide * 2;
+          for (let u = -K; u <= K; u++) {
+            for (let v = -K; v <= K; v++) {
+              const cx = u * step;
+              const cz = v * step;
+              const vertices = computePolygonVertices(cx, cz, R, 4, Math.PI / 4);
+              rawTiles.push({ id: idCounter++, u, v, parity: (u + v) & 1, cx, cz, vertices });
+            }
+          }
+        } else if (n === 6) {
+          const sqrt3 = Math.sqrt(3);
+          for (let q = -K; q <= K; q++) {
+            for (let r = -K; r <= K; r++) {
+              if (Math.abs(q + r) > K) continue;
+              const cx = R * sqrt3 * (q + r * 0.5);
+              const cz = R * 1.5 * r;
+              const vertices = computePolygonVertices(cx, cz, R, 6, Math.PI / 6);
+              rawTiles.push({ id: idCounter++, u: q, v: r, parity: (q - r) % 3, cx, cz, vertices });
+            }
+          }
+        } else {
+          const side = Math.sqrt(3) * R;
+          const rowH = 1.5 * R;
+          for (let v = -K; v < K; v++) {
+            for (let u = -K; u < K; u++) {
+              const cxUp = (u + 0.5 * v + 0.5) * side;
+              const czUp = v * rowH + 0.5 * R;
+              if (Math.hypot(cxUp, czUp) <= (K + 0.85) * side * 0.62) {
+                rawTiles.push({
+                  id: idCounter++, u, v, parity: 0, cx: cxUp, cz: czUp,
+                  vertices: computePolygonVertices(cxUp, czUp, R, 3, Math.PI / 2)
+                });
+              }
+              const cxDn = (u + 0.5 * v + 1.0) * side;
+              const czDn = v * rowH + R;
+              if (Math.hypot(cxDn, czDn) <= (K + 0.85) * side * 0.62) {
+                rawTiles.push({
+                  id: idCounter++, u, v, parity: 1, cx: cxDn, cz: czDn,
+                  vertices: computePolygonVertices(cxDn, czDn, R, 3, -Math.PI / 2)
+                });
+              }
+            }
+          }
+        }
+
+        let maxDist = 0.01;
+        let maxSpan = R * 2;
+        const clusters = new Map();
+        let rollingSum = 0;
+
+        rawTiles.forEach((t) => {
+          t.dist = Math.hypot(t.cx, t.cz);
+          if (t.dist > maxDist) maxDist = t.dist;
+          t.vertices.forEach((vt) => {
+            const vd = Math.hypot(vt.x, vt.z);
+            if (vd > maxSpan) maxSpan = vd;
+            const key = quantizeKey(vt.x, vt.z);
+            if (!clusters.has(key)) {
+              clusters.set(key, { x: vt.x, z: vt.z, tileIds: [] });
+            }
+            clusters.get(key).tileIds.push(t.id);
+            rollingSum += Math.round((vt.x * 13 + vt.z * 17) * 100);
+          });
+        });
+
+        rawTiles.forEach((t) => {
+          t.color = computeTileColor(t, maxDist);
+          const wave = Math.cos(t.dist * 0.55) * 0.18 + ((Math.abs(t.u * 3 + t.v * 5 + t.parity) % 4) * 0.09);
+          t.height = Math.max(0.24, 0.42 + wave);
+        });
+
+        state.tiles = rawTiles;
+        state.vertexClusters = clusters;
+        state.citySpanRadius = maxSpan;
+        state.theoreticalAngleDeg = ((n - 2) * 180) / n;
+        state.expectedMeetCount = Math.round(360 / state.theoreticalAngleDeg);
+        state.checksum = Math.abs(rollingSum % 1000000);
+
+        selectBestVertexNear(0, 0);
+      }
+
+      function computeVertexInteriorAngleDeg(tile, vx, vz) {
+        const verts = tile.vertices;
+        let idx = 0;
+        let bestD = Infinity;
+        for (let i = 0; i < verts.length; i++) {
+          const d = Math.hypot(verts[i].x - vx, verts[i].z - vz);
+          if (d < bestD) { bestD = d; idx = i; }
+        }
+        const curr = verts[idx];
+        const prev = verts[(idx - 1 + verts.length) % verts.length];
+        const next = verts[(idx + 1) % verts.length];
+        const ax = prev.x - curr.x, az = prev.z - curr.z;
+        const bx = next.x - curr.x, bz = next.z - curr.z;
+        const dot = ax * bx + az * bz;
+        const mag = Math.hypot(ax, az) * Math.hypot(bx, bz);
+        if (mag < 1e-6) return state.theoreticalAngleDeg;
+        const cosVal = Math.max(-1, Math.min(1, dot / mag));
+        return (Math.acos(cosVal) * 180) / Math.PI;
+      }
+
+      function selectBestVertexNear(targetX, targetZ, candidateVertices) {
+        const needed = state.expectedMeetCount;
+        let bestKey = null;
+        let bestDist = Infinity;
+
+        const pool = candidateVertices
+          ? candidateVertices.map((v) => quantizeKey(v.x, v.z))
+          : Array.from(state.vertexClusters.keys());
+
+        pool.forEach((key) => {
+          const cluster = state.vertexClusters.get(key);
+          if (!cluster) return;
+          const isFullVertex = cluster.tileIds.length === needed;
+          const penalty = isFullVertex ? 0 : 1000;
+          const d = Math.hypot(cluster.x - targetX, cluster.z - targetZ) + penalty;
+          if (d < bestDist) {
+            bestDist = d;
+            bestKey = key;
+          }
+        });
+
+        if (bestKey && state.vertexClusters.has(bestKey)) {
+          const cluster = state.vertexClusters.get(bestKey);
+          state.selectedVertexKey = bestKey;
+          state.selectedVertex = { x: cluster.x, z: cluster.z };
+          state.highlightedTileIds = new Set(cluster.tileIds);
+          state.actualMeetCount = cluster.tileIds.length;
+          const sampleTile = state.tiles.find((t) => t.id === cluster.tileIds[0]);
+          state.measuredAngleDeg = sampleTile
+            ? computeVertexInteriorAngleDeg(sampleTile, cluster.x, cluster.z)
+            : state.theoreticalAngleDeg;
+        }
+        updateHudDisplay();
+      }
+
+      function updateHudDisplay() {
+        const angle = Math.round(state.measuredAngleDeg);
+        const count = state.actualMeetCount;
+        const total = angle * count;
+        const shapeNames = { 3: '정삼각형', 4: '정사각형', 6: '정육각형' };
+
+        document.getElementById('hud-vertex-title').textContent =
+          `${shapeNames[state.sides]} 한 꼭짓점 모임 (${count}개 타일 공유)`;
+        document.getElementById('hud-vertex-math').textContent =
+          `${angle}° × ${count}개 = ${total}° (빈틈 ${Math.max(0, 360 - total)}°)`;
+        document.getElementById('hud-vertex-coord').textContent =
+          `선택 정점: (${state.selectedVertex.x.toFixed(2)}, ${state.selectedVertex.z.toFixed(2)}) · 도시 타일 ${state.tiles.length}개`;
+
+        const svg = document.getElementById('vertex-svg');
+        const stepRad = (Math.PI * 2) / state.expectedMeetCount;
+        const startOffset = state.sides === 4 ? Math.PI / 4 : 0;
+        const colors = ['#38bdf8', '#818cf8', '#34d399', '#fbbf24', '#f472b6', '#2dd4bf'];
+        let paths = `<circle cx="0" cy="0" r="19" fill="none" stroke="#334155" stroke-width="1"/>`;
+        for (let i = 0; i < count; i++) {
+          const a0 = startOffset + i * stepRad;
+          const a1 = a0 + stepRad;
+          const x0 = (18 * Math.cos(a0)).toFixed(2);
+          const y0 = (18 * Math.sin(a0)).toFixed(2);
+          const x1 = (18 * Math.cos(a1)).toFixed(2);
+          const y1 = (18 * Math.sin(a1)).toFixed(2);
+          const c = colors[i % colors.length];
+          paths += `<path d="M0,0 L${x0},${y0} A18,18 0 0,1 ${x1},${y1} Z" fill="${c}55" stroke="${c}" stroke-width="1.3"/>`;
+        }
+        paths += `<circle cx="0" cy="0" r="3" fill="#fbbf24" stroke="#fff" stroke-width="1"/>`;
+        svg.innerHTML = paths;
+      }
+
+      const stageWrap = document.getElementById('stage-wrap');
+      let renderer = null, scene = null, camera = null, cityGroup = null, markerGroup = null;
+      let raycaster = null, pointerNDC = null;
+      let fallbackCanvas = null, fallbackCtx = null;
+
+      const camRig = {
+        yaw: 0.62,
+        pitch: 0.78,
+        targetYaw: 0.62,
+        targetPitch: 0.78,
+        distance: 28,
+        targetDistance: 28,
+        isDragging: false,
+        dragMoved: false,
+        downX: 0,
+        downY: 0
+      };
+
+      function initStage() {
+        try {
+          if (!window.THREE) throw new Error('Three.js 로드 실패');
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.domElement.className = 'stage-canvas';
+          stageWrap.innerHTML = '';
+          stageWrap.appendChild(renderer.domElement);
+
+          const ambient = new THREE.AmbientLight(0xdbeafe, 0.78);
+          const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.92);
+          dirLight1.position.set(18, 34, 22);
+          const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.48);
+          dirLight2.position.set(-22, 18, -16);
+          scene.add(ambient, dirLight1, dirLight2);
+
+          cityGroup = new THREE.Group();
+          markerGroup = new THREE.Group();
+          scene.add(cityGroup, markerGroup);
+
+          raycaster = new THREE.Raycaster();
+          pointerNDC = new THREE.Vector2();
+          state.webglActive = true;
+          bindPointerEvents(renderer.domElement);
+        } catch (err) {
+          state.webglActive = false;
+          document.getElementById('fallback-banner').style.display = 'block';
+          fallbackCanvas = document.createElement('canvas');
+          fallbackCanvas.className = 'stage-canvas';
+          stageWrap.innerHTML = '';
+          stageWrap.appendChild(fallbackCanvas);
+          fallbackCtx = fallbackCanvas.getContext('2d');
+          bindPointerEvents(fallbackCanvas);
+        }
+      }
+
+      function buildThreeCityMeshes() {
+        if (!state.webglActive || !cityGroup) return;
+
+        while (cityGroup.children.length > 0) {
+          const obj = cityGroup.children.pop();
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) obj.material.dispose();
+        }
+
+        state.tiles.forEach((tile) => {
+          const isHi = state.highlightedTileIds.has(tile.id);
+          const extrudeH = state.isPlanar2DView ? 0.08 : (isHi ? tile.height + 0.24 : tile.height);
+
+          const shape = new THREE.Shape();
+          tile.vertices.forEach((vt, idx) => {
+            if (idx === 0) shape.moveTo(vt.x, -vt.z);
+            else shape.lineTo(vt.x, -vt.z);
+          });
+          shape.closePath();
+
+          const geo = new THREE.ExtrudeGeometry(shape, {
+            depth: extrudeH,
+            bevelEnabled: false,
+            steps: 1
+          });
+          geo.rotateX(-Math.PI / 2);
+
+          const baseColor = new THREE.Color(tile.color);
+          const mat = new THREE.MeshPhysicalMaterial({
+            color: baseColor,
+            emissive: isHi ? new THREE.Color('#fbbf24') : baseColor,
+            emissiveIntensity: isHi ? 0.55 : 0.18,
+            transparent: true,
+            opacity: isHi ? 0.95 : 0.78,
+            roughness: 0.18,
+            metalness: 0.12,
+            transmission: 0.25
+          });
+
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.userData = { tileId: tile.id };
+          cityGroup.add(mesh);
+
+          const edgeGeo = new THREE.EdgesGeometry(geo);
+          const edgeMat = new THREE.LineBasicMaterial({
+            color: isHi ? 0xfef08a : 0xe0f2fe,
+            transparent: true,
+            opacity: isHi ? 1.0 : 0.52
+          });
+          const wire = new THREE.LineSegments(edgeGeo, edgeMat);
+          wire.position.y = 0.005;
+          cityGroup.add(wire);
+        });
+
+        updateThreeVertexMarker();
+      }
+
+      function updateThreeVertexMarker() {
+        if (!state.webglActive || !markerGroup) return;
+        while (markerGroup.children.length > 0) {
+          const child = markerGroup.children.pop();
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) child.material.dispose();
+        }
+        const vx = state.selectedVertex.x;
+        const vz = state.selectedVertex.z;
+        const ringRadius = Math.max(0.35, state.tileRadius * 0.34);
+
+        const ringGeo = new THREE.RingGeometry(ringRadius * 0.62, ringRadius, 36);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xfbbf24,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.92
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.set(vx, 0.92, vz);
+
+        const pillarGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.15, 16);
+        const pillarMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.set(vx, 0.55, vz);
+
+        markerGroup.add(ringMesh, pillar);
+      }
+
+      function updateCameraFit() {
+        const w = stageWrap.clientWidth || window.innerWidth;
+        const h = stageWrap.clientHeight || (window.innerHeight - 116);
+        const aspect = w / Math.max(1, h);
+
+        if (state.webglActive && renderer && camera) {
+          renderer.setSize(w, h);
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+        } else if (fallbackCanvas) {
+          fallbackCanvas.width = w;
+          fallbackCanvas.height = h;
+        }
+
+        const fovRad = (42 * Math.PI) / 180;
+        const fitFactor = aspect < 1 ? 1 / Math.max(0.48, aspect * 0.85) : 1.08;
+        camRig.targetDistance = ((state.citySpanRadius * 1.28) / Math.tan(fovRad / 2)) * fitFactor;
+        camRig.targetPitch = state.isPlanar2DView ? 1.55 : 0.78;
+      }
+
+      function render2DFallback() {
+        if (!fallbackCtx || !fallbackCanvas) return;
+        const w = fallbackCanvas.width;
+        const h = fallbackCanvas.height;
+        fallbackCtx.clearRect(0, 0, w, h);
+
+        const scale = (Math.min(w, h) * 0.39) / Math.max(1, state.citySpanRadius);
+        const cx0 = w * 0.5;
+        const cy0 = h * 0.48;
+
+        state.tiles.forEach((tile) => {
+          const isHi = state.highlightedTileIds.has(tile.id);
+          fallbackCtx.beginPath();
+          tile.vertices.forEach((vt, idx) => {
+            const sx = cx0 + vt.x * scale;
+            const sy = cy0 + vt.z * scale;
+            if (idx === 0) fallbackCtx.moveTo(sx, sy);
+            else fallbackCtx.lineTo(sx, sy);
+          });
+          fallbackCtx.closePath();
+          fallbackCtx.fillStyle = isHi ? '#fbbf24cc' : `${tile.color}bb`;
+          fallbackCtx.fill();
+          fallbackCtx.lineWidth = isHi ? 2.4 : 1.1;
+          fallbackCtx.strokeStyle = isHi ? '#fef08a' : '#e0f2fe';
+          fallbackCtx.stroke();
+        });
+
+        const vx = cx0 + state.selectedVertex.x * scale;
+        const vy = cy0 + state.selectedVertex.z * scale;
+        fallbackCtx.beginPath();
+        fallbackCtx.arc(vx, vy, Math.max(6, state.tileRadius * scale * 0.28), 0, Math.PI * 2);
+        fallbackCtx.strokeStyle = '#fbbf24';
+        fallbackCtx.lineWidth = 3;
+        fallbackCtx.stroke();
+      }
+
+      function handleStageTap(clientX, clientY, domElem) {
+        const rect = domElem.getBoundingClientRect();
+        if (state.webglActive && raycaster && camera) {
+          pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+          pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(pointerNDC, camera);
+          const meshes = cityGroup.children.filter((c) => c.isMesh);
+          const hits = raycaster.intersectObjects(meshes, false);
+          if (hits.length > 0) {
+            const hit = hits[0];
+            const tile = state.tiles.find((t) => t.id === hit.object.userData.tileId);
+            if (tile) {
+              selectBestVertexNear(hit.point.x, hit.point.z, tile.vertices);
+              buildThreeCityMeshes();
+            }
+          }
+        } else if (fallbackCanvas) {
+          const scale = (Math.min(rect.width, rect.height) * 0.39) / Math.max(1, state.citySpanRadius);
+          const wx = (clientX - rect.left - rect.width * 0.5) / scale;
+          const wz = (clientY - rect.top - rect.height * 0.48) / scale;
+          selectBestVertexNear(wx, wz);
+          render2DFallback();
+        }
+      }
+
+      function bindPointerEvents(domElem) {
+        domElem.addEventListener('pointerdown', (e) => {
+          camRig.isDragging = true;
+          camRig.dragMoved = false;
+          camRig.downX = e.clientX;
+          camRig.downY = e.clientY;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (!camRig.isDragging) return;
+          const dx = e.clientX - camRig.downX;
+          const dy = e.clientY - camRig.downY;
+          if (Math.hypot(dx, dy) > 5) camRig.dragMoved = true;
+          camRig.targetYaw -= dx * 0.007;
+          if (!state.isPlanar2DView) {
+            camRig.targetPitch = Math.max(0.28, Math.min(1.48, camRig.targetPitch + dy * 0.006));
+          }
+          camRig.downX = e.clientX;
+          camRig.downY = e.clientY;
+        });
+
+        window.addEventListener('pointerup', (e) => {
+          if (camRig.isDragging && !camRig.dragMoved && e.target === domElem) {
+            handleStageTap(e.clientX, e.clientY, domElem);
+          }
+          camRig.isDragging = false;
+        });
+
+        domElem.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          camRig.targetDistance = Math.max(8, Math.min(95, camRig.targetDistance + e.deltaY * 0.02));
+        }, { passive: false });
+      }
+
+      function syncUIFromState() {
+        document.querySelectorAll('[data-sides]').forEach((btn) => {
+          btn.classList.toggle('active', Number(btn.dataset.sides) === state.sides);
+        });
+        document.querySelectorAll('[data-color]').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.color === state.colorRule);
+        });
+        const sSize = document.getElementById('slider-size');
+        sSize.value = state.tileRadius.toFixed(2);
+        document.getElementById('val-size').textContent = state.tileRadius.toFixed(2);
+
+        const sRange = document.getElementById('slider-range');
+        sRange.value = String(state.gridRange);
+        document.getElementById('val-range').textContent = `${state.gridRange}단계 (${state.tiles.length}개)`;
+
+        const btnView = document.getElementById('btn-view');
+        btnView.classList.toggle('active', state.isPlanar2DView);
+        btnView.textContent = state.isPlanar2DView ? '평면 테셀레이션 시점 (2D)' : '입체 도시 시점 (3D)';
+      }
+
+      function refreshSceneAll(refit = true) {
+        rebuildTessellationData();
+        syncUIFromState();
+        if (refit) updateCameraFit();
+        if (state.webglActive) buildThreeCityMeshes();
+        else render2DFallback();
+      }
+
+      document.querySelectorAll('[data-sides]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.sides = Number(btn.dataset.sides);
+          refreshSceneAll(true);
+        });
+      });
+
+      document.querySelectorAll('[data-color]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.colorRule = btn.dataset.color;
+          refreshSceneAll(false);
+        });
+      });
+
+      document.getElementById('slider-size').addEventListener('input', (e) => {
+        state.tileRadius = parseFloat(e.target.value);
+        refreshSceneAll(true);
+      });
+
+      document.getElementById('slider-range').addEventListener('input', (e) => {
+        state.gridRange = parseInt(e.target.value, 10);
+        refreshSceneAll(true);
+      });
+
+      document.getElementById('btn-view').addEventListener('click', () => {
+        state.isPlanar2DView = !state.isPlanar2DView;
+        camRig.targetPitch = state.isPlanar2DView ? 1.56 : 0.78;
+        if (state.isPlanar2DView) camRig.targetYaw = 0;
+        syncUIFromState();
+        if (state.webglActive) buildThreeCityMeshes();
+      });
+
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        state.sides = DEFAULTS.sides;
+        state.tileRadius = DEFAULTS.tileRadius;
+        state.gridRange = DEFAULTS.gridRange;
+        state.colorRule = DEFAULTS.colorRule;
+        state.isPlanar2DView = DEFAULTS.isPlanar2DView;
+        camRig.targetYaw = 0.62;
+        camRig.targetPitch = 0.78;
+        refreshSceneAll(true);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') camRig.targetYaw -= 0.12;
+        else if (e.key === 'ArrowRight') camRig.targetYaw += 0.12;
+        else if (e.key === 'ArrowUp') camRig.targetPitch = Math.min(1.55, camRig.targetPitch + 0.08);
+        else if (e.key === 'ArrowDown') camRig.targetPitch = Math.max(0.28, camRig.targetPitch - 0.08);
+      });
+
+      window.addEventListener('resize', () => {
+        updateCameraFit();
+        if (!state.webglActive) render2DFallback();
+      });
+
+      window.appDiagnostics = function () {
+        const sample = state.tiles.slice(0, 3).map((t) => ({
+          id: t.id,
+          center: [Number(t.cx.toFixed(3)), Number(t.cz.toFixed(3))],
+          vertices: t.vertices.map((v) => [Number(v.x.toFixed(3)), Number(v.z.toFixed(3))])
+        }));
+        return Object.freeze({
+          appName: 'TESSELLATION CITY | 빈틈없이 이어지는 패턴 도시',
+          webglActive: state.webglActive,
+          polygonSides: state.sides,
+          tileRadius: state.tileRadius,
+          gridRange: state.gridRange,
+          colorRule: state.colorRule,
+          isPlanar2DView: state.isPlanar2DView,
+          actualTileCount: state.tiles.length,
+          interiorAngleDeg: Number(state.measuredAngleDeg.toFixed(2)),
+          tilesAtSelectedVertex: state.actualMeetCount,
+          vertexAngleSumDeg: Number((state.measuredAngleDeg * state.actualMeetCount).toFixed(2)),
+          selectedVertex: { ...state.selectedVertex },
+          vertexSample: sample,
+          layoutChecksum: state.checksum
+        });
+      };
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+        if (!state.webglActive) return;
+
+        camRig.yaw += (camRig.targetYaw - camRig.yaw) * 0.12;
+        camRig.pitch += (camRig.targetPitch - camRig.pitch) * 0.12;
+        camRig.distance += (camRig.targetDistance - camRig.distance) * 0.12;
+
+        const rHoriz = camRig.distance * Math.cos(camRig.pitch);
+        camera.position.set(
+          rHoriz * Math.sin(camRig.yaw),
+          camRig.distance * Math.sin(camRig.pitch),
+          rHoriz * Math.cos(camRig.yaw)
+        );
+        camera.lookAt(0, 0, 0);
+
+        if (markerGroup && markerGroup.children[0]) {
+          markerGroup.children[0].scale.setScalar(1 + Math.sin(now * 0.005) * 0.12);
+        }
+        renderer.render(scene, camera);
+      }
+
+      window.onload = function () {
+        initStage();
+        refreshSceneAll(true);
+        requestAnimationFrame(animate);
+      };
+    })();
+  </script>
+</body>
+</html>

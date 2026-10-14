@@ -1,0 +1,3128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CLAY STUDIO | 손끝으로 빚는 도자기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Matching Three.js r128 and OrbitControls CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    :root {
+      --bg-studio-top: #f6f2e9;
+      --bg-studio-mid: #ede6d8;
+      --bg-studio-bot: #dfd5c3;
+      --ink-primary: #2c2621;
+      --ink-secondary: #685e54;
+      --accent-celadon: #4d7c6f;
+      --accent-terracotta: #b85d3b;
+      --panel-bg: rgba(251, 248, 242, 0.88);
+      --panel-border: rgba(120, 106, 90, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Noto Sans KR', sans-serif;
+      background: radial-gradient(circle at 38% 28%, #fbf9f4 0%, var(--bg-studio-top) 38%, var(--bg-studio-mid) 74%, var(--bg-studio-bot) 100%);
+      color: var(--ink-primary);
+    }
+
+    .serif-title {
+      font-family: 'Noto Serif KR', serif;
+    }
+
+    /* Glassmorphic studio HUD panels */
+    .studio-glass {
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 10px 30px -8px rgba(48, 38, 28, 0.12), 0 2px 6px rgba(48, 38, 28, 0.06);
+    }
+
+    /* Custom range sliders */
+    input[type="range"].studio-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: rgba(110, 96, 82, 0.22);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"].studio-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4d7c6f;
+      border: 2px solid #fbf9f4;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    input[type="range"].studio-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.14);
+      background: #3b6559;
+    }
+
+    input[type="range"].studio-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4d7c6f;
+      border: 2px solid #fbf9f4;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Sculpt handle SVG styling */
+    .sculpt-handle-group {
+      cursor: ew-resize;
+      pointer-events: all;
+      transition: filter 0.15s ease;
+    }
+
+    .sculpt-handle-group:hover .handle-outer {
+      r: 13px;
+    }
+
+    .sculpt-handle-group.active .handle-outer {
+      stroke: #b85d3b;
+      stroke-width: 3px;
+      fill: #fff8f0;
+    }
+
+    .sculpt-handle-group.active .handle-inner {
+      fill: #b85d3b;
+    }
+
+    /* Tool buttons */
+    .studio-btn {
+      transition: all 0.15s ease;
+    }
+
+    .studio-btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .studio-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    .tab-active {
+      background: #3d6459 !important;
+      color: #ffffff !important;
+      box-shadow: 0 3px 10px rgba(61, 100, 89, 0.28);
+    }
+
+    .subbtn-active {
+      background: #e3ece8 !important;
+      color: #284b40 !important;
+      border-color: #4d7c6f !important;
+      font-weight: 600;
+    }
+
+    /* Custom scrollbar for drawers */
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(110, 96, 82, 0.3);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+
+<body class="relative w-full h-full select-none overflow-hidden">
+
+  <!-- Main 3D / 2D Fallback Viewport Container (Occupies 100% screen, artwork framed to 65~75% height) -->
+  <main id="viewportContainer" class="relative w-full h-full overflow-hidden">
+    <!-- Three.js WebGL Canvas -->
+    <canvas id="glCanvas" class="block w-full h-full outline-none"></canvas>
+
+    <!-- 2D Silhouette Fallback Canvas (Shown only if WebGL/Three fails or user switches to 2D inspect) -->
+    <canvas id="fallback2DCanvas" class="hidden absolute inset-0 w-full h-full"></canvas>
+
+    <!-- Interactive SVG Overlay for Sculpt Handles & Silhouette Guides -->
+    <svg id="sculptOverlaySvg" class="
+      absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible
+    " xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="handleShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#2c2621" flood-opacity="0.28" />
+        </filter>
+      </defs>
+      <!-- Center Axis Guide -->
+      <line id="svgAxisLine" x1="0" y1="0" x2="0" y2="0" stroke="#7c6f60" stroke-width="1" stroke-dasharray="4 4" opacity="0.45" />
+      <!-- Active Radius Dimension Line -->
+      <line id="svgRadiusLine" x1="0" y1="0" x2="0" y2="0" stroke="#b85d3b" stroke-width="1.75" stroke-dasharray="3 2" opacity="0.85" />
+      <rect id="svgRadiusBadgeBg" x="0" y="0" width="66" height="20" rx="6" fill="#fff9f2" stroke="#b85d3b" stroke-width="1" opacity="0.95" />
+      <text id="svgRadiusBadgeText" x="0" y="0" fill="#9c4627" font-size="11" font-weight="600" text-anchor="middle" dominant-baseline="central">7.5 cm</text>
+      <!-- Silhouette Curve Path -->
+      <path id="svgContourPath" d="" fill="none" stroke="#4d7c6f" stroke-width="2" stroke-dasharray="4 3" opacity="0.75" />
+      <!-- Group holding the 8 draggable height handles -->
+      <g id="svgHandlesGroup"></g>
+    </svg>
+
+    <!-- Subtle Context Hint Pill (Top below header) -->
+    <div class="
+      pointer-events-none absolute top-14 left-1/2 -translate-x-1/2 z-20
+      flex items-center gap-2 px-3.5 py-1 rounded-full studio-glass text-xs text-stone-700
+      transition-opacity duration-200
+    " id="modeHintBanner">
+      <span id="modeHintDot" class="w-2 h-2 rounded-full bg-emerald-700"></span>
+      <span id="modeHintText">빚기 모드: 우측 윤곽 손잡이를 좌우로 끌거나 아래 슬라이더·방향키(←/→)로 도자기 형태를 빚어보세요.</span>
+    </div>
+
+    <!-- Fallback Notice Banner (Hidden when 3D WebGL runs normally) -->
+    <div id="fallbackNotice" class="
+      hidden absolute top-24 left-1/2 -translate-x-1/2 z-20
+      px-4 py-1.5 rounded-xl bg-amber-50/95 border border-amber-300 text-amber-900 text-xs shadow-md
+    ">
+      3D WebGL 가속을 사용할 수 없어 2D 물레 단면·무늬 대체 모드로 작동 중입니다. (형태 빚기·유약·무늬·저장 모두 가능)
+    </div>
+  </main>
+
+  <header class="
+    fixed top-2.5 left-3 right-3 z-30 flex items-center justify-between gap-2
+    px-3.5 py-2 rounded-2xl studio-glass
+  ">
+    <!-- Brand & Live Verifiable Metrics -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-[#3d6459] flex items-center justify-center text-white shadow-sm shrink-0">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+            <path d="M7 3h10l-1.5 4.5c2.2 2.3 3.2 5.2 2.5 8.5-.6 2.8-2.6 4.5-4.5 5H10.5c-1.9-.5-3.9-2.2-4.5-5-.7-3.3.3-6.2 2.5-8.5L7 3z" stroke-linejoin="round"/>
+            <path d="M6.5 12.5c3.5-1.5 7.5 1.5 11 0" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="truncate">
+          <div class="flex items-center gap-2">
+            <h1 class="serif-title text-sm sm:text-base font-bold tracking-tight text-stone-800 truncate">CLAY STUDIO</h1>
+            <span class="hidden md:inline-block text-xs text-stone-500 font-medium">| 손끝으로 빚는 도자기</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Verifiable Ceramic Specs Badge -->
+      <div class="
+        hidden sm:flex items-center gap-2.5 px-2.5 py-1 rounded-xl
+        bg-stone-200/60 border border-stone-300/70 text-[11px] text-stone-700 font-medium shrink-0
+      " title="실시간 3D 도자기 치수 및 형상 갱신 횟수">
+        <span>최대너비 <strong id="metricMaxWidth" class="text-stone-900 font-bold">21.6</strong>cm</span>
+        <span class="text-stone-400">·</span>
+        <span>높이 <strong id="metricHeight" class="text-stone-900 font-bold">24.0</strong>cm</span>
+        <span class="text-stone-400">·</span>
+        <span>3D갱신 <strong id="metricGeoUpdates" class="text-emerald-800 font-bold">1</strong>회</span>
+      </div>
+    </div>
+
+    <!-- Top Right Utility & Lesson Controls -->
+    <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      <!-- Wheel Quick Toggle -->
+      <button id="btnWheelToggleTop" type="button" class="
+        studio-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium
+        bg-emerald-50/90 text-emerald-900 border border-emerald-700/30 hover:bg-emerald-100/80
+      " title="물레 회전 켜기/끄기">
+        <svg id="iconWheelSpin" class="w-4 h-4 animate-spin" style="animation-duration: 6s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="8"/>
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M12 4v4M12 16v4M4 12h4M16 12h4"/>
+        </svg>
+        <span id="labelWheelToggleTop" class="hidden md:inline">물레 회전중</span>
+      </button>
+
+      <!-- Home Camera View -->
+      <button id="btnResetCamera" type="button" class="
+        studio-btn flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium
+        bg-stone-100/90 text-stone-700 border border-stone-300/80 hover:bg-stone-200/80
+      " title="홈 시점 (화면 맞춤)">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="hidden lg:inline">홈 시점</span>
+      </button>
+
+      <!-- Undo / Redo / Reset Artwork -->
+      <div class="flex items-center bg-stone-100/90 rounded-xl border border-stone-300/80 p-0.5">
+        <button id="btnUndo" type="button" disabled class="
+          studio-btn p-1.5 rounded-lg text-stone-700 hover:bg-stone-200/70
+        " title="실행 취소 (Ctrl+Z)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 14L4 9l5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="btnRedo" type="button" disabled class="
+          studio-btn p-1.5 rounded-lg text-stone-700 hover:bg-stone-200/70
+        " title="다시 실행 (Ctrl+Y)">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 14l5-5-5-5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button id="btnResetArt" type="button" class="
+          studio-btn px-2 py-1 rounded-lg text-xs font-medium text-stone-700 hover:bg-stone-200/70
+        " title="초기 청자 달항아리 작품으로 되돌리기">
+          초기화
+        </button>
+      </div>
+
+      <!-- Save PNG -->
+      <button id="btnSavePng" type="button" class="
+        studio-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold
+        bg-[#3d6459] text-white hover:bg-[#2f5047] shadow-sm
+      " title="현재 작품을 PNG 이미지로 저장">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="7 10 12 15 17 10" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="15" x2="12" y2="3" stroke-linecap="round"/>
+        </svg>
+        <span class="hidden sm:inline">작품 PNG 저장</span>
+      </button>
+
+      <!-- 5-Minute Art Lesson Drawer Toggle -->
+      <button id="btnLessonToggle" type="button" class="
+        studio-btn flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium
+        bg-amber-50/90 text-amber-900 border border-amber-400/60 hover:bg-amber-100/80
+      ">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" stroke-linejoin="round"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" stroke-linejoin="round"/>
+        </svg>
+        <span class="hidden md:inline">5분 미술 수업</span>
+      </button>
+
+      <!-- Info & Self-Test Drawer Toggle -->
+      <button id="btnTestToggle" type="button" class="
+        studio-btn flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium
+        bg-stone-100/90 text-stone-700 border border-stone-300/80 hover:bg-stone-200/80
+      ">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 11l3 3L22 4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="hidden md:inline">정보·검사</span>
+      </button>
+    </div>
+  </header>
+
+  <footer class="
+    fixed bottom-2.5 left-1/2 -translate-x-1/2 z-30
+    w-[96vw] max-w-4xl px-3 py-2.5 rounded-2xl studio-glass
+  ">
+    <div class="flex flex-col gap-2">
+      <!-- Top Row of Dock: 4 Mode Tabs + Active Mode Quick Status -->
+      <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-stone-300/60 pb-2">
+        <div class="flex items-center gap-1" role="tablist" aria-label="작업 도구 모드">
+          <button type="button" data-mode="sculpt" class="
+            mode-tab-btn studio-btn tab-active flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+            bg-stone-200/70 text-stone-700
+          ">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 3h12l-2 6c2 2.5 2.5 6 1 9-1 2-3 3-5 3s-4-1-5-3c-1.5-3-1-6.5 1-9L6 3z" stroke-linejoin="round"/>
+              <path d="M3 12h4M17 12h4" stroke-linecap="round"/>
+            </svg>
+            <span>1. 형태 빚기</span>
+          </button>
+
+          <button type="button" data-mode="glaze" class="
+            mode-tab-btn studio-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+            bg-stone-200/70 text-stone-700
+          ">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" stroke-linejoin="round"/>
+            </svg>
+            <span>2. 유약·질감</span>
+          </button>
+
+          <button type="button" data-mode="paint" class="
+            mode-tab-btn studio-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+            bg-stone-200/70 text-stone-700
+          ">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 3a3 3 0 0 1 3 3c0 1.3-.8 2.4-2 2.8L9 19l-5 2 2-5 10.2-10c.4-1.2 1.5-2 2.8-2z" stroke-linejoin="round"/>
+            </svg>
+            <span>3. 무늬 그리기</span>
+          </button>
+
+          <button type="button" data-mode="wheel" class="
+            mode-tab-btn studio-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+            bg-stone-200/70 text-stone-700
+          ">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M12 8v4l3 3" stroke-linecap="round"/>
+            </svg>
+            <span>4. 물레·조명</span>
+          </button>
+        </div>
+
+        <!-- Mobile-visible compact metric & camera tip -->
+        <div class="flex items-center gap-2 text-[11px] text-stone-600">
+          <span class="sm:hidden">폭 <strong id="metricMaxWidthMobile">21.6</strong>cm · 갱신 <strong id="metricGeoUpdatesMobile">1</strong></span>
+          <span class="hidden sm:inline">배경 드래그: 시점 회전 · 휠/핀치: 확대/축소</span>
+        </div>
+      </div>
+
+      <!-- PANEL 1: 형태 빚기 (Shape Sculpting) -->
+      <div id="panelSculpt" class="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <!-- 3 Distinct Form Presets -->
+        <div class="flex items-center gap-1">
+          <span class="text-[11px] font-semibold text-stone-500 mr-1">기형 프리셋</span>
+          <button type="button" data-preset="moonjar" class="preset-btn studio-btn subbtn-active px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            달항아리
+          </button>
+          <button type="button" data-preset="gourd" class="preset-btn studio-btn px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            호리병
+          </button>
+          <button type="button" data-preset="bowl" class="preset-btn studio-btn px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            넓은 볼
+          </button>
+        </div>
+
+        <!-- 4 Anatomical Region Selectors -->
+        <div class="flex items-center gap-1">
+          <span class="text-[11px] font-semibold text-stone-500 mr-1">부위 선택</span>
+          <button type="button" data-region="mouth" class="region-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            입구
+          </button>
+          <button type="button" data-region="neck" class="region-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            목
+          </button>
+          <button type="button" data-region="body" class="region-btn studio-btn subbtn-active px-2 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            몸통
+          </button>
+          <button type="button" data-region="base" class="region-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            밑동
+          </button>
+        </div>
+
+        <!-- Radius Slider & Keyboard Nudge Buttons -->
+        <div class="flex items-center gap-2 grow sm:grow-0 justify-end">
+          <span id="labelActiveHandle" class="text-[11px] font-semibold text-[#9c4627] min-w-[78px] text-right">
+            몸통(#4): 10.8cm
+          </span>
+          <button id="btnRadiusDec" type="button" class="studio-btn w-6 h-6 rounded-lg bg-stone-200/80 hover:bg-stone-300 flex items-center justify-center font-bold text-stone-700" title="반지름 줄이기 (← 방향키)">-</button>
+          <input id="sliderRadius" type="range" min="2.4" max="14.5" step="0.1" value="10.8" class="studio-slider w-28 sm:w-36" aria-label="선택 구간 반지름 조절" />
+          <button id="btnRadiusInc" type="button" class="studio-btn w-6 h-6 rounded-lg bg-stone-200/80 hover:bg-stone-300 flex items-center justify-center font-bold text-stone-700" title="반지름 늘리기 (→ 방향키)">+</button>
+        </div>
+      </div>
+
+      <!-- PANEL 2: 유약·질감 (Glaze & Surface) -->
+      <div id="panelGlaze" class="hidden flex-wrap items-center justify-between gap-2 text-xs">
+        <!-- 4 Ceramic Glazes -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-[11px] font-semibold text-stone-500 mr-0.5">전통 유약</span>
+          <button type="button" data-glaze="celadon" class="glaze-btn studio-btn subbtn-active flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80">
+            <span class="w-3.5 h-3.5 rounded-full bg-[#88aa99] border border-stone-500/40"></span>
+            <span>청자 (비색)</span>
+          </button>
+          <button type="button" data-glaze="porcelain" class="glaze-btn studio-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80">
+            <span class="w-3.5 h-3.5 rounded-full bg-[#f4f1ea] border border-stone-400"></span>
+            <span>백자 (순백)</span>
+          </button>
+          <button type="button" data-glaze="cobalt" class="glaze-btn studio-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80">
+            <span class="w-3.5 h-3.5 rounded-full bg-[#2b4c7e] border border-stone-500/40"></span>
+            <span>코발트 (청화)</span>
+          </button>
+          <button type="button" data-glaze="buncheong" class="glaze-btn studio-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80">
+            <span class="w-3.5 h-3.5 rounded-full bg-[#b9b09f] border border-stone-500/40"></span>
+            <span>분청 (귀얄)</span>
+          </button>
+        </div>
+
+        <!-- Glossiness Slider (Matte <-> Glossy) & Custom Glaze Tint -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-stone-600">무광</span>
+            <input id="sliderGloss" type="range" min="0" max="100" step="1" value="84" class="studio-slider w-24 sm:w-28" aria-label="유약 광택 조절" />
+            <span class="text-[11px] text-stone-600">유광(<strong id="labelGlossVal">84%</strong>)</span>
+          </div>
+          <label class="flex items-center gap-1 cursor-pointer text-[11px] text-stone-600" title="유약 미세 색조 변경">
+            <span>색조</span>
+            <input id="inputGlazeTint" type="color" value="#88aa99" class="w-6 h-6 rounded cursor-pointer border border-stone-300 bg-transparent p-0" />
+          </label>
+        </div>
+      </div>
+
+      <!-- PANEL 3: 무늬 그리기 (Pattern Painting) -->
+      <div id="panelPaint" class="hidden flex-wrap items-center justify-between gap-2 text-xs">
+        <!-- Draw vs Erase vs Orbit sub-tools -->
+        <div class="flex items-center gap-1">
+          <button id="btnPaintBrush" type="button" class="studio-btn subbtn-active px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+            <span>붓</span>
+          </button>
+          <button id="btnPaintEraser" type="button" class="studio-btn px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2 15 2 13 3 12L13 2L22 11L20 20Z"/><path d="M17 17L7 7"/></svg>
+            <span>지우개</span>
+          </button>
+          <button id="btnPaintOrbit" type="button" class="studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700" title="다른 면에 그리기 위해 시점 회전">
+            시점회전
+          </button>
+        </div>
+
+        <!-- Ceramic Pigment Swatches + Size -->
+        <div class="flex items-center gap-1.5">
+          <div id="swatchContainer" class="flex items-center gap-1">
+            <button type="button" data-color="#f5f2eb" class="swatch-btn w-5 h-5 rounded-full bg-[#f5f2eb] border-2 border-stone-800 shadow-sm" title="백토 상감 (흰색)"></button>
+            <button type="button" data-color="#27322d" class="swatch-btn w-5 h-5 rounded-full bg-[#27322d] border border-stone-400" title="흑상감/철화 (먹색)"></button>
+            <button type="button" data-color="#1f4482" class="swatch-btn w-5 h-5 rounded-full bg-[#1f4482] border border-stone-400" title="청화 코발트 (쪽빛)"></button>
+            <button type="button" data-color="#6b3421" class="swatch-btn w-5 h-5 rounded-full bg-[#6b3421] border border-stone-400" title="철화 (자갈색)"></button>
+            <button type="button" data-color="#9e2b25" class="swatch-btn w-5 h-5 rounded-full bg-[#9e2b25] border border-stone-400" title="진사 (구리 붉은색)"></button>
+            <input id="inputBrushColor" type="color" value="#f5f2eb" class="w-5 h-5 rounded cursor-pointer border border-stone-300 p-0 bg-transparent" title="직접 색 선택" />
+          </div>
+          <div class="flex items-center gap-1 ml-1">
+            <span class="text-[11px] text-stone-600">굵기</span>
+            <input id="sliderBrushSize" type="range" min="3" max="32" step="1" value="9" class="studio-slider w-16 sm:w-20" aria-label="붓 굵기" />
+          </div>
+        </div>
+
+        <!-- 3 Procedural Ceramic Patterns + Clear All -->
+        <div class="flex items-center gap-1">
+          <button type="button" data-pattern="band" class="pattern-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-amber-50/80 text-stone-800 hover:bg-amber-100" title="표면에 전통 띠 무늬 스탬프 추가">
+            +띠
+          </button>
+          <button type="button" data-pattern="dots" class="pattern-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-amber-50/80 text-stone-800 hover:bg-amber-100" title="표면에 연주문 점 무늬 추가">
+            +점
+          </button>
+          <button type="button" data-pattern="wave" class="pattern-btn studio-btn px-2 py-1 rounded-lg border border-stone-300 bg-amber-50/80 text-stone-800 hover:bg-amber-100" title="표면에 파동 물결 무늬 추가">
+            +물결
+          </button>
+          <button id="btnClearPattern" type="button" class="studio-btn px-2 py-1 rounded-lg border border-rose-300 bg-rose-50/80 text-rose-800 hover:bg-rose-100" title="그려진 모든 무늬 지우기">
+            전체지우기
+          </button>
+        </div>
+      </div>
+
+      <!-- PANEL 4: 물레·조명 (Wheel & Studio Lighting) -->
+      <div id="panelWheel" class="hidden flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <button id="btnWheelToggleDock" type="button" class="studio-btn subbtn-active px-3 py-1 rounded-lg border border-stone-300 bg-white/80 font-medium">
+            물레 회전: 켜짐
+          </button>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-stone-600">회전 속도</span>
+            <input id="sliderWheelSpeed" type="range" min="0" max="100" step="1" value="28" class="studio-slider w-24 sm:w-28" aria-label="물레 회전 속도" />
+            <span id="labelWheelSpeed" class="text-[11px] font-semibold text-stone-700 min-w-[32px]">28%</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-stone-600">창문빛 각도</span>
+            <input id="sliderLightAngle" type="range" min="-150" max="150" step="1" value="38" class="studio-slider w-24 sm:w-28" aria-label="창문 조명 각도" />
+          </div>
+          <button id="btnViewRim" type="button" class="studio-btn px-2.5 py-1 rounded-lg border border-stone-300 bg-white/80 text-stone-700">
+            입구·내부 들여다보기
+          </button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Collapsible '5분 미술 수업' Modal/Drawer -->
+  <aside id="drawerLesson" class="
+    hidden fixed top-16 right-3 z-40 w-[92vw] max-w-md max-h-[72vh]
+    rounded-2xl studio-glass p-4 overflow-y-auto custom-scroll
+  ">
+    <div class="flex items-center justify-between border-b border-stone-300/70 pb-2.5 mb-3">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-md bg-amber-800 text-white text-[11px] font-bold">5분 미술·기술 수업</span>
+        <h2 class="serif-title text-sm font-bold text-stone-800">회전체 조형과 도자 표면에 담긴 미학</h2>
+      </div>
+      <button id="btnCloseLesson" type="button" class="p-1 rounded-lg hover:bg-stone-200/70 text-stone-600">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="space-y-3 text-xs leading-relaxed text-stone-700">
+      <div class="p-2.5 rounded-xl bg-white/75 border border-stone-200/90">
+        <p class="font-bold text-stone-900 mb-1">1단계 · 관찰하기 (회전체의 대칭과 구조)</p>
+        <p>물레 위에서 회전하는 도자기는 중심축에서부터의 <strong>반지름-높이 윤곽선</strong>이 360° 회전하여 만들어집니다. 시점을 기울여 열린 입구(구연부), 둥근 어깨, 안쪽 벽면과 바닥, 그리고 바닥을 지탱하는 <strong>굽(foot ring)</strong>과 벽 두께를 관찰해 보세요.</p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-white/75 border border-stone-200/90">
+        <p class="font-bold text-stone-900 mb-1">2단계 · 형태 빚기 (입구·목·몸통·밑동의 비례)</p>
+        <p><strong>[1. 형태 빚기]</strong>에서 <em>달항아리·호리병·넓은 볼</em> 프리셋을 비교한 뒤, 오른쪽 8개 윤곽 손잡이나 슬라이더를 움직여 나만의 비례를 찾아보세요. 몸통 중심을 넓히면 풍만하고 넉넉한 인상이, 목을 좁히면 긴장감 있는 곡선이 살아납니다.</p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-white/75 border border-stone-200/90">
+        <p class="font-bold text-stone-900 mb-1">3단계 · 유약과 반복 무늬 표현</p>
+        <p><strong>[2. 유약·질감]</strong>에서 청자·백자·코발트·분청을 바꾸고 무광↔유광을 조절해 표면 반사광의 깊이를 비교하세요. 이어 <strong>[3. 무늬 그리기]</strong>에서 물레를 돌려가며 붓으로 직접 그리거나 <em>띠·점·물결</em> 반복 무늬를 입혀 보세요.</p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-white/75 border border-stone-200/90">
+        <p class="font-bold text-stone-900 mb-1">4단계 · 조명 비교 및 작품 기록</p>
+        <p><strong>[4. 물레·조명]</strong>에서 창문빛 각도를 바꾸어 곡면에 맺히는 하이라이트와 그림자 변화를 감상한 뒤, <strong>[작품 PNG 저장]</strong>으로 나만의 도자기 작품을 이미지로 저장해 친구들과 비교해 보세요.</p>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-stone-200/55 text-[11px] text-stone-600">
+        <strong>학습 모형 안내:</strong> 본 앱은 학교 미술·기술 수업을 위한 <strong>학습용 3D 형상·재질 시각 모형</strong>입니다. 실제 점토의 수분 수축률, 가마 소성 온도 화학 반응, 구조적 하중이나 실제 도자기 제조 가능성을 정밀 예측하지 않으며, 개인정보 입력이나 외부 서버 전송 없이 브라우저 내에서만 안전하게 동작합니다.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Collapsible '정보·검사' (Pure Function Verification Suite) Drawer -->
+  <aside id="drawerTest" class="
+    hidden fixed top-16 right-3 z-40 w-[94vw] max-w-lg max-h-[75vh]
+    rounded-2xl studio-glass p-4 overflow-y-auto custom-scroll
+  ">
+    <div class="flex items-center justify-between border-b border-stone-300/70 pb-2.5 mb-3">
+      <div>
+        <h2 class="serif-title text-sm font-bold text-stone-800">실시간 순수 함수(Pure Function) 검증 및 상태 진단</h2>
+        <p class="text-[11px] text-stone-500">현재 작업 중인 작품을 훼손하지 않고 형상·두께·Undo·UV·패턴 체크섬을 실제 계산으로 검증합니다.</p>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="btnRunTestsNow" type="button" class="studio-btn px-2.5 py-1 rounded-lg bg-[#3d6459] text-white text-xs font-semibold">
+          검사 다시 실행
+        </button>
+        <button id="btnCloseTest" type="button" class="p-1 rounded-lg hover:bg-stone-200/70 text-stone-600">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="testSummaryBanner" class="mb-3 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-semibold text-emerald-900 flex items-center justify-between">
+      <span>검증 대기 중...</span>
+      <span id="testTimestamp" class="text-[11px] font-normal text-emerald-700"></span>
+    </div>
+
+    <div id="testResultsList" class="space-y-2 text-xs"></div>
+  </aside>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* =========================================================================
+       * 1. CONSTANTS, PRESETS & GLAZE RECIPES (PURE DATA & CLAMP RULES)
+       * ========================================================================= */
+      const MIN_RADIUS_CM = 2.4;
+      const MAX_RADIUS_CM = 14.5;
+      const MIN_WALL_THICKNESS_CM = 0.45;
+      const MAX_WALL_THICKNESS_CM = 1.40;
+      const DEFAULT_WALL_THICKNESS_CM = 0.72;
+      const MIN_INNER_RADIUS_CM = 0.85;
+
+      // Normalized vertical positions for the 8 contour handles (strictly ascending from foot to rim)
+      const HANDLE_Y_RATIOS = Object.freeze([0.06, 0.19, 0.34, 0.50, 0.66, 0.80, 0.91, 1.00]);
+      const HANDLE_LABELS = Object.freeze([
+        '밑동 굽위(#1)',
+        '하단배(#2)',
+        '중하단(#3)',
+        '몸통중심(#4)',
+        '어깨(#5)',
+        '목아래(#6)',
+        '목(#7)',
+        '입구 림(#8)'
+      ]);
+
+      // Mapping of 4 anatomical regions to primary handle index and neighbor weights
+      const REGION_MAP = Object.freeze({
+        base:  { primary: 0, weights: [{ idx: 0, w: 1.0 }, { idx: 1, w: 0.45 }] },
+        body:  { primary: 3, weights: [{ idx: 2, w: 0.55 }, { idx: 3, w: 1.0 }, { idx: 4, w: 0.65 }] },
+        neck:  { primary: 6, weights: [{ idx: 5, w: 0.60 }, { idx: 6, w: 1.0 }] },
+        mouth: { primary: 7, weights: [{ idx: 7, w: 1.0 }, { idx: 6, w: 0.35 }] }
+      });
+
+      // 3 Distinct Ceramic Vessel Presets (radii in cm for the 8 control heights, plus height in cm)
+      const VESSEL_PRESETS = Object.freeze({
+        moonjar: {
+          name: '달항아리',
+          heightCm: 24.0,
+          thicknessCm: 0.72,
+          // Classic Joseon Moon Jar: modest foot, generous full round belly, gentle shoulder, neat vertical-ish rim
+          radiiCm: [5.4, 8.3, 10.4, 10.8, 9.8, 7.6, 5.8, 6.0]
+        },
+        gourd: {
+          name: '호리병',
+          heightCm: 26.5,
+          thicknessCm: 0.68,
+          // Double-bulb Gourd Bottle (표주박형 호리병): plump lower belly, cinched waist at #5, rounded upper bulb at #6, narrow mouth
+          radiiCm: [4.8, 8.6, 9.4, 6.8, 4.1, 6.3, 4.3, 3.1]
+        },
+        bowl: {
+          name: '넓은 볼',
+          heightCm: 15.0,
+          thicknessCm: 0.65,
+          // Wide Ceremonial Tea/Fruit Bowl (다완·넓은 발): crisp foot, sweeping outward wall to a wide open rim
+          radiiCm: [4.6, 6.8, 8.7, 10.2, 11.4, 12.3, 12.9, 13.4]
+        }
+      });
+
+      // 4 Ceramic Glaze Definitions
+      const GLAZE_RECIPES = Object.freeze({
+        celadon: {
+          id: 'celadon',
+          name: '청자 (비색)',
+          baseColor: '#88aa99',
+          deepColor: '#567868',
+          speckleColor: '#3f5349',
+          crackleAlpha: 0.24,
+          speckleCount: 180,
+          brushTextureAlpha: 0.08,
+          defaultGloss: 84,
+          clearcoat: 0.92
+        },
+        porcelain: {
+          id: 'porcelain',
+          name: '백자 (순백)',
+          baseColor: '#f3f0e8',
+          deepColor: '#d9d3c5',
+          speckleColor: '#a89f91',
+          crackleAlpha: 0.05,
+          speckleCount: 45,
+          brushTextureAlpha: 0.04,
+          defaultGloss: 88,
+          clearcoat: 0.88
+        },
+        cobalt: {
+          id: 'cobalt',
+          name: '코발트 (청화)',
+          baseColor: '#2b4c7e',
+          deepColor: '#172c4f',
+          speckleColor: '#0e1b33',
+          crackleAlpha: 0.14,
+          speckleCount: 140,
+          brushTextureAlpha: 0.12,
+          defaultGloss: 90,
+          clearcoat: 0.95
+        },
+        buncheong: {
+          id: 'buncheong',
+          name: '분청 (귀얄)',
+          baseColor: '#b9b09f',
+          deepColor: '#8d826f',
+          speckleColor: '#4a4137',
+          crackleAlpha: 0.08,
+          speckleCount: 620,
+          brushTextureAlpha: 0.38,
+          defaultGloss: 42,
+          clearcoat: 0.45
+        }
+      });
+
+      /* =========================================================================
+       * 2. PURE MATHEMATICAL & GEOMETRY FUNCTIONS (USED BY BOTH APP & SELF-TESTS)
+       * ========================================================================= */
+
+      function clampRadius(radiusCm) {
+        if (!Number.isFinite(radiusCm)) return MIN_RADIUS_CM;
+        return Math.min(MAX_RADIUS_CM, Math.max(MIN_RADIUS_CM, Number(radiusCm)));
+      }
+
+      function clampWallThickness(thicknessCm) {
+        if (!Number.isFinite(thicknessCm)) return DEFAULT_WALL_THICKNESS_CM;
+        return Math.min(MAX_WALL_THICKNESS_CM, Math.max(MIN_WALL_THICKNESS_CM, Number(thicknessCm)));
+      }
+
+      function sanitizeRadiiArray(radiiCm) {
+        const result = [];
+        for (let i = 0; i < HANDLE_Y_RATIOS.length; i++) {
+          const fallback = VESSEL_PRESETS.moonjar.radiiCm[i];
+          const val = Array.isArray(radiiCm) && Number.isFinite(radiiCm[i]) ? radiiCm[i] : fallback;
+          result.push(Number(clampRadius(val).toFixed(3)));
+        }
+        return result;
+      }
+
+      function generateProfileHeights(heightCm) {
+        const safeH = Math.max(10.0, Math.min(34.0, Number(heightCm) || 24.0));
+        return HANDLE_Y_RATIOS.map(function (ratio) {
+          return Number((ratio * safeH).toFixed(4));
+        });
+      }
+
+      // Catmull-Rom spline evaluation for smooth ceramic silhouette
+      function catmullRomInterpolate(p0, p1, p2, p3, t) {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        return 0.5 * (
+          (2 * p1) +
+          (-p0 + p2) * t +
+          (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+          (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+        );
+      }
+
+      function sampleOuterRadiusAtRatio(radiiCm, yRatio) {
+        const safeRadii = sanitizeRadiiArray(radiiCm);
+        const n = HANDLE_Y_RATIOS.length;
+        if (yRatio <= HANDLE_Y_RATIOS[0]) return safeRadii[0];
+        if (yRatio >= HANDLE_Y_RATIOS[n - 1]) return safeRadii[n - 1];
+
+        let seg = 0;
+        for (let i = 0; i < n - 1; i++) {
+          if (yRatio >= HANDLE_Y_RATIOS[i] && yRatio <= HANDLE_Y_RATIOS[i + 1]) {
+            seg = i;
+            break;
+          }
+        }
+        const y0 = HANDLE_Y_RATIOS[seg];
+        const y1 = HANDLE_Y_RATIOS[seg + 1];
+        const localT = (yRatio - y0) / Math.max(1e-6, y1 - y0);
+
+        const r0 = safeRadii[Math.max(0, seg - 1)];
+        const r1 = safeRadii[seg];
+        const r2 = safeRadii[seg + 1];
+        const r3 = safeRadii[Math.min(n - 1, seg + 2)];
+
+        return clampRadius(catmullRomInterpolate(r0, r1, r2, r3, localT));
+      }
+
+      /**
+       * Builds a complete 2D cross-section loop from outer foot -> outer wall -> rounded lip -> inner wall -> inner floor.
+       * All units are in cm; returns array of { r, y, v, isOuter, normalR, normalY }
+       */
+      function computeCrossSectionPoints(radiiCm, heightCm, wallThicknessCm, outerSteps) {
+        const steps = outerSteps || 52;
+        const safeRadii = sanitizeRadiiArray(radiiCm);
+        const H = Math.max(10.0, Math.min(34.0, Number(heightCm) || 24.0));
+        const T = clampWallThickness(wallThicknessCm);
+        const points = [];
+
+        const baseOuterR = safeRadii[0];
+        const footContactR = Math.max(MIN_RADIUS_CM * 0.82, baseOuterR * 0.86);
+        const footHeight = HANDLE_Y_RATIOS[0] * H;
+
+        // 1. Recessed bottom center to inner foot ring (gives authentic ceramic '굽' underside)
+        points.push({ r: 0.0, y: 0.32 * footHeight, v: 0.01 });
+        points.push({ r: footContactR * 0.88, y: 0.32 * footHeight, v: 0.02 });
+        points.push({ r: footContactR * 0.92, y: 0.0, v: 0.025 });
+        points.push({ r: footContactR, y: 0.0, v: 0.035 });
+        points.push({ r: footContactR * 1.02, y: 0.55 * footHeight, v: 0.048 });
+
+        // 2. Outer Wall from foot top (yRatio = 0.06) to Rim (yRatio = 1.0)
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          const yRatio = HANDLE_Y_RATIOS[0] + t * (1.0 - HANDLE_Y_RATIOS[0]);
+          const r = sampleOuterRadiusAtRatio(safeRadii, yRatio);
+          const y = yRatio * H;
+          // Map outer surface v cleanly in [0.06, 0.94]
+          const v = 0.06 + t * 0.88;
+          points.push({ r: r, y: y, v: v, isOuter: true });
+        }
+
+        // 3. Rounded Rim / Lip (입구 림) connecting outer wall top to inner wall top
+        const rimOuterR = safeRadii[safeRadii.length - 1];
+        const effectiveRimT = Math.min(T, rimOuterR - MIN_INNER_RADIUS_CM);
+        const rimInnerR = Math.max(MIN_INNER_RADIUS_CM, rimOuterR - effectiveRimT);
+        const rimMidR = 0.5 * (rimOuterR + rimInnerR);
+        const rimRadius = 0.5 * (rimOuterR - rimInnerR);
+
+        const lipSteps = 6;
+        for (let i = 1; i < lipSteps; i++) {
+          const angle = (i / lipSteps) * Math.PI; // 0 (outer) -> PI (inner)
+          const r = rimMidR + Math.cos(angle) * rimRadius;
+          const y = H + Math.sin(angle) * (rimRadius * 0.85);
+          const v = 0.94 + (i / lipSteps) * 0.04;
+          points.push({ r: r, y: y, v: v, isRim: true });
+        }
+
+        // 4. Inner Wall going down from y = H to inner floor (yRatio = 0.09)
+        const innerSteps = 34;
+        const innerBottomRatio = 0.09;
+        for (let i = 0; i <= innerSteps; i++) {
+          const t = i / innerSteps;
+          const yRatio = 1.0 - t * (1.0 - innerBottomRatio);
+          const outerR = sampleOuterRadiusAtRatio(safeRadii, yRatio);
+          const innerR = Math.max(MIN_INNER_RADIUS_CM, outerR - T);
+          const y = yRatio * H;
+          // Mirror v along height so painting inside a wide bowl also maps naturally
+          const v = 0.06 + ((yRatio - HANDLE_Y_RATIOS[0]) / (1.0 - HANDLE_Y_RATIOS[0])) * 0.88;
+          points.push({ r: innerR, y: y, v: Math.max(0.06, Math.min(0.94, v)), isInner: true });
+        }
+
+        // 5. Curved Inner Floor closing at center axis
+        const floorOuterR = Math.max(MIN_INNER_RADIUS_CM, sampleOuterRadiusAtRatio(safeRadii, innerBottomRatio) - T);
+        const floorY = innerBottomRatio * H;
+        points.push({ r: floorOuterR * 0.55, y: floorY * 0.84, v: 0.05 });
+        points.push({ r: 0.0, y: floorY * 0.78, v: 0.04 });
+
+        return points;
+      }
+
+      /**
+       * Generates raw Float32 vertex buffers (positions, normals, uvs, indices) in Three.js world units (1 unit = 10 cm).
+       * Pure function so it can be tested directly in unit tests.
+       */
+      function buildPotteryVertexData(radiiCm, heightCm, wallThicknessCm, radialSegments) {
+        const segs = radialSegments || 72;
+        const crossSection = computeCrossSectionPoints(radiiCm, heightCm, wallThicknessCm, 52);
+        const ringCount = crossSection.length;
+        const scale = 0.1; // 10 cm = 1.0 Three.js world unit
+
+        // Compute smooth 2D profile normals
+        const profileNormals = [];
+        for (let i = 0; i < ringCount; i++) {
+          const prev = crossSection[Math.max(0, i - 1)];
+          const next = crossSection[Math.min(ringCount - 1, i + 1)];
+          const dr = next.r - prev.r;
+          const dy = next.y - prev.y;
+          // Tangent is (dr, dy), outward normal for counter-clockwise loop is (dy, -dr)
+          let nr = dy;
+          let ny = -dr;
+          const len = Math.hypot(nr, ny) || 1.0;
+          nr /= len;
+          ny /= len;
+          profileNormals.push({ nr: nr, ny: ny });
+        }
+
+        const vertCount = ringCount * (segs + 1);
+        const positions = new Float32Array(vertCount * 3);
+        const normals = new Float32Array(vertCount * 3);
+        const uvs = new Float32Array(vertCount * 2);
+        const indices = [];
+
+        let vIdx = 0;
+        let uvIdx = 0;
+
+        for (let i = 0; i < ringCount; i++) {
+          const pt = crossSection[i];
+          const nrm = profileNormals[i];
+          const rWorld = pt.r * scale;
+          const yWorld = pt.y * scale;
+
+          for (let j = 0; j <= segs; j++) {
+            const u = j / segs;
+            const theta = u * Math.PI * 2.0;
+            const cosT = Math.cos(theta);
+            const sinT = Math.sin(theta);
+
+            positions[vIdx]     = rWorld * cosT;
+            positions[vIdx + 1] = yWorld;
+            positions[vIdx + 2] = rWorld * sinT;
+
+            normals[vIdx]       = nrm.nr * cosT;
+            normals[vIdx + 1]   = nrm.ny;
+            normals[vIdx + 2]   = nrm.nr * sinT;
+
+            uvs[uvIdx]     = u;
+            uvs[uvIdx + 1] = pt.v;
+
+            vIdx += 3;
+            uvIdx += 2;
+          }
+        }
+
+        for (let i = 0; i < ringCount - 1; i++) {
+          for (let j = 0; j < segs; j++) {
+            const a = i * (segs + 1) + j;
+            const b = (i + 1) * (segs + 1) + j;
+            const c = (i + 1) * (segs + 1) + (j + 1);
+            const d = i * (segs + 1) + (j + 1);
+
+            indices.push(a, b, d);
+            indices.push(b, c, d);
+          }
+        }
+
+        return {
+          positions: positions,
+          normals: normals,
+          uvs: uvs,
+          indices: indices,
+          maxRadiusCm: Math.max.apply(null, sanitizeRadiiArray(radiiCm)),
+          heightCm: heightCm
+        };
+      }
+
+      /**
+       * Pure function for UV seam wrapping:
+       * When painting a stroke from uv0 to uv1, if |uv1.u - uv0.u| > 0.5, the brush crossed the 360° seam (u=0 / u=1).
+       * Returns 1 or 2 line segments in [0,1] UV space so strokes wrap seamlessly around the vessel circumference.
+       */
+      function computeUvWrappedSegments(uv0, uv1) {
+        const u0 = ((uv0.u % 1) + 1) % 1;
+        const u1 = ((uv1.u % 1) + 1) % 1;
+        const v0 = Math.max(0, Math.min(1, uv0.v));
+        const v1 = Math.max(0, Math.min(1, uv1.v));
+
+        const du = u1 - u0;
+        if (Math.abs(du) <= 0.5) {
+          return [{ u0: u0, v0: v0, u1: u1, v1: v1, crossedSeam: false }];
+        }
+
+        // Crossed the u=0/1 seam
+        if (du > 0.5) {
+          // Example: u0 = 0.03, u1 = 0.98 -> moved left across 0
+          const u1Unwrapped = u1 - 1.0; // -0.02
+          return [
+            { u0: u0, v0: v0, u1: u1Unwrapped, v1: v1, crossedSeam: true },
+            { u0: u0 + 1.0, v0: v0, u1: u1, v1: v1, crossedSeam: true }
+          ];
+        } else {
+          // Example: u0 = 0.98, u1 = 0.03 -> moved right across 1
+          const u1Unwrapped = u1 + 1.0; // 1.03
+          return [
+            { u0: u0, v0: v0, u1: u1Unwrapped, v1: v1, crossedSeam: true },
+            { u0: u0 - 1.0, v0: v0, u1: u1, v1: v1, crossedSeam: true }
+          ];
+        }
+      }
+
+      /**
+       * Draws a procedural ceramic pattern ('band', 'dots', 'wave', or 'initialWave') onto a 2D paint canvas context.
+       */
+      function applyProceduralPatternToContext(ctx, width, height, patternType, color, brushSize, targetVRatio) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = color || '#f5f2eb';
+        ctx.fillStyle = color || '#f5f2eb';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // In canvas coordinates, y=0 is top (v=1.0) and y=height is bottom (v=0.0)
+        const vCenter = Number.isFinite(targetVRatio) ? targetVRatio : 0.62;
+        const centerY = (1.0 - vCenter) * height;
+        const baseLw = Math.max(3, (brushSize || 9) * 0.95);
+
+        if (patternType === 'band') {
+          // Double artisanal concentric sanggam bands
+          ctx.lineWidth = baseLw;
+          ctx.beginPath();
+          ctx.moveTo(0, centerY - baseLw * 1.4);
+          ctx.lineTo(width, centerY - baseLw * 1.4);
+          ctx.stroke();
+
+          ctx.lineWidth = Math.max(2, baseLw * 0.55);
+          ctx.beginPath();
+          ctx.moveTo(0, centerY + baseLw * 1.2);
+          ctx.lineTo(width, centerY + baseLw * 1.2);
+          ctx.stroke();
+        } else if (patternType === 'dots') {
+          // Rhythmic ring of ceramic slip dots (연주문)
+          const dotCount = 24;
+          const dotRadius = Math.max(4, baseLw * 0.85);
+          for (let i = 0; i < dotCount; i++) {
+            const x = ((i + 0.5) / dotCount) * width;
+            ctx.beginPath();
+            ctx.arc(x, centerY, dotRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (patternType === 'wave') {
+          // Continuous periodic wave motif (integer cycles so u=0 and u=1 join seamlessly!)
+          const cycles = 8;
+          const amp = Math.max(10, baseLw * 2.1);
+          ctx.lineWidth = baseLw;
+          ctx.beginPath();
+          for (let x = 0; x <= width; x += 4) {
+            const phase = (x / width) * Math.PI * 2 * cycles;
+            const y = centerY + Math.sin(phase) * amp;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        } else if (patternType === 'initialWave') {
+          // Subtle, museum-grade initial wave & sanggam motif for the initial Celadon Moon Jar
+          const yShoulder = (1.0 - 0.64) * height;
+          ctx.strokeStyle = 'rgba(244, 241, 232, 0.86)';
+          ctx.lineWidth = 4.5;
+
+          // Thin upper & lower framing lines
+          ctx.beginPath();
+          ctx.moveTo(0, yShoulder - 24);
+          ctx.lineTo(width, yShoulder - 24);
+          ctx.moveTo(0, yShoulder + 24);
+          ctx.lineTo(width, yShoulder + 24);
+          ctx.stroke();
+
+          // Primary sanggam wave (10 cycles around vessel)
+          ctx.lineWidth = 6.0;
+          ctx.beginPath();
+          const cycles = 10;
+          for (let x = 0; x <= width; x += 4) {
+            const phase = (x / width) * Math.PI * 2 * cycles;
+            const y = yShoulder + Math.sin(phase) * 11.5;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+
+          // Delicate dark iron-glaze accent dots at wave troughs
+          ctx.fillStyle = 'rgba(46, 68, 59, 0.78)';
+          for (let i = 0; i < cycles; i++) {
+            const xPeak = ((i + 0.25) / cycles) * width;
+            ctx.beginPath();
+            ctx.arc(xPeak, yShoulder - 4, 3.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      /**
+       * Computes a fast integer checksum over a Canvas2D context's pixels for verifiable self-testing.
+       */
+      function computeCanvasChecksum(ctx, width, height) {
+        const imgData = ctx.getImageData(0, 0, width, height).data;
+        let hash = 2166136261;
+        // Stride sampling for fast deterministic checksum
+        const stride = 16;
+        for (let i = 0; i < imgData.length; i += stride) {
+          hash ^= imgData[i];
+          hash = Math.imul(hash, 16777619);
+        }
+        return (hash >>> 0);
+      }
+
+      /* =========================================================================
+       * 3. ISOLATABLE UNDO/REDO HISTORY MANAGER
+       * ========================================================================= */
+      function createHistoryManager(maxSteps) {
+        const limit = maxSteps || 25;
+        let stack = [];
+        let pointer = -1;
+
+        function cloneState(state) {
+          return {
+            radiiCm: state.radiiCm.slice(),
+            heightCm: state.heightCm,
+            thicknessCm: state.thicknessCm,
+            presetId: state.presetId,
+            glazeId: state.glazeId,
+            glazeTint: state.glazeTint,
+            glossiness: state.glossiness,
+            paintImageData: state.paintImageData ? new ImageData(
+              new Uint8ClampedArray(state.paintImageData.data),
+              state.paintImageData.width,
+              state.paintImageData.height
+            ) : null,
+            paintChecksum: state.paintChecksum || 0
+          };
+        }
+
+        return {
+          push: function (state) {
+            // Truncate any redo branch
+            if (pointer < stack.length - 1) {
+              stack = stack.slice(0, pointer + 1);
+            }
+            stack.push(cloneState(state));
+            if (stack.length > limit) {
+              stack.shift();
+            } else {
+              pointer++;
+            }
+          },
+          canUndo: function () {
+            return pointer > 0;
+          },
+          canRedo: function () {
+            return pointer >= 0 && pointer < stack.length - 1;
+          },
+          undo: function () {
+            if (pointer <= 0) return null;
+            pointer--;
+            return cloneState(stack[pointer]);
+          },
+          redo: function () {
+            if (pointer >= stack.length - 1) return null;
+            pointer++;
+            return cloneState(stack[pointer]);
+          },
+          current: function () {
+            return pointer >= 0 ? cloneState(stack[pointer]) : null;
+          },
+          clear: function () {
+            stack = [];
+            pointer = -1;
+          }
+        };
+      }
+
+      /* =========================================================================
+       * 4. LIVE APPLICATION STATE & LAYERED CANVAS TEXTURE PIPELINE
+       * ========================================================================= */
+      const TEX_WIDTH = 1024;
+      const TEX_HEIGHT = 512;
+
+      // 3 offscreen canvases:
+      // 1) glazeBaseCanvas: holds procedural glaze color gradient, throwing lines, speckles, crackle
+      // 2) paintLayerCanvas: holds user brush strokes & pattern stamps (transparent background)
+      // 3) compositeCanvas: merges glazeBaseCanvas + paintLayerCanvas -> feeds THREE.CanvasTexture
+      const glazeBaseCanvas = document.createElement('canvas');
+      glazeBaseCanvas.width = TEX_WIDTH;
+      glazeBaseCanvas.height = TEX_HEIGHT;
+      const glazeBaseCtx = glazeBaseCanvas.getContext('2d');
+
+      const paintLayerCanvas = document.createElement('canvas');
+      paintLayerCanvas.width = TEX_WIDTH;
+      paintLayerCanvas.height = TEX_HEIGHT;
+      const paintLayerCtx = paintLayerCanvas.getContext('2d', { willReadFrequently: true });
+
+      const compositeCanvas = document.createElement('canvas');
+      compositeCanvas.width = TEX_WIDTH;
+      compositeCanvas.height = TEX_HEIGHT;
+      const compositeCtx = compositeCanvas.getContext('2d');
+
+      // Procedural Bump Map Canvas (throwing rings + subtle mineral texture)
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = 512;
+      bumpCanvas.height = 512;
+      const bumpCtx = bumpCanvas.getContext('2d');
+
+      const appState = {
+        mode: 'sculpt', // 'sculpt' | 'glaze' | 'paint' | 'wheel'
+        presetId: 'moonjar',
+        radiiCm: VESSEL_PRESETS.moonjar.radiiCm.slice(),
+        heightCm: VESSEL_PRESETS.moonjar.heightCm,
+        thicknessCm: VESSEL_PRESETS.moonjar.thicknessCm,
+        selectedRegion: 'body',
+        selectedHandleIdx: 3, // #4 Center Belly
+        geometryUpdateCount: 0,
+
+        glazeId: 'celadon',
+        glazeTint: GLAZE_RECIPES.celadon.baseColor,
+        glossiness: GLAZE_RECIPES.celadon.defaultGloss,
+
+        paintTool: 'brush', // 'brush' | 'eraser' | 'orbit'
+        brushColor: '#f5f2eb',
+        brushSize: 9,
+
+        wheelSpinning: true,
+        wheelSpeed: 28, // 0..100
+        wheelRotationRad: 0,
+        lightAngleDeg: 38,
+
+        isDraggingHandle: false,
+        isPaintingStroke: false,
+        lastPaintUv: null,
+        usingFallback2D: false
+      };
+
+      const historyManager = createHistoryManager(25);
+
+      function hexToRgb(hex) {
+        const clean = (hex || '#88aa99').replace('#', '');
+        const num = parseInt(clean.length === 3
+          ? clean.split('').map(function (c) { return c + c; }).join('')
+          : clean, 16);
+        return {
+          r: (num >> 16) & 255,
+          g: (num >> 8) & 255,
+          b: num & 255
+        };
+      }
+
+      function rgbToCss(r, g, b, a) {
+        const cr = Math.max(0, Math.min(255, Math.round(r)));
+        const cg = Math.max(0, Math.min(255, Math.round(g)));
+        const cb = Math.max(0, Math.min(255, Math.round(b)));
+        if (a !== undefined) return 'rgba(' + cr + ',' + cg + ',' + cb + ',' + a + ')';
+        return 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+      }
+
+      /**
+       * Renders realistic ceramic glaze base + subtle foot clay ring + throwing lines + mineral speckles/crackle
+       */
+      function renderGlazeBaseLayer() {
+        const recipe = GLAZE_RECIPES[appState.glazeId] || GLAZE_RECIPES.celadon;
+        const tintRgb = hexToRgb(appState.glazeTint || recipe.baseColor);
+
+        // Vertical glaze pooling gradient (from rim at y=0 to foot at y=TEX_HEIGHT)
+        const grad = glazeBaseCtx.createLinearGradient(0, 0, 0, TEX_HEIGHT);
+        grad.addColorStop(0.00, rgbToCss(tintRgb.r + 14, tintRgb.g + 14, tintRgb.b + 12));
+        grad.addColorStop(0.18, rgbToCss(tintRgb.r + 4, tintRgb.g + 4, tintRgb.b + 4));
+        grad.addColorStop(0.65, rgbToCss(tintRgb.r, tintRgb.g, tintRgb.b));
+        grad.addColorStop(0.92, rgbToCss(tintRgb.r - 18, tintRgb.g - 16, tintRgb.b - 16));
+        // Unglazed stoneware clay foot ring at the very bottom (v < 0.055 -> y > 0.945 * TEX_HEIGHT)
+        grad.addColorStop(0.955, '#c7b89e');
+        grad.addColorStop(1.00, '#a8967a');
+
+        glazeBaseCtx.fillStyle = grad;
+        glazeBaseCtx.fillRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+
+        // Deterministic pseudo-random generator so texture doesn't flicker on rebuild
+        let seed = 1337 + appState.glazeId.charCodeAt(0) * 97;
+        function nextRand() {
+          seed = (seed * 1664525 + 1013904223) % 4294967296;
+          return seed / 4294967296;
+        }
+
+        // Subtle horizontal wheel-throwing lines (물레결)
+        for (let y = 8; y < TEX_HEIGHT * 0.94; y += 3) {
+          const delta = (nextRand() - 0.5) * 10;
+          glazeBaseCtx.fillStyle = delta > 0
+            ? 'rgba(255, 255, 255, 0.025)'
+            : 'rgba(25, 22, 18, 0.028)';
+          glazeBaseCtx.fillRect(0, y, TEX_WIDTH, 1.5);
+        }
+
+        // Buncheong expressive slip brush strokes (귀얄 분장결)
+        if (recipe.brushTextureAlpha > 0.1) {
+          glazeBaseCtx.strokeStyle = 'rgba(246, 242, 232, ' + recipe.brushTextureAlpha + ')';
+          for (let i = 0; i < 42; i++) {
+            const y = (0.12 + nextRand() * 0.76) * TEX_HEIGHT;
+            glazeBaseCtx.lineWidth = 4 + nextRand() * 14;
+            glazeBaseCtx.beginPath();
+            glazeBaseCtx.moveTo(0, y);
+            glazeBaseCtx.lineTo(TEX_WIDTH, y + (nextRand() - 0.5) * 6);
+            glazeBaseCtx.stroke();
+          }
+        }
+
+        // Celadon / glaze faint ice-crackle network (빙렬)
+        if (recipe.crackleAlpha > 0.06) {
+          glazeBaseCtx.strokeStyle = 'rgba(235, 245, 240, ' + (recipe.crackleAlpha * 0.45) + ')';
+          glazeBaseCtx.lineWidth = 0.8;
+          for (let i = 0; i < 55; i++) {
+            let cx = nextRand() * TEX_WIDTH;
+            let cy = (0.08 + nextRand() * 0.82) * TEX_HEIGHT;
+            glazeBaseCtx.beginPath();
+            glazeBaseCtx.moveTo(cx, cy);
+            for (let s = 0; s < 5; s++) {
+              cx += (nextRand() - 0.48) * 55;
+              cy += (nextRand() - 0.48) * 42;
+              glazeBaseCtx.lineTo(cx, cy);
+            }
+            glazeBaseCtx.stroke();
+          }
+        }
+
+        // Mineral iron speckles (철점)
+        const spRgb = hexToRgb(recipe.speckleColor);
+        for (let i = 0; i < recipe.speckleCount; i++) {
+          const sx = nextRand() * TEX_WIDTH;
+          const sy = (0.06 + nextRand() * 0.88) * TEX_HEIGHT;
+          const sr = 0.6 + nextRand() * 1.4;
+          glazeBaseCtx.fillStyle = rgbToCss(spRgb.r, spRgb.g, spRgb.b, 0.18 + nextRand() * 0.25);
+          glazeBaseCtx.beginPath();
+          glazeBaseCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+          glazeBaseCtx.fill();
+        }
+
+        // Also update the bump map for tactile surface micro-relief
+        bumpCtx.fillStyle = '#808080';
+        bumpCtx.fillRect(0, 0, 512, 512);
+        for (let y = 0; y < 512; y += 2) {
+          const v = 124 + Math.sin(y * 0.35) * 6 + (nextRand() - 0.5) * 8;
+          bumpCtx.fillStyle = rgbToCss(v, v, v);
+          bumpCtx.fillRect(0, y, 512, 2);
+        }
+      }
+
+      let threeColorTexture = null;
+      let threeBumpTexture = null;
+
+      function updateCompositeTexture() {
+        compositeCtx.clearRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        compositeCtx.drawImage(glazeBaseCanvas, 0, 0);
+        compositeCtx.drawImage(paintLayerCanvas, 0, 0);
+        if (threeColorTexture) {
+          threeColorTexture.needsUpdate = true;
+        }
+        if (threeBumpTexture) {
+          threeBumpTexture.needsUpdate = true;
+        }
+      }
+
+      function resetPaintLayerWithInitialWave() {
+        paintLayerCtx.clearRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        applyProceduralPatternToContext(paintLayerCtx, TEX_WIDTH, TEX_HEIGHT, 'initialWave', '#f4f1e8', 6, 0.64);
+        updateCompositeTexture();
+      }
+
+      /* =========================================================================
+       * 5. THREE.JS 3D SCENE, LIGHTING, POTTERY MESH & WOODEN WHEEL
+       * ========================================================================= */
+      const glCanvas = document.getElementById('glCanvas');
+      const fallback2DCanvas = document.getElementById('fallback2DCanvas');
+      const viewportContainer = document.getElementById('viewportContainer');
+
+      let renderer = null;
+      let scene = null;
+      let camera = null;
+      let controls = null;
+      let potteryMesh = null;
+      let potteryMaterial = null;
+      let highlightRingMesh = null;
+      let wheelGroup = null;
+      let keyLight = null;
+      let raycaster = null;
+      let pointerNdc = null;
+
+      function createProceduralEnvMap(threeRenderer) {
+        try {
+          if (typeof THREE.PMREMGenerator === 'function') {
+            const pmremGenerator = new THREE.PMREMGenerator(threeRenderer);
+            pmremGenerator.compileEquirectangularShader();
+
+            const envScene = new THREE.Scene();
+            envScene.background = new THREE.Color('#e8e0d2');
+
+            // Warm gallery ceiling skylight
+            const skyGeo = new THREE.SphereGeometry(20, 24, 16);
+            const skyMat = new THREE.MeshBasicMaterial({ color: '#f3eee4', side: THREE.BackSide });
+            envScene.add(new THREE.Mesh(skyGeo, skyMat));
+
+            // Large soft window light panel (left-front)
+            const winGeo = new THREE.PlaneGeometry(14, 16);
+            const winMat = new THREE.MeshBasicMaterial({ color: '#ffffff', side: THREE.DoubleSide });
+            const winMesh1 = new THREE.Mesh(winGeo, winMat);
+            winMesh1.position.set(10, 7, 10);
+            winMesh1.lookAt(0, 2, 0);
+            envScene.add(winMesh1);
+
+            // Secondary warm bounce panel (right-back)
+            const winMat2 = new THREE.MeshBasicMaterial({ color: '#fff3dc', side: THREE.DoubleSide });
+            const winMesh2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), winMat2);
+            winMesh2.position.set(-11, 5, -7);
+            winMesh2.lookAt(0, 2, 0);
+            envScene.add(winMesh2);
+
+            // Warm wooden floor bounce
+            const floorGeo = new THREE.CircleGeometry(18, 32);
+            const floorMat = new THREE.MeshBasicMaterial({ color: '#b59b7c', side: THREE.DoubleSide });
+            const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.position.y = -4;
+            envScene.add(floorMesh);
+
+            const envRT = pmremGenerator.fromScene(envScene, 0.04);
+            pmremGenerator.dispose();
+            return envRT.texture;
+          }
+        } catch (err) {
+          console.warn('PMREM environment fallback:', err);
+        }
+        return null;
+      }
+
+      function createWoodenWheelTexture() {
+        const c = document.createElement('canvas');
+        c.width = 512;
+        c.height = 512;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = '#9c7a56';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Subtle wood grain & concentric wheel centering grooves
+        const cx = 256;
+        const cy = 256;
+        for (let r = 20; r < 245; r += 32) {
+          ctx.strokeStyle = 'rgba(72, 52, 34, 0.35)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          ctx.strokeStyle = 'rgba(72, 52, 34, 0.18)';
+          ctx.beginPath();
+          ctx.moveTo(cx + Math.cos(angle) * 20, cy + Math.sin(angle) * 20);
+          ctx.lineTo(cx + Math.cos(angle) * 246, cy + Math.sin(angle) * 246);
+          ctx.stroke();
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+      }
+
+      function createContactShadowTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext('2d');
+        const g = ctx.createRadialGradient(128, 128, 18, 128, 128, 120);
+        g.addColorStop(0.0, 'rgba(38, 28, 18, 0.42)');
+        g.addColorStop(0.45, 'rgba(38, 28, 18, 0.18)');
+        g.addColorStop(1.0, 'rgba(38, 28, 18, 0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        return new THREE.CanvasTexture(c);
+      }
+
+      function initThreeStudio() {
+        if (typeof window.THREE === 'undefined') {
+          activateFallback2D('Three.js 라이브러리를 불러오지 못해 2D 대체 모드로 전환되었습니다.');
+          return false;
+        }
+
+        try {
+          renderer = new THREE.WebGLRenderer({
+            canvas: glCanvas,
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true // Required for clean local PNG export
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.outputEncoding = THREE.sRGBEncoding;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.06;
+
+          scene = new THREE.Scene();
+
+          camera = new THREE.PerspectiveCamera(
+            34,
+            viewportContainer.clientWidth / Math.max(1, viewportContainer.clientHeight),
+            0.1,
+            100
+          );
+
+          if (typeof THREE.OrbitControls === 'function') {
+            controls = new THREE.OrbitControls(camera, glCanvas);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.enablePan = false;
+            controls.minDistance = 2.6;
+            controls.maxDistance = 12.5;
+            controls.maxPolarAngle = Math.PI * 0.56;
+            controls.minPolarAngle = Math.PI * 0.06;
+          }
+
+          // Studio Environment Reflection Map
+          const envMap = createProceduralEnvMap(renderer);
+          if (envMap) {
+            scene.environment = envMap;
+          }
+
+          // Warm Gallery Studio Lighting
+          const hemiLight = new THREE.HemisphereLight('#fffdf8', '#c9baa3', 0.72);
+          hemiLight.position.set(0, 10, 0);
+          scene.add(hemiLight);
+
+          keyLight = new THREE.DirectionalLight('#fffaf0', 1.15);
+          keyLight.position.set(3.8, 5.6, 4.5);
+          keyLight.castShadow = true;
+          keyLight.shadow.mapSize.width = 1024;
+          keyLight.shadow.mapSize.height = 1024;
+          keyLight.shadow.camera.near = 1.0;
+          keyLight.shadow.camera.far = 16.0;
+          const d = 2.6;
+          keyLight.shadow.camera.left = -d;
+          keyLight.shadow.camera.right = d;
+          keyLight.shadow.camera.top = d;
+          keyLight.shadow.camera.bottom = -d;
+          keyLight.shadow.bias = -0.0008;
+          scene.add(keyLight);
+
+          const fillLight = new THREE.DirectionalLight('#e8f0f2', 0.48);
+          fillLight.position.set(-4.2, 3.0, -2.8);
+          scene.add(fillLight);
+
+          const rimLight = new THREE.DirectionalLight('#fff3db', 0.42);
+          rimLight.position.set(0.5, 4.2, -5.0);
+          scene.add(rimLight);
+
+          // Wooden Pottery Wheel Head (원목 물레판)
+          wheelGroup = new THREE.Group();
+          const wheelTopGeo = new THREE.CylinderGeometry(1.62, 1.56, 0.14, 64);
+          const wheelWoodTex = createWoodenWheelTexture();
+          const wheelTopMat = new THREE.MeshStandardMaterial({
+            map: wheelWoodTex,
+            roughness: 0.68,
+            metalness: 0.05
+          });
+          const wheelTopMesh = new THREE.Mesh(wheelTopGeo, wheelTopMat);
+          wheelTopMesh.position.y = -0.07;
+          wheelTopMesh.receiveShadow = true;
+          wheelGroup.add(wheelTopMesh);
+
+          // Lower turntable shaft & studio plinth
+          const shaftGeo = new THREE.CylinderGeometry(0.42, 0.52, 0.45, 32);
+          const shaftMat = new THREE.MeshStandardMaterial({ color: '#5c5248', roughness: 0.55, metalness: 0.25 });
+          const shaftMesh = new THREE.Mesh(shaftGeo, shaftMat);
+          shaftMesh.position.y = -0.34;
+          wheelGroup.add(shaftMesh);
+
+          const basePlinthGeo = new THREE.CylinderGeometry(2.15, 2.25, 0.18, 64);
+          const basePlinthMat = new THREE.MeshStandardMaterial({ color: '#d8cebe', roughness: 0.85, metalness: 0.02 });
+          const basePlinthMesh = new THREE.Mesh(basePlinthGeo, basePlinthMat);
+          basePlinthMesh.position.y = -0.58;
+          basePlinthMesh.receiveShadow = true;
+          scene.add(basePlinthMesh);
+
+          // Delicate contact shadow directly under the ceramic foot
+          const contactShadowGeo = new THREE.PlaneGeometry(2.2, 2.2);
+          const contactShadowMat = new THREE.MeshBasicMaterial({
+            map: createContactShadowTexture(),
+            transparent: true,
+            depthWrite: false
+          });
+          const contactShadowMesh = new THREE.Mesh(contactShadowGeo, contactShadowMat);
+          contactShadowMesh.rotation.x = -Math.PI / 2;
+          contactShadowMesh.position.y = 0.002;
+          contactShadowMesh.name = 'footContactShadow';
+          wheelGroup.add(contactShadowMesh);
+
+          scene.add(wheelGroup);
+
+          // Shared CanvasTextures for Pottery Material
+          threeColorTexture = new THREE.CanvasTexture(compositeCanvas);
+          threeColorTexture.wrapS = THREE.RepeatWrapping;
+          threeColorTexture.wrapT = THREE.ClampToEdgeWrapping;
+          threeColorTexture.encoding = THREE.sRGBEncoding;
+          threeColorTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+          threeBumpTexture = new THREE.CanvasTexture(bumpCanvas);
+          threeBumpTexture.wrapS = THREE.RepeatWrapping;
+          threeBumpTexture.wrapT = THREE.RepeatWrapping;
+
+          potteryMaterial = new THREE.MeshPhysicalMaterial({
+            map: threeColorTexture,
+            bumpMap: threeBumpTexture,
+            bumpScale: 0.004,
+            roughness: 0.22,
+            metalness: 0.02,
+            clearcoat: 0.90,
+            clearcoatRoughness: 0.14,
+            reflectivity: 0.75,
+            side: THREE.DoubleSide
+          });
+
+          // Highlight Ring for active sculpt handle/region
+          const ringGeo = new THREE.TorusGeometry(1.0, 0.014, 12, 72);
+          ringGeo.rotateX(Math.PI / 2);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color: '#b85d3b',
+            transparent: true,
+            opacity: 0.65
+          });
+          highlightRingMesh = new THREE.Mesh(ringGeo, ringMat);
+          scene.add(highlightRingMesh);
+
+          raycaster = new THREE.Raycaster();
+          pointerNdc = new THREE.Vector2();
+
+          return true;
+        } catch (err) {
+          console.error('WebGL initialization error:', err);
+          activateFallback2D('WebGL 초기화 중 오류가 발생하여 2D 대체 모드로 전환되었습니다.');
+          return false;
+        }
+      }
+
+      function rebuildPotteryMesh() {
+        appState.geometryUpdateCount += 1;
+
+        const maxR = Math.max.apply(null, appState.radiiCm);
+        const maxWidthCm = (maxR * 2).toFixed(1);
+        const heightStr = appState.heightCm.toFixed(1);
+
+        const elMaxW = document.getElementById('metricMaxWidth');
+        const elMaxWMob = document.getElementById('metricMaxWidthMobile');
+        const elHeight = document.getElementById('metricHeight');
+        const elUpdates = document.getElementById('metricGeoUpdates');
+        const elUpdatesMob = document.getElementById('metricGeoUpdatesMobile');
+
+        if (elMaxW) elMaxW.textContent = maxWidthCm;
+        if (elMaxWMob) elMaxWMob.textContent = maxWidthCm;
+        if (elHeight) elHeight.textContent = heightStr;
+        if (elUpdates) elUpdates.textContent = String(appState.geometryUpdateCount);
+        if (elUpdatesMob) elUpdatesMob.textContent = String(appState.geometryUpdateCount);
+
+        if (appState.usingFallback2D || !scene) {
+          updateHighlightAndHandlesUI();
+          return;
+        }
+
+        const vData = buildPotteryVertexData(appState.radiiCm, appState.heightCm, appState.thicknessCm, 72);
+        const newGeo = new THREE.BufferGeometry();
+        newGeo.setAttribute('position', new THREE.BufferAttribute(vData.positions, 3));
+        newGeo.setAttribute('normal', new THREE.BufferAttribute(vData.normals, 3));
+        newGeo.setAttribute('uv', new THREE.BufferAttribute(vData.uvs, 2));
+        newGeo.setIndex(vData.indices);
+        newGeo.computeBoundingSphere();
+
+        if (!potteryMesh) {
+          potteryMesh = new THREE.Mesh(newGeo, potteryMaterial);
+          potteryMesh.castShadow = true;
+          potteryMesh.receiveShadow = true;
+          wheelGroup.add(potteryMesh);
+        } else {
+          const oldGeo = potteryMesh.geometry;
+          potteryMesh.geometry = newGeo;
+          if (oldGeo) oldGeo.dispose(); // Prevent GPU memory leak
+        }
+
+        // Scale contact shadow proportionally to base radius
+        const footShadow = wheelGroup.getObjectByName('footContactShadow');
+        if (footShadow) {
+          const s = Math.max(0.65, (appState.radiiCm[0] / 6.0));
+          footShadow.scale.set(s, s, 1);
+        }
+
+        updateHighlightAndHandlesUI();
+      }
+
+      function applyGlazeMaterialSettings() {
+        const recipe = GLAZE_RECIPES[appState.glazeId] || GLAZE_RECIPES.celadon;
+        renderGlazeBaseLayer();
+        updateCompositeTexture();
+
+        if (potteryMaterial) {
+          const gloss01 = Math.max(0, Math.min(1, appState.glossiness / 100));
+          // Matte (0) -> roughness 0.72, clearcoat 0.08 | Glossy (1) -> roughness 0.14, clearcoat 0.95
+          potteryMaterial.roughness = 0.72 - gloss01 * 0.58;
+          potteryMaterial.clearcoat = 0.08 + gloss01 * (recipe.clearcoat * 0.92);
+          potteryMaterial.clearcoatRoughness = 0.45 - gloss01 * 0.34;
+          potteryMaterial.bumpScale = appState.glazeId === 'buncheong' ? 0.0085 : 0.0038;
+          potteryMaterial.needsUpdate = true;
+        }
+      }
+
+      function updateStudioLightingAngle() {
+        if (!keyLight) return;
+        const rad = (appState.lightAngleDeg * Math.PI) / 180;
+        const radius = 5.8;
+        keyLight.position.set(Math.sin(rad) * radius, 5.5, Math.cos(rad) * radius);
+      }
+
+      /**
+       * Aspect-aware framing: ensures the ceramic artwork occupies ~65~72% of viewport height
+       * without colliding with the top bar or bottom workspace dock on any screen aspect ratio.
+       */
+      function fitCameraToPottery(viewPreset) {
+        if (!camera || !controls) return;
+
+        const w = Math.max(320, viewportContainer.clientWidth);
+        const h = Math.max(320, viewportContainer.clientHeight);
+        const aspect = w / h;
+
+        const vesselHeightWorld = appState.heightCm * 0.1;
+        const maxRadiusWorld = Math.max.apply(null, appState.radiiCm) * 0.1;
+
+        const fovRad = THREE.MathUtils.degToRad(camera.fov);
+        // Target vertical coverage ~64% of screen height
+        const targetHeightSpan = Math.max(2.1, vesselHeightWorld + 0.35);
+        const distVertical = (targetHeightSpan / 0.62) / (2 * Math.tan(fovRad / 2));
+
+        // Ensure horizontal span (including right-side sculpt handles) never clips on portrait screens
+        const totalWidthSpan = (maxRadiusWorld * 2.45) + 0.7;
+        const distHorizontal = (totalWidthSpan / 0.76) / (2 * Math.tan(fovRad / 2) * aspect);
+
+        const distance = Math.max(distVertical, distHorizontal, 3.6);
+        const targetY = vesselHeightWorld * 0.44 - 0.08;
+
+        controls.target.set(0, targetY, 0);
+
+        if (viewPreset === 'rim') {
+          // Elevated angle looking into the open mouth, rim, and glazed interior cavity
+          camera.position.set(0.0, targetY + distance * 0.68, distance * 0.74);
+        } else {
+          // Classic gallery 3/4 elevation view
+          camera.position.set(0.0, targetY + distance * 0.22, distance * 0.97);
+        }
+        controls.update();
+      }
+
+      /* =========================================================================
+       * 6. SVG CONTOUR HANDLES (NO SVG .className ASSIGNMENT - STRICT setAttribute)
+       * ========================================================================= */
+      const svgHandlesGroup = document.getElementById('svgHandlesGroup');
+      const svgContourPath = document.getElementById('svgContourPath');
+      const svgAxisLine = document.getElementById('svgAxisLine');
+      const svgRadiusLine = document.getElementById('svgRadiusLine');
+      const svgRadiusBadgeBg = document.getElementById('svgRadiusBadgeBg');
+      const svgRadiusBadgeText = document.getElementById('svgRadiusBadgeText');
+      const sculptOverlaySvg = document.getElementById('sculptOverlaySvg');
+
+      const svgHandleElements = [];
+
+      function initSvgHandles() {
+        if (!svgHandlesGroup) return;
+        while (svgHandlesGroup.firstChild) {
+          svgHandlesGroup.removeChild(svgHandlesGroup.firstChild);
+        }
+        svgHandleElements.length = 0;
+
+        const ns = 'http://www.w3.org/2000/svg';
+        for (let i = 0; i < HANDLE_Y_RATIOS.length; i++) {
+          const g = document.createElementNS(ns, 'g');
+          g.setAttribute('class', 'sculpt-handle-group');
+          g.setAttribute('data-handle-idx', String(i));
+          g.setAttribute('filter', 'url(#handleShadow)');
+
+          // Connection tick from silhouette to handle knob
+          const tick = document.createElementNS(ns, 'line');
+          tick.setAttribute('x1', '-16');
+          tick.setAttribute('y1', '0');
+          tick.setAttribute('x2', '0');
+          tick.setAttribute('y2', '0');
+          tick.setAttribute('stroke', '#4d7c6f');
+          tick.setAttribute('stroke-width', '1.6');
+          g.appendChild(tick);
+
+          // Outer knob circle
+          const outer = document.createElementNS(ns, 'circle');
+          outer.setAttribute('class', 'handle-outer');
+          outer.setAttribute('cx', '0');
+          outer.setAttribute('cy', '0');
+          outer.setAttribute('r', '11');
+          outer.setAttribute('fill', '#fbf9f4');
+          outer.setAttribute('stroke', '#3d6459');
+          outer.setAttribute('stroke-width', '2.2');
+          g.appendChild(outer);
+
+          // Left-right arrow glyph inside knob
+          const arrow = document.createElementNS(ns, 'path');
+          arrow.setAttribute('d', 'M-5 0 L5 0 M-2.5 -2.5 L-5.2 0 L-2.5 2.5 M2.5 -2.5 L5.2 0 L2.5 2.5');
+          arrow.setAttribute('stroke', '#3d6459');
+          arrow.setAttribute('stroke-width', '1.4');
+          arrow.setAttribute('stroke-linecap', 'round');
+          arrow.setAttribute('stroke-linejoin', 'round');
+          arrow.setAttribute('fill', 'none');
+          g.appendChild(arrow);
+
+          // Attach pointer down for direct dragging
+          g.addEventListener('pointerdown', onSculptHandlePointerDown);
+
+          svgHandlesGroup.appendChild(g);
+          svgHandleElements.push(g);
+        }
+      }
+
+      /**
+       * Projects a 3D world point to 2D viewport pixel coordinates (or computes 2D fallback coordinates)
+       */
+      function projectWorldToScreen(worldX, worldY, worldZ) {
+        const w = viewportContainer.clientWidth;
+        const h = viewportContainer.clientHeight;
+
+        if (appState.usingFallback2D || !camera) {
+          // 2D fallback coordinate system
+          const scalePxPerCm = Math.min(w * 0.022, h * 0.024);
+          const centerX = w * 0.5;
+          const baseY = h * 0.74;
+          return {
+            x: centerX + (worldX * 10) * scalePxPerCm,
+            y: baseY - (worldY * 10) * scalePxPerCm,
+            pxPerCm: scalePxPerCm
+          };
+        }
+
+        const v = new THREE.Vector3(worldX, worldY, worldZ);
+        v.project(camera);
+        return {
+          x: (v.x * 0.5 + 0.5) * w,
+          y: (-v.y * 0.5 + 0.5) * h
+        };
+      }
+
+      function updateHighlightAndHandlesUI() {
+        const idx = appState.selectedHandleIdx;
+        const rCm = appState.radiiCm[idx];
+        const yCm = HANDLE_Y_RATIOS[idx] * appState.heightCm;
+
+        // Update 3D highlight ring position & radius
+        if (highlightRingMesh) {
+          highlightRingMesh.visible = (appState.mode === 'sculpt');
+          const rWorld = rCm * 0.1 + 0.015;
+          highlightRingMesh.scale.set(rWorld, 1, rWorld);
+          highlightRingMesh.position.y = yCm * 0.1;
+        }
+
+        // Update bottom dock slider & label
+        const sliderRadius = document.getElementById('sliderRadius');
+        const labelActive = document.getElementById('labelActiveHandle');
+        if (sliderRadius && document.activeElement !== sliderRadius) {
+          sliderRadius.value = String(rCm.toFixed(1));
+        }
+        if (labelActive) {
+          labelActive.textContent = HANDLE_LABELS[idx] + ': ' + rCm.toFixed(1) + 'cm';
+        }
+
+        // Highlight active SVG handle using setAttribute('class', ...) ONLY
+        for (let i = 0; i < svgHandleElements.length; i++) {
+          const el = svgHandleElements[i];
+          if (i === idx) {
+            el.setAttribute('class', 'sculpt-handle-group active');
+          } else {
+            el.setAttribute('class', 'sculpt-handle-group');
+          }
+        }
+      }
+
+      /**
+       * Syncs the SVG overlay handles & silhouette curve to the live 3D camera projection every frame.
+       */
+      function updateSvgSculptOverlayPosition() {
+        if (!sculptOverlaySvg) return;
+
+        if (appState.mode !== 'sculpt') {
+          sculptOverlaySvg.setAttribute('class', 'hidden');
+          return;
+        }
+        sculptOverlaySvg.setAttribute('class', 'absolute inset-0 w-full h-full pointer-events-none z-10 overflow-visible');
+
+        // Determine camera's horizontal right vector so handles always sit on the right silhouette of the pot
+        let rightX = 1, rightZ = 0;
+        if (!appState.usingFallback2D && camera) {
+          const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+          camRight.y = 0;
+          if (camRight.lengthSq() > 1e-5) {
+            camRight.normalize();
+            rightX = camRight.x;
+            rightZ = camRight.z;
+          }
+        }
+
+        const H = appState.heightCm;
+        const axisBottom = projectWorldToScreen(0, 0, 0);
+        const axisTop = projectWorldToScreen(0, H * 0.105, 0);
+
+        svgAxisLine.setAttribute('x1', String(axisBottom.x.toFixed(1)));
+        svgAxisLine.setAttribute('y1', String(axisBottom.y.toFixed(1)));
+        svgAxisLine.setAttribute('x2', String(axisTop.x.toFixed(1)));
+        svgAxisLine.setAttribute('y2', String(axisTop.y.toFixed(1)));
+
+        // Build smooth contour guide path along the right silhouette
+        let pathD = '';
+        const curveSamples = 28;
+        for (let s = 0; s <= curveSamples; s++) {
+          const t = s / curveSamples;
+          const yRatio = HANDLE_Y_RATIOS[0] + t * (1.0 - HANDLE_Y_RATIOS[0]);
+          const rWorld = sampleOuterRadiusAtRatio(appState.radiiCm, yRatio) * 0.1;
+          const yWorld = yRatio * H * 0.1;
+          const scr = projectWorldToScreen(rightX * rWorld, yWorld, rightZ * rWorld);
+          pathD += (s === 0 ? 'M ' : ' L ') + scr.x.toFixed(1) + ' ' + scr.y.toFixed(1);
+        }
+        svgContourPath.setAttribute('d', pathD);
+
+        // Position each of the 8 handles slightly offset to the right of the silhouette edge
+        const handleOffsetPx = 16;
+        for (let i = 0; i < HANDLE_Y_RATIOS.length; i++) {
+          const yWorld = HANDLE_Y_RATIOS[i] * H * 0.1;
+          const rWorld = appState.radiiCm[i] * 0.1;
+          const edgeScr = projectWorldToScreen(rightX * rWorld, yWorld, rightZ * rWorld);
+          const hx = edgeScr.x + handleOffsetPx;
+          const hy = edgeScr.y;
+
+          const g = svgHandleElements[i];
+          if (g) {
+            g.setAttribute('transform', 'translate(' + hx.toFixed(1) + ',' + hy.toFixed(1) + ')');
+          }
+
+          if (i === appState.selectedHandleIdx) {
+            const centerScr = projectWorldToScreen(0, yWorld, 0);
+            svgRadiusLine.setAttribute('x1', String(centerScr.x.toFixed(1)));
+            svgRadiusLine.setAttribute('y1', String(centerScr.y.toFixed(1)));
+            svgRadiusLine.setAttribute('x2', String(edgeScr.x.toFixed(1)));
+            svgRadiusLine.setAttribute('y2', String(edgeScr.y.toFixed(1)));
+
+            const midX = (centerScr.x + edgeScr.x) * 0.5;
+            const midY = centerScr.y - 14;
+            svgRadiusBadgeBg.setAttribute('x', String((midX - 33).toFixed(1)));
+            svgRadiusBadgeBg.setAttribute('y', String((midY - 10).toFixed(1)));
+            svgRadiusBadgeText.setAttribute('x', String(midX.toFixed(1)));
+            svgRadiusBadgeText.setAttribute('y', String(midY.toFixed(1)));
+            svgRadiusBadgeText.textContent = appState.radiiCm[i].toFixed(1) + ' cm';
+          }
+        }
+      }
+
+      /* =========================================================================
+       * 7. INTERACTION HANDLERS: SCULPTING, GLAZING, PAINTING & WHEEL
+       * ========================================================================= */
+      let activeDragPointerId = null;
+      let dragStartX = 0;
+      let dragStartRadii = null;
+      let dragPxPerCm = 12;
+
+      function getCurrentAppStateSnapshot() {
+        return {
+          radiiCm: appState.radiiCm.slice(),
+          heightCm: appState.heightCm,
+          thicknessCm: appState.thicknessCm,
+          presetId: appState.presetId,
+          glazeId: appState.glazeId,
+          glazeTint: appState.glazeTint,
+          glossiness: appState.glossiness,
+          paintImageData: paintLayerCtx.getImageData(0, 0, TEX_WIDTH, TEX_HEIGHT),
+          paintChecksum: computeCanvasChecksum(paintLayerCtx, TEX_WIDTH, TEX_HEIGHT)
+        };
+      }
+
+      function commitHistoryStep() {
+        historyManager.push(getCurrentAppStateSnapshot());
+        updateUndoRedoButtonsUI();
+      }
+
+      function restoreAppStateSnapshot(snap) {
+        if (!snap) return;
+        appState.radiiCm = sanitizeRadiiArray(snap.radiiCm);
+        appState.heightCm = snap.heightCm;
+        appState.thicknessCm = snap.thicknessCm;
+        appState.presetId = snap.presetId;
+        appState.glazeId = snap.glazeId;
+        appState.glazeTint = snap.glazeTint;
+        appState.glossiness = snap.glossiness;
+
+        if (snap.paintImageData) {
+          paintLayerCtx.putImageData(snap.paintImageData, 0, 0);
+        }
+
+        // Sync UI controls
+        const sliderGloss = document.getElementById('sliderGloss');
+        const labelGlossVal = document.getElementById('labelGlossVal');
+        const inputGlazeTint = document.getElementById('inputGlazeTint');
+        if (sliderGloss) sliderGloss.value = String(appState.glossiness);
+        if (labelGlossVal) labelGlossVal.textContent = appState.glossiness + '%';
+        if (inputGlazeTint) inputGlazeTint.value = appState.glazeTint;
+
+        document.querySelectorAll('.preset-btn').forEach(function (btn) {
+          btn.classList.toggle('subbtn-active', btn.getAttribute('data-preset') === appState.presetId);
+        });
+        document.querySelectorAll('.glaze-btn').forEach(function (btn) {
+          btn.classList.toggle('subbtn-active', btn.getAttribute('data-glaze') === appState.glazeId);
+        });
+
+        applyGlazeMaterialSettings();
+        rebuildPotteryMesh();
+        updateUndoRedoButtonsUI();
+      }
+
+      function updateUndoRedoButtonsUI() {
+        const btnUndo = document.getElementById('btnUndo');
+        const btnRedo = document.getElementById('btnRedo');
+        if (btnUndo) btnUndo.disabled = !historyManager.canUndo();
+        if (btnRedo) btnRedo.disabled = !historyManager.canRedo();
+      }
+
+      function setHandleRadiusWithCoupling(handleIdx, newRadiusCm, baseRadiiArray, coupleNeighbors) {
+        const clamped = clampRadius(newRadiusCm);
+        const source = baseRadiiArray ? baseRadiiArray.slice() : appState.radiiCm.slice();
+        const delta = clamped - source[handleIdx];
+        source[handleIdx] = Number(clamped.toFixed(2));
+
+        // Gentle organic coupling to immediate neighbors so dragging feels like supple wet clay
+        if (coupleNeighbors) {
+          if (handleIdx > 0) {
+            source[handleIdx - 1] = Number(clampRadius(source[handleIdx - 1] + delta * 0.28).toFixed(2));
+          }
+          if (handleIdx < source.length - 1) {
+            source[handleIdx + 1] = Number(clampRadius(source[handleIdx + 1] + delta * 0.28).toFixed(2));
+          }
+        }
+        appState.radiiCm = source;
+        rebuildPotteryMesh();
+      }
+
+      function onSculptHandlePointerDown(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        const g = e.currentTarget;
+        const idx = parseInt(g.getAttribute('data-handle-idx'), 10);
+        if (!Number.isFinite(idx)) return;
+
+        appState.selectedHandleIdx = idx;
+        appState.isDraggingHandle = true;
+        activeDragPointerId = e.pointerId;
+        dragStartX = e.clientX;
+        dragStartRadii = appState.radiiCm.slice();
+
+        // Compute screen pixel per cm at this handle's height
+        const yWorld = HANDLE_Y_RATIOS[idx] * appState.heightCm * 0.1;
+        const p0 = projectWorldToScreen(0, yWorld, 0);
+        const p1 = projectWorldToScreen(0.5, yWorld, 0); // 5 cm in world units
+        dragPxPerCm = Math.max(4, Math.hypot(p1.x - p0.x, p1.y - p0.y) / 5.0);
+
+        if (controls) controls.enabled = false;
+        updateHighlightAndHandlesUI();
+
+        window.addEventListener('pointermove', onSculptHandlePointerMove);
+        window.addEventListener('pointerup', onSculptHandlePointerUp);
+        window.addEventListener('pointercancel', onSculptHandlePointerUp);
+      }
+
+      function onSculptHandlePointerMove(e) {
+        if (!appState.isDraggingHandle || e.pointerId !== activeDragPointerId) return;
+        const dxPx = e.clientX - dragStartX;
+        const deltaCm = dxPx / dragPxPerCm;
+        const targetR = dragStartRadii[appState.selectedHandleIdx] + deltaCm;
+        setHandleRadiusWithCoupling(appState.selectedHandleIdx, targetR, dragStartRadii, true);
+      }
+
+      function onSculptHandlePointerUp(e) {
+        if (!appState.isDraggingHandle) return;
+        if (activeDragPointerId !== null && e.pointerId !== activeDragPointerId) return;
+
+        appState.isDraggingHandle = false;
+        activeDragPointerId = null;
+        if (controls) {
+          controls.enabled = (appState.mode !== 'paint' || appState.paintTool === 'orbit');
+        }
+
+        window.removeEventListener('pointermove', onSculptHandlePointerMove);
+        window.removeEventListener('pointerup', onSculptHandlePointerUp);
+        window.removeEventListener('pointercancel', onSculptHandlePointerUp);
+
+        // Commit single atomic undo step if radius changed
+        if (dragStartRadii) {
+          const changed = dragStartRadii.some(function (val, i) {
+            return Math.abs(val - appState.radiiCm[i]) > 0.01;
+          });
+          if (changed) {
+            commitHistoryStep();
+          }
+        }
+        dragStartRadii = null;
+      }
+
+      /* =========================================================================
+       * 8. 3D SURFACE RAYCAST PAINTING WITH SEAMLESS UV WRAPPING
+       * ========================================================================= */
+      let strokeDirtiedPaint = false;
+
+      function getPotteryHitUv(clientX, clientY) {
+        const rect = viewportContainer.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        if (appState.usingFallback2D || !raycaster || !potteryMesh || !camera) {
+          // 2D Fallback UV projection onto the silhouette
+          const w = rect.width;
+          const h = rect.height;
+          const scalePxPerCm = Math.min(w * 0.022, h * 0.024);
+          const centerX = w * 0.5;
+          const baseY = h * 0.74;
+
+          const yCm = (baseY - y) / scalePxPerCm;
+          const yRatio = yCm / appState.heightCm;
+          if (yRatio < 0.04 || yRatio > 1.02) return null;
+
+          const outerRCm = sampleOuterRadiusAtRatio(appState.radiiCm, Math.max(0.06, Math.min(1, yRatio)));
+          const dxCm = (x - centerX) / scalePxPerCm;
+          if (Math.abs(dxCm) > outerRCm * 1.08) return null;
+
+          const normX = Math.max(-1, Math.min(1, dxCm / Math.max(1, outerRCm)));
+          const angle = Math.asin(normX); // -PI/2 .. PI/2 front hemisphere
+          const u = (((angle / (Math.PI * 2)) + 0.25 - (appState.wheelRotationRad / (Math.PI * 2))) % 1 + 1) % 1;
+          const v = Math.max(0.06, Math.min(0.95, 0.06 + ((yRatio - 0.06) / 0.94) * 0.88));
+          return { u: u, v: v };
+        }
+
+        pointerNdc.x = (x / rect.width) * 2 - 1;
+        pointerNdc.y = -(y / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointerNdc, camera);
+
+        const hits = raycaster.intersectObject(potteryMesh, false);
+        if (hits && hits.length > 0 && hits[0].uv) {
+          return { u: hits[0].uv.x, v: hits[0].uv.y };
+        }
+        return null;
+      }
+
+      function drawUvStrokeOnPaintCanvas(uv0, uv1) {
+        const segments = computeUvWrappedSegments(uv0, uv1);
+        paintLayerCtx.save();
+
+        if (appState.paintTool === 'eraser') {
+          paintLayerCtx.globalCompositeOperation = 'destination-out';
+          paintLayerCtx.strokeStyle = 'rgba(0,0,0,1)';
+          paintLayerCtx.fillStyle = 'rgba(0,0,0,1)';
+        } else {
+          paintLayerCtx.globalCompositeOperation = 'source-over';
+          paintLayerCtx.strokeStyle = appState.brushColor;
+          paintLayerCtx.fillStyle = appState.brushColor;
+        }
+
+        const rPx = Math.max(2, appState.brushSize);
+        paintLayerCtx.lineWidth = rPx * 2;
+        paintLayerCtx.lineCap = 'round';
+        paintLayerCtx.lineJoin = 'round';
+
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          const x0 = seg.u0 * TEX_WIDTH;
+          const y0 = (1.0 - seg.v0) * TEX_HEIGHT;
+          const x1 = seg.u1 * TEX_WIDTH;
+          const y1 = (1.0 - seg.v1) * TEX_HEIGHT;
+
+          paintLayerCtx.beginPath();
+          paintLayerCtx.moveTo(x0, y0);
+          paintLayerCtx.lineTo(x1, y1);
+          paintLayerCtx.stroke();
+
+          // Also draw circular dab for single clicks
+          paintLayerCtx.beginPath();
+          paintLayerCtx.arc(x1, y1, rPx, 0, Math.PI * 2);
+          paintLayerCtx.fill();
+        }
+
+        paintLayerCtx.restore();
+        updateCompositeTexture();
+      }
+
+      function onViewportPointerDown(e) {
+        if (appState.mode !== 'paint' || appState.paintTool === 'orbit') return;
+        if (e.button !== undefined && e.button !== 0) return;
+
+        const hitUv = getPotteryHitUv(e.clientX, e.clientY);
+        if (!hitUv) {
+          // Clicked outside the pottery: allow camera orbit during this drag!
+          if (controls) controls.enabled = true;
+          return;
+        }
+
+        // Clicked directly on the pottery surface in Paint mode: lock camera & wheel and paint!
+        e.preventDefault();
+        if (controls) controls.enabled = false;
+        appState.isPaintingStroke = true;
+        appState.lastPaintUv = hitUv;
+        strokeDirtiedPaint = true;
+
+        drawUvStrokeOnPaintCanvas(hitUv, hitUv);
+
+        window.addEventListener('pointermove', onViewportPointerMove);
+        window.addEventListener('pointerup', onViewportPointerUp);
+        window.addEventListener('pointercancel', onViewportPointerUp);
+      }
+
+      function onViewportPointerMove(e) {
+        if (!appState.isPaintingStroke) return;
+        const hitUv = getPotteryHitUv(e.clientX, e.clientY);
+        if (!hitUv) {
+          appState.lastPaintUv = null;
+          return;
+        }
+        if (appState.lastPaintUv) {
+          drawUvStrokeOnPaintCanvas(appState.lastPaintUv, hitUv);
+        } else {
+          drawUvStrokeOnPaintCanvas(hitUv, hitUv);
+        }
+        appState.lastPaintUv = hitUv;
+      }
+
+      function onViewportPointerUp() {
+        if (!appState.isPaintingStroke) return;
+        appState.isPaintingStroke = false;
+        appState.lastPaintUv = null;
+
+        window.removeEventListener('pointermove', onViewportPointerMove);
+        window.removeEventListener('pointerup', onViewportPointerUp);
+        window.removeEventListener('pointercancel', onViewportPointerUp);
+
+        if (strokeDirtiedPaint) {
+          strokeDirtiedPaint = false;
+          commitHistoryStep();
+        }
+
+        if (controls) {
+          controls.enabled = (appState.mode !== 'paint' || appState.paintTool === 'orbit');
+        }
+      }
+
+      /* =========================================================================
+       * 9. 2D SILHOUETTE & PATTERN FALLBACK RENDERER (IF WEBGL UNAVAILABLE)
+       * ========================================================================= */
+      function activateFallback2D(reasonMsg) {
+        appState.usingFallback2D = true;
+        if (glCanvas) glCanvas.classList.add('hidden');
+        if (fallback2DCanvas) fallback2DCanvas.classList.remove('hidden');
+        const banner = document.getElementById('fallbackNotice');
+        if (banner) {
+          banner.textContent = reasonMsg || '2D 도자기 윤곽·무늬 대체 모드로 실행 중입니다.';
+          banner.classList.remove('hidden');
+        }
+      }
+
+      function renderFallback2DScene() {
+        if (!fallback2DCanvas) return;
+        const w = viewportContainer.clientWidth;
+        const h = viewportContainer.clientHeight;
+        if (fallback2DCanvas.width !== w || fallback2DCanvas.height !== h) {
+          fallback2DCanvas.width = w;
+          fallback2DCanvas.height = h;
+        }
+        const ctx = fallback2DCanvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+
+        const scalePxPerCm = Math.min(w * 0.022, h * 0.024);
+        const centerX = w * 0.5;
+        const baseY = h * 0.74;
+
+        // Draw wooden wheel head
+        ctx.save();
+        ctx.fillStyle = '#8b6b4a';
+        ctx.beginPath();
+        ctx.ellipse(centerX, baseY + 8, 15.5 * scalePxPerCm, 2.2 * scalePxPerCm, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Contact shadow
+        ctx.fillStyle = 'rgba(38, 28, 18, 0.26)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, baseY + 2, appState.radiiCm[0] * 1.15 * scalePxPerCm, 1.1 * scalePxPerCm, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw horizontal slices of the revolved pottery using compositeCanvas
+        const slices = 64;
+        for (let i = 0; i < slices; i++) {
+          const t0 = i / slices;
+          const t1 = (i + 1) / slices;
+          const yRatio = HANDLE_Y_RATIOS[0] + t0 * (1.0 - HANDLE_Y_RATIOS[0]);
+          const rCm = sampleOuterRadiusAtRatio(appState.radiiCm, yRatio);
+          const yPx0 = baseY - (t1 * appState.heightCm) * scalePxPerCm;
+          const yPx1 = baseY - (t0 * appState.heightCm) * scalePxPerCm;
+          const halfW = rCm * scalePxPerCm;
+
+          const texY = Math.floor((1.0 - (0.06 + t0 * 0.88)) * TEX_HEIGHT);
+          const uOffset = Math.floor((((appState.wheelRotationRad / (Math.PI * 2)) % 1 + 1) % 1) * TEX_WIDTH);
+
+          ctx.drawImage(
+            compositeCanvas,
+            uOffset % (TEX_WIDTH / 2),
+            Math.max(0, Math.min(TEX_HEIGHT - 4, texY)),
+            TEX_WIDTH / 2,
+            4,
+            centerX - halfW,
+            yPx0,
+            halfW * 2,
+            Math.max(2, yPx1 - yPx0 + 1.5)
+          );
+
+          // Cylindrical studio lighting & glaze specular overlay
+          const shadeGrad = ctx.createLinearGradient(centerX - halfW, 0, centerX + halfW, 0);
+          const gloss01 = appState.glossiness / 100;
+          shadeGrad.addColorStop(0.0, 'rgba(30, 25, 20, 0.28)');
+          shadeGrad.addColorStop(0.28, 'rgba(255, 255, 250, ' + (0.12 + gloss01 * 0.26) + ')');
+          shadeGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.0)');
+          shadeGrad.addColorStop(1.0, 'rgba(25, 20, 15, 0.36)');
+          ctx.fillStyle = shadeGrad;
+          ctx.fillRect(centerX - halfW, yPx0, halfW * 2, Math.max(2, yPx1 - yPx0 + 1.5));
+        }
+
+        // Draw open mouth & interior rim ellipse at top
+        const topRCm = appState.radiiCm[appState.radiiCm.length - 1];
+        const topY = baseY - appState.heightCm * scalePxPerCm;
+        ctx.fillStyle = '#4a5d54';
+        ctx.strokeStyle = '#d8d2c5';
+        ctx.lineWidth = appState.thicknessCm * scalePxPerCm;
+        ctx.beginPath();
+        ctx.ellipse(centerX, topY, topRCm * scalePxPerCm, topRCm * 0.18 * scalePxPerCm, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      /* =========================================================================
+       * 10. UI EVENT BINDINGS & KEYBOARD ACCESSIBILITY
+       * ========================================================================= */
+      const MODE_HINTS = {
+        sculpt: '빚기 모드: 우측 윤곽 손잡이를 좌우로 끌거나 아래 슬라이더·방향키(←/→)로 도자기 형태를 빚어보세요.',
+        glaze: '유약·질감 모드: 청자·백자·코발트·분청 유약과 무광↔유광 광택을 조절해 빛의 반사를 관찰하세요.',
+        paint: '무늬 그리기 모드: 도자기 표면에 직접 드래그해 붓으로 그리거나 +띠·+점·+물결 패턴을 찍어보세요.',
+        wheel: '물레·조명 모드: 물레 회전 속도와 창문빛 각도를 조절하며 입체적인 도자기 작품을 감상하세요.'
+      };
+
+      function switchMode(newMode) {
+        appState.mode = newMode;
+
+        document.querySelectorAll('.mode-tab-btn').forEach(function (btn) {
+          btn.classList.toggle('tab-active', btn.getAttribute('data-mode') === newMode);
+        });
+
+        document.getElementById('panelSculpt').classList.toggle('hidden', newMode !== 'sculpt');
+        document.getElementById('panelSculpt').classList.toggle('flex', newMode === 'sculpt');
+
+        document.getElementById('panelGlaze').classList.toggle('hidden', newMode !== 'glaze');
+        document.getElementById('panelGlaze').classList.toggle('flex', newMode === 'glaze');
+
+        document.getElementById('panelPaint').classList.toggle('hidden', newMode !== 'paint');
+        document.getElementById('panelPaint').classList.toggle('flex', newMode === 'paint');
+
+        document.getElementById('panelWheel').classList.toggle('hidden', newMode !== 'wheel');
+        document.getElementById('panelWheel').classList.toggle('flex', newMode === 'wheel');
+
+        const hintText = document.getElementById('modeHintText');
+        if (hintText && MODE_HINTS[newMode]) {
+          hintText.textContent = MODE_HINTS[newMode];
+        }
+
+        if (controls) {
+          controls.enabled = (newMode !== 'paint' || appState.paintTool === 'orbit');
+        }
+
+        if (glCanvas) {
+          glCanvas.style.cursor = (newMode === 'paint' && appState.paintTool !== 'orbit') ? 'crosshair' : 'grab';
+        }
+
+        updateHighlightAndHandlesUI();
+        updateSvgSculptOverlayPosition();
+      }
+
+      function syncWheelUI() {
+        const topLabel = document.getElementById('labelWheelToggleTop');
+        const dockBtn = document.getElementById('btnWheelToggleDock');
+        const spinIcon = document.getElementById('iconWheelSpin');
+        const speedLabel = document.getElementById('labelWheelSpeed');
+        const speedSlider = document.getElementById('sliderWheelSpeed');
+
+        if (topLabel) topLabel.textContent = appState.wheelSpinning ? '물레 회전중' : '물레 정지';
+        if (dockBtn) {
+          dockBtn.textContent = appState.wheelSpinning ? '물레 회전: 켜짐' : '물레 회전: 꺼짐';
+          dockBtn.classList.toggle('subbtn-active', appState.wheelSpinning);
+        }
+        if (spinIcon) {
+          if (appState.wheelSpinning && appState.wheelSpeed > 0) {
+            spinIcon.setAttribute('class', 'w-4 h-4 animate-spin');
+          } else {
+            spinIcon.setAttribute('class', 'w-4 h-4');
+          }
+        }
+        if (speedLabel) speedLabel.textContent = appState.wheelSpeed + '%';
+        if (speedSlider && document.activeElement !== speedSlider) {
+          speedSlider.value = String(appState.wheelSpeed);
+        }
+      }
+
+      function bindUIEvents() {
+        // Mode tabs
+        document.querySelectorAll('.mode-tab-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            switchMode(btn.getAttribute('data-mode'));
+          });
+        });
+
+        // 3 Vessel Presets
+        document.querySelectorAll('.preset-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const pid = btn.getAttribute('data-preset');
+            const preset = VESSEL_PRESETS[pid];
+            if (!preset) return;
+
+            appState.presetId = pid;
+            appState.radiiCm = preset.radiiCm.slice();
+            appState.heightCm = preset.heightCm;
+            appState.thicknessCm = preset.thicknessCm;
+
+            document.querySelectorAll('.preset-btn').forEach(function (b) {
+              b.classList.toggle('subbtn-active', b === btn);
+            });
+
+            rebuildPotteryMesh();
+            fitCameraToPottery('front');
+            commitHistoryStep();
+          });
+        });
+
+        // 4 Region Selector Buttons
+        document.querySelectorAll('.region-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const region = btn.getAttribute('data-region');
+            const mapInfo = REGION_MAP[region];
+            if (!mapInfo) return;
+
+            appState.selectedRegion = region;
+            appState.selectedHandleIdx = mapInfo.primary;
+
+            document.querySelectorAll('.region-btn').forEach(function (b) {
+              b.classList.toggle('subbtn-active', b === btn);
+            });
+
+            updateHighlightAndHandlesUI();
+            updateSvgSculptOverlayPosition();
+          });
+        });
+
+        // Radius Slider (Continuous sculpt + commit on change)
+        const sliderRadius = document.getElementById('sliderRadius');
+        let sliderStartRadii = null;
+        if (sliderRadius) {
+          sliderRadius.addEventListener('pointerdown', function () {
+            sliderStartRadii = appState.radiiCm.slice();
+          });
+          sliderRadius.addEventListener('input', function () {
+            const val = parseFloat(sliderRadius.value);
+            setHandleRadiusWithCoupling(appState.selectedHandleIdx, val, sliderStartRadii || appState.radiiCm, true);
+          });
+          sliderRadius.addEventListener('change', function () {
+            sliderStartRadii = null;
+            commitHistoryStep();
+          });
+        }
+
+        // Radius Nudge Buttons (- / +)
+        const btnDec = document.getElementById('btnRadiusDec');
+        const btnInc = document.getElementById('btnRadiusInc');
+        if (btnDec) {
+          btnDec.addEventListener('click', function () {
+            const cur = appState.radiiCm[appState.selectedHandleIdx];
+            setHandleRadiusWithCoupling(appState.selectedHandleIdx, cur - 0.4, appState.radiiCm, true);
+            commitHistoryStep();
+          });
+        }
+        if (btnInc) {
+          btnInc.addEventListener('click', function () {
+            const cur = appState.radiiCm[appState.selectedHandleIdx];
+            setHandleRadiusWithCoupling(appState.selectedHandleIdx, cur + 0.4, appState.radiiCm, true);
+            commitHistoryStep();
+          });
+        }
+
+        // Keyboard Arrow Keys for accessible sculpting
+        window.addEventListener('keydown', function (e) {
+          if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            if (e.shiftKey) {
+              const s = historyManager.redo();
+              if (s) restoreAppStateSnapshot(s);
+            } else {
+              const s = historyManager.undo();
+              if (s) restoreAppStateSnapshot(s);
+            }
+            return;
+          }
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+            e.preventDefault();
+            const s = historyManager.redo();
+            if (s) restoreAppStateSnapshot(s);
+            return;
+          }
+
+          if (appState.mode === 'sculpt') {
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              const cur = appState.radiiCm[appState.selectedHandleIdx];
+              setHandleRadiusWithCoupling(appState.selectedHandleIdx, cur - 0.3, appState.radiiCm, true);
+              commitHistoryStep();
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              const cur = appState.radiiCm[appState.selectedHandleIdx];
+              setHandleRadiusWithCoupling(appState.selectedHandleIdx, cur + 0.3, appState.radiiCm, true);
+              commitHistoryStep();
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              appState.selectedHandleIdx = Math.min(HANDLE_Y_RATIOS.length - 1, appState.selectedHandleIdx + 1);
+              updateHighlightAndHandlesUI();
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              appState.selectedHandleIdx = Math.max(0, appState.selectedHandleIdx - 1);
+              updateHighlightAndHandlesUI();
+            }
+          }
+        });
+
+        // 4 Glaze Buttons
+        document.querySelectorAll('.glaze-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const gid = btn.getAttribute('data-glaze');
+            const recipe = GLAZE_RECIPES[gid];
+            if (!recipe) return;
+
+            appState.glazeId = gid;
+            appState.glazeTint = recipe.baseColor;
+            appState.glossiness = recipe.defaultGloss;
+
+            document.querySelectorAll('.glaze-btn').forEach(function (b) {
+              b.classList.toggle('subbtn-active', b === btn);
+            });
+
+            const sliderGloss = document.getElementById('sliderGloss');
+            const labelGlossVal = document.getElementById('labelGlossVal');
+            const inputGlazeTint = document.getElementById('inputGlazeTint');
+            if (sliderGloss) sliderGloss.value = String(appState.glossiness);
+            if (labelGlossVal) labelGlossVal.textContent = appState.glossiness + '%';
+            if (inputGlazeTint) inputGlazeTint.value = appState.glazeTint;
+
+            applyGlazeMaterialSettings();
+            commitHistoryStep();
+          });
+        });
+
+        // Glossiness Slider & Glaze Tint Picker
+        const sliderGloss = document.getElementById('sliderGloss');
+        const labelGlossVal = document.getElementById('labelGlossVal');
+        if (sliderGloss) {
+          sliderGloss.addEventListener('input', function () {
+            appState.glossiness = parseInt(sliderGloss.value, 10) || 0;
+            if (labelGlossVal) labelGlossVal.textContent = appState.glossiness + '%';
+            applyGlazeMaterialSettings();
+          });
+          sliderGloss.addEventListener('change', function () {
+            commitHistoryStep();
+          });
+        }
+
+        const inputGlazeTint = document.getElementById('inputGlazeTint');
+        if (inputGlazeTint) {
+          inputGlazeTint.addEventListener('input', function () {
+            appState.glazeTint = inputGlazeTint.value;
+            applyGlazeMaterialSettings();
+          });
+          inputGlazeTint.addEventListener('change', function () {
+            commitHistoryStep();
+          });
+        }
+
+        // Paint Sub-Tools (Brush / Eraser / Orbit)
+        const btnPaintBrush = document.getElementById('btnPaintBrush');
+        const btnPaintEraser = document.getElementById('btnPaintEraser');
+        const btnPaintOrbit = document.getElementById('btnPaintOrbit');
+
+        function setPaintSubTool(tool) {
+          appState.paintTool = tool;
+          if (btnPaintBrush) btnPaintBrush.classList.toggle('subbtn-active', tool === 'brush');
+          if (btnPaintEraser) btnPaintEraser.classList.toggle('subbtn-active', tool === 'eraser');
+          if (btnPaintOrbit) btnPaintOrbit.classList.toggle('subbtn-active', tool === 'orbit');
+          if (controls) controls.enabled = (appState.mode !== 'paint' || tool === 'orbit');
+          if (glCanvas) {
+            glCanvas.style.cursor = (appState.mode === 'paint' && tool !== 'orbit') ? 'crosshair' : 'grab';
+          }
+        }
+
+        if (btnPaintBrush) btnPaintBrush.addEventListener('click', function () { setPaintSubTool('brush'); });
+        if (btnPaintEraser) btnPaintEraser.addEventListener('click', function () { setPaintSubTool('eraser'); });
+        if (btnPaintOrbit) btnPaintOrbit.addEventListener('click', function () { setPaintSubTool('orbit'); });
+
+        // Brush Color Swatches & Picker
+        const inputBrushColor = document.getElementById('inputBrushColor');
+        document.querySelectorAll('.swatch-btn').forEach(function (sw) {
+          sw.addEventListener('click', function () {
+            const col = sw.getAttribute('data-color');
+            appState.brushColor = col;
+            if (inputBrushColor) inputBrushColor.value = col;
+            setPaintSubTool('brush');
+            document.querySelectorAll('.swatch-btn').forEach(function (b) {
+              b.classList.toggle('border-2', b === sw);
+              b.classList.toggle('border-stone-800', b === sw);
+            });
+          });
+        });
+
+        if (inputBrushColor) {
+          inputBrushColor.addEventListener('input', function () {
+            appState.brushColor = inputBrushColor.value;
+            setPaintSubTool('brush');
+          });
+        }
+
+        const sliderBrushSize = document.getElementById('sliderBrushSize');
+        if (sliderBrushSize) {
+          sliderBrushSize.addEventListener('input', function () {
+            appState.brushSize = parseInt(sliderBrushSize.value, 10) || 9;
+          });
+        }
+
+        // 3 Pattern Stamps & Clear Pattern
+        document.querySelectorAll('.pattern-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const pat = btn.getAttribute('data-pattern');
+            // Stamp at the height of the currently selected handle (or gently staggered)
+            const targetV = 0.14 + HANDLE_Y_RATIOS[appState.selectedHandleIdx] * 0.74;
+            applyProceduralPatternToContext(
+              paintLayerCtx,
+              TEX_WIDTH,
+              TEX_HEIGHT,
+              pat,
+              appState.brushColor,
+              appState.brushSize,
+              targetV
+            );
+            updateCompositeTexture();
+            commitHistoryStep();
+          });
+        });
+
+        const btnClearPattern = document.getElementById('btnClearPattern');
+        if (btnClearPattern) {
+          btnClearPattern.addEventListener('click', function () {
+            paintLayerCtx.clearRect(0, 0, TEX_WIDTH, TEX_HEIGHT);
+            updateCompositeTexture();
+            commitHistoryStep();
+          });
+        }
+
+        // Viewport Pointer Down for Painting
+        viewportContainer.addEventListener('pointerdown', onViewportPointerDown);
+
+        // Wheel Spin Controls
+        function toggleWheelSpin() {
+          appState.wheelSpinning = !appState.wheelSpinning;
+          syncWheelUI();
+        }
+        const btnWheelTop = document.getElementById('btnWheelToggleTop');
+        const btnWheelDock = document.getElementById('btnWheelToggleDock');
+        if (btnWheelTop) btnWheelTop.addEventListener('click', toggleWheelSpin);
+        if (btnWheelDock) btnWheelDock.addEventListener('click', toggleWheelSpin);
+
+        const sliderWheelSpeed = document.getElementById('sliderWheelSpeed');
+        if (sliderWheelSpeed) {
+          sliderWheelSpeed.addEventListener('input', function () {
+            appState.wheelSpeed = parseInt(sliderWheelSpeed.value, 10) || 0;
+            if (appState.wheelSpeed > 0 && !appState.wheelSpinning) {
+              appState.wheelSpinning = true;
+            }
+            syncWheelUI();
+          });
+        }
+
+        const sliderLightAngle = document.getElementById('sliderLightAngle');
+        if (sliderLightAngle) {
+          sliderLightAngle.addEventListener('input', function () {
+            appState.lightAngleDeg = parseFloat(sliderLightAngle.value) || 0;
+            updateStudioLightingAngle();
+          });
+        }
+
+        // Camera View Presets
+        const btnResetCam = document.getElementById('btnResetCamera');
+        if (btnResetCam) {
+          btnResetCam.addEventListener('click', function () {
+            fitCameraToPottery('front');
+          });
+        }
+
+        const btnViewRim = document.getElementById('btnViewRim');
+        let rimViewActive = false;
+        if (btnViewRim) {
+          btnViewRim.addEventListener('click', function () {
+            rimViewActive = !rimViewActive;
+            fitCameraToPottery(rimViewActive ? 'rim' : 'front');
+            btnViewRim.textContent = rimViewActive ? '정면 시점으로 보기' : '입구·내부 들여다보기';
+          });
+        }
+
+        // Undo / Redo / Reset Initial Artwork
+        const btnUndo = document.getElementById('btnUndo');
+        const btnRedo = document.getElementById('btnRedo');
+        const btnResetArt = document.getElementById('btnResetArt');
+
+        if (btnUndo) {
+          btnUndo.addEventListener('click', function () {
+            const snap = historyManager.undo();
+            if (snap) restoreAppStateSnapshot(snap);
+          });
+        }
+        if (btnRedo) {
+          btnRedo.addEventListener('click', function () {
+            const snap = historyManager.redo();
+            if (snap) restoreAppStateSnapshot(snap);
+          });
+        }
+        if (btnResetArt) {
+          btnResetArt.addEventListener('click', function () {
+            appState.presetId = 'moonjar';
+            appState.radiiCm = VESSEL_PRESETS.moonjar.radiiCm.slice();
+            appState.heightCm = VESSEL_PRESETS.moonjar.heightCm;
+            appState.thicknessCm = VESSEL_PRESETS.moonjar.thicknessCm;
+            appState.glazeId = 'celadon';
+            appState.glazeTint = GLAZE_RECIPES.celadon.baseColor;
+            appState.glossiness = GLAZE_RECIPES.celadon.defaultGloss;
+            appState.selectedRegion = 'body';
+            appState.selectedHandleIdx = 3;
+
+            resetPaintLayerWithInitialWave();
+            applyGlazeMaterialSettings();
+            rebuildPotteryMesh();
+            fitCameraToPottery('front');
+            commitHistoryStep();
+
+            document.querySelectorAll('.preset-btn').forEach(function (b) {
+              b.classList.toggle('subbtn-active', b.getAttribute('data-preset') === 'moonjar');
+            });
+            document.querySelectorAll('.glaze-btn').forEach(function (b) {
+              b.classList.toggle('subbtn-active', b.getAttribute('data-glaze') === 'celadon');
+            });
+          });
+        }
+
+        // Save Artwork as Real Local PNG Download
+        const btnSavePng = document.getElementById('btnSavePng');
+        if (btnSavePng) {
+          btnSavePng.addEventListener('click', function () {
+            try {
+              let dataUrl = '';
+              if (!appState.usingFallback2D && renderer && scene && camera) {
+                const wasRingVisible = highlightRingMesh ? highlightRingMesh.visible : false;
+                if (highlightRingMesh) highlightRingMesh.visible = false;
+                renderer.render(scene, camera);
+                dataUrl = glCanvas.toDataURL('image/png');
+                if (highlightRingMesh) highlightRingMesh.visible = wasRingVisible;
+              } else {
+                renderFallback2DScene();
+                dataUrl = fallback2DCanvas.toDataURL('image/png');
+              }
+
+              const link = document.createElement('a');
+              link.download = 'clay-studio-' + appState.presetId + '-' + appState.glazeId + '.png';
+              link.href = dataUrl;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            } catch (err) {
+              console.error('PNG Export Error:', err);
+            }
+          });
+        }
+
+        // Drawers: 5-Minute Art Lesson & Verification Suite
+        const drawerLesson = document.getElementById('drawerLesson');
+        const drawerTest = document.getElementById('drawerTest');
+        const btnLessonToggle = document.getElementById('btnLessonToggle');
+        const btnCloseLesson = document.getElementById('btnCloseLesson');
+        const btnTestToggle = document.getElementById('btnTestToggle');
+        const btnCloseTest = document.getElementById('btnCloseTest');
+        const btnRunTestsNow = document.getElementById('btnRunTestsNow');
+
+        if (btnLessonToggle && drawerLesson) {
+          btnLessonToggle.addEventListener('click', function () {
+            const isHidden = drawerLesson.classList.contains('hidden');
+            if (drawerTest) drawerTest.classList.add('hidden');
+            drawerLesson.classList.toggle('hidden', !isHidden);
+          });
+        }
+        if (btnCloseLesson && drawerLesson) {
+          btnCloseLesson.addEventListener('click', function () {
+            drawerLesson.classList.add('hidden');
+          });
+        }
+
+        if (btnTestToggle && drawerTest) {
+          btnTestToggle.addEventListener('click', function () {
+            const isHidden = drawerTest.classList.contains('hidden');
+            if (drawerLesson) drawerLesson.classList.add('hidden');
+            drawerTest.classList.toggle('hidden', !isHidden);
+            if (isHidden) {
+              runPureFunctionVerificationSuite();
+            }
+          });
+        }
+        if (btnCloseTest && drawerTest) {
+          btnCloseTest.addEventListener('click', function () {
+            drawerTest.classList.add('hidden');
+          });
+        }
+        if (btnRunTestsNow) {
+          btnRunTestsNow.addEventListener('click', function () {
+            runPureFunctionVerificationSuite();
+          });
+        }
+
+        // Responsive Window Resize
+        window.addEventListener('resize', function () {
+          if (!appState.usingFallback2D && renderer && camera) {
+            const w = viewportContainer.clientWidth;
+            const h = viewportContainer.clientHeight;
+            camera.aspect = w / Math.max(1, h);
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            fitCameraToPottery('front');
+          }
+          updateSvgSculptOverlayPosition();
+        });
+      }
+
+      /* =========================================================================
+       * 11. REAL PURE FUNCTION SELF-VERIFICATION SUITE (NON-DESTRUCTIVE)
+       * ========================================================================= */
+      function runPureFunctionVerificationSuite() {
+        const results = [];
+
+        // TEST 1: Profile Radius Clamp
+        (function () {
+          const low = clampRadius(-4.2);
+          const mid = clampRadius(8.75);
+          const high = clampRadius(99.9);
+          const sanitized = sanitizeRadiiArray([-10, 5.5, 6.0, 200, NaN, 7.2, 5.1, 6.0]);
+          const allInBounds = sanitized.every(function (r) {
+            return r >= MIN_RADIUS_CM && r <= MAX_RADIUS_CM;
+          });
+          const pass = (low === MIN_RADIUS_CM) && (mid === 8.75) && (high === MAX_RADIUS_CM) && allInBounds;
+          results.push({
+            title: '1. 프로파일 반지름 Clamp 검증 (Profile Radius Clamp)',
+            pass: pass,
+            detail: '입력 [-4.2, 8.75, 99.9] → 출력 [' + low + ', ' + mid + ', ' + high + '] cm (유효범위 ' + MIN_RADIUS_CM + '~' + MAX_RADIUS_CM + 'cm)'
+          });
+        })();
+
+        // TEST 2: Profile Ascending Height Order
+        (function () {
+          const heights = generateProfileHeights(24.0);
+          let strictlyIncreasing = (heights.length === 8);
+          for (let i = 0; i < heights.length - 1; i++) {
+            if (!(heights[i] < heights[i + 1])) {
+              strictlyIncreasing = false;
+              break;
+            }
+          }
+          results.push({
+            title: '2. 윤곽 손잡이 높이 단조증가 검증 (Monotonic Profile Heights)',
+            pass: strictlyIncreasing,
+            detail: '8개 구간 높이(cm): [' + heights.map(function (h) { return h.toFixed(1); }).join(' < ') + ']'
+          });
+        })();
+
+        // TEST 3: Wall Thickness & Inner Cavity Radius Condition
+        (function () {
+          const testRadii = [5.2, 8.0, 10.2, 10.8, 9.6, 7.4, 5.8, 6.0];
+          const T = 0.72;
+          const pts = computeCrossSectionPoints(testRadii, 24.0, T, 40);
+          const innerPts = pts.filter(function (p) { return p.isInner === true; });
+          let validCavity = innerPts.length > 10;
+          let minInnerObserved = Infinity;
+
+          for (let i = 0; i < innerPts.length; i++) {
+            const p = innerPts[i];
+            if (p.r < minInnerObserved) minInnerObserved = p.r;
+            if (!(p.r >= MIN_INNER_RADIUS_CM - 1e-4 && p.r < MAX_RADIUS_CM)) {
+              validCavity = false;
+            }
+          }
+          results.push({
+            title: '3. 내벽 반지름 및 벽두께 무결성 검증 (Inner Radius & Wall Thickness)',
+            pass: validCavity,
+            detail: '벽두께 ' + T + 'cm 적용 · 내벽 샘플 ' + innerPts.length + '개 · 최소 내경 반지름 ' + minInnerObserved.toFixed(2) + 'cm (>= ' + MIN_INNER_RADIUS_CM + 'cm)'
+          });
+        })();
+
+        // TEST 4: 3D Geometry Vertex Mutation on Shape Change
+        (function () {
+          const geoA = buildPotteryVertexData(VESSEL_PRESETS.moonjar.radiiCm, 24.0, 0.72, 36);
+          const geoB = buildPotteryVertexData(VESSEL_PRESETS.gourd.radiiCm, 26.5, 0.68, 36);
+
+          // Sample middle belly vertex X coordinate
+          const sameGeo = buildPotteryVertexData(VESSEL_PRESETS.moonjar.radiiCm, 24.0, 0.72, 36);
+          let valA = 0;
+          let valB = 0;
+          let changedCoordinateCount = 0;
+          for (let k = 0; k < Math.min(geoA.positions.length, geoB.positions.length); k++) {
+            const delta = Math.abs(geoA.positions[k] - geoB.positions[k]);
+            valA = Math.max(valA, delta);
+            if (delta > 0.000001) changedCoordinateCount++;
+          }
+          for (let k = 0; k < Math.min(geoA.positions.length, sameGeo.positions.length); k++) {
+            valB = Math.max(valB, Math.abs(geoA.positions[k] - sameGeo.positions[k]));
+          }
+          const finiteBuffers = geoA.positions.every(Number.isFinite) && geoB.positions.every(Number.isFinite) && sameGeo.positions.every(Number.isFinite);
+          const pass = finiteBuffers && geoA.positions.length === sameGeo.positions.length && valB === 0 && (geoA.positions.length !== geoB.positions.length || (valA > 0.01 && changedCoordinateCount > 0)) && geoA.maxRadiusCm !== geoB.maxRadiusCm;
+          results.push({
+            title: '4. 형태 변경 시 3D Geometry 버퍼 정점 변화 검증',
+            pass: pass,
+            detail: '전체 XYZ 버퍼 비교 · 서로 다른 기형 최대차이=' + valA.toFixed(4) + ' · 변경 좌표=' + changedCoordinateCount + '개 · 동일 입력 재생성 최대차이=' + valB.toFixed(4) + ' · 유한수 검증=' + finiteBuffers
+          });
+        })();
+
+        // TEST 5: Undo -> Redo Shape / Glaze / Texture State Identity (Isolated Test Instance)
+        (function () {
+          const testHist = createHistoryManager(10);
+          const state1 = {
+            radiiCm: [5.4, 8.3, 10.4, 10.8, 9.8, 7.6, 5.8, 6.0],
+            heightCm: 24.0,
+            thicknessCm: 0.72,
+            presetId: 'moonjar',
+            glazeId: 'celadon',
+            glazeTint: '#88aa99',
+            glossiness: 84,
+            paintImageData: null,
+            paintChecksum: 11223344
+          };
+          const state2 = {
+            radiiCm: [4.8, 8.6, 9.4, 6.8, 4.1, 6.3, 4.3, 3.1],
+            heightCm: 26.5,
+            thicknessCm: 0.68,
+            presetId: 'gourd',
+            glazeId: 'cobalt',
+            glazeTint: '#2b4c7e',
+            glossiness: 90,
+            paintImageData: null,
+            paintChecksum: 88776655
+          };
+
+          testHist.push(state1);
+          testHist.push(state2);
+          const undone = testHist.undo();
+          const redone = testHist.redo();
+
+          const undoMatch = undone &&
+            undone.glazeId === 'celadon' &&
+            undone.paintChecksum === 11223344 &&
+            JSON.stringify(undone.radiiCm) === JSON.stringify(state1.radiiCm);
+
+          const redoMatch = redone &&
+            redone.glazeId === 'cobalt' &&
+            redone.glossiness === 90 &&
+            redone.paintChecksum === 88776655 &&
+            JSON.stringify(redone.radiiCm) === JSON.stringify(state2.radiiCm);
+
+          const pass = Boolean(undoMatch && redoMatch);
+          results.push({
+            title: '5. Undo → Redo 형태·유약·무늬 상태 일치성 검증',
+            pass: pass,
+            detail: 'Undo 복원(' + (undone ? undone.glazeId : 'null') + ', checksum=' + (undone ? undone.paintChecksum : 0) + ') → Redo 복원(' + (redone ? redone.glazeId : 'null') + ', checksum=' + (redone ? redone.paintChecksum : 0) + ')'
+          });
+        })();
+
+        // TEST 6: UV Horizontal Seam Wrap (Crossing u = 0.98 -> 0.03)
+        (function () {
+          const segs = computeUvWrappedSegments({ u: 0.98, v: 0.50 }, { u: 0.03, v: 0.52 });
+          const crossed = segs.length === 2 && segs[0].crossedSeam === true;
+          const span0 = Math.abs(segs[0].u1 - segs[0].u0);
+          const span1 = crossed ? Math.abs(segs[1].u1 - segs[1].u0) : 999;
+          const pass = crossed && Math.abs(span0 - 0.05) < 1e-5 && Math.abs(span1 - 0.05) < 1e-5;
+          results.push({
+            title: '6. 360° UV 좌우 경계(Seam) 연속 래핑 검증',
+            pass: pass,
+            detail: '입력 u: 0.98 → 0.03 | 분할 세그먼트 ' + segs.length + '개 (각 Δu=' + span0.toFixed(2) + ', 가로질러 깨짐 방지 확인)'
+          });
+        })();
+
+        // TEST 7: Procedural Pattern Pixel Checksum Mutation (Offscreen Buffer)
+        (function () {
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = 256;
+          offCanvas.height = 128;
+          const offCtx = offCanvas.getContext('2d');
+          offCtx.clearRect(0, 0, 256, 128);
+          const beforeSum = computeCanvasChecksum(offCtx, 256, 128);
+          applyProceduralPatternToContext(offCtx, 256, 128, 'wave', '#1f4482', 8, 0.55);
+          const afterSum = computeCanvasChecksum(offCtx, 256, 128);
+          const pass = (beforeSum !== afterSum);
+          results.push({
+            title: '7. 패턴 스탬프 적용 시 Texture 픽셀 체크섬 변화 검증',
+            pass: pass,
+            detail: '적용 전 Checksum: 0x' + beforeSum.toString(16).toUpperCase() + ' → 물결 패턴 적용 후: 0x' + afterSum.toString(16).toUpperCase()
+          });
+        })();
+
+        // Render Results into Drawer
+        const listEl = document.getElementById('testResultsList');
+        const bannerEl = document.getElementById('testSummaryBanner');
+        const timeEl = document.getElementById('testTimestamp');
+
+        if (!listEl) return;
+        while (listEl.firstChild) listEl.removeChild(listEl.firstChild);
+
+        let passCount = 0;
+        results.forEach(function (r) {
+          if (r.pass) passCount++;
+          const item = document.createElement('div');
+          item.className = 'p-2.5 rounded-xl border ' + (r.pass
+            ? 'bg-white/85 border-emerald-300/90'
+            : 'bg-rose-50 border-rose-300');
+
+          const topRow = document.createElement('div');
+          topRow.className = 'flex items-center justify-between gap-2 mb-1';
+
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'font-bold text-stone-800';
+          titleSpan.textContent = r.title;
+
+          const badge = document.createElement('span');
+          badge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold ' + (r.pass
+            ? 'bg-emerald-700 text-white'
+            : 'bg-rose-700 text-white');
+          badge.textContent = r.pass ? 'PASS' : 'FAIL';
+
+          topRow.appendChild(titleSpan);
+          topRow.appendChild(badge);
+
+          const detailP = document.createElement('p');
+          detailP.className = 'text-[11px] text-stone-600 font-mono break-all';
+          detailP.textContent = r.detail;
+
+          item.appendChild(topRow);
+          item.appendChild(detailP);
+          listEl.appendChild(item);
+        });
+
+        if (bannerEl) {
+          const allPassed = passCount === results.length;
+          bannerEl.className = 'mb-3 px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-between ' + (
+            allPassed
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+              : 'bg-rose-50 border-rose-300 text-rose-900'
+          );
+          bannerEl.firstElementChild.textContent = '검증 결과: ' + passCount + ' / ' + results.length + ' 항목 통과 (' + (allPassed ? '정상' : '점검 필요') + ')';
+        }
+        if (timeEl) {
+          const now = new Date();
+          timeEl.textContent = now.toLocaleTimeString('ko-KR');
+        }
+      }
+
+      /* =========================================================================
+       * 12. MAIN ANIMATION LOOP & INITIALIZATION ON WINDOW LOAD
+       * ========================================================================= */
+      let lastFrameTime = performance.now();
+
+      function animateLoop(now) {
+        requestAnimationFrame(animateLoop);
+
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
+        lastFrameTime = now;
+
+        // Rotate wooden wheel and pottery when wheelSpinning is active and user isn't mid-stroke/drag
+        const shouldSpin = appState.wheelSpinning &&
+          appState.wheelSpeed > 0 &&
+          !appState.isDraggingHandle &&
+          !appState.isPaintingStroke;
+
+        if (shouldSpin) {
+          const radPerSec = (appState.wheelSpeed / 100) * 2.4;
+          appState.wheelRotationRad = (appState.wheelRotationRad + radPerSec * dt) % (Math.PI * 2);
+          if (wheelGroup) {
+            wheelGroup.rotation.y = appState.wheelRotationRad;
+          }
+        }
+
+        if (!appState.usingFallback2D && renderer && scene && camera) {
+          if (controls) controls.update();
+          renderer.render(scene, camera);
+        } else {
+          renderFallback2DScene();
+        }
+
+        updateSvgSculptOverlayPosition();
+      }
+
+      window.onload = function () {
+        initSvgHandles();
+        resetPaintLayerWithInitialWave();
+        renderGlazeBaseLayer();
+        updateCompositeTexture();
+
+        const webglOk = initThreeStudio();
+        applyGlazeMaterialSettings();
+        rebuildPotteryMesh();
+
+        if (webglOk) {
+          updateStudioLightingAngle();
+          fitCameraToPottery('front');
+        }
+
+        // Save initial state (Celadon Moon Jar with subtle wave motif) as first Undo history entry
+        commitHistoryStep();
+
+        bindUIEvents();
+        syncWheelUI();
+        runPureFunctionVerificationSuite();
+
+        lastFrameTime = performance.now();
+        animateLoop(lastFrameTime);
+      };
+    })();
+  </script>
+</body>
+</html>

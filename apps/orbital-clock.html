@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ORBITAL CLOCK | 밤하늘의 시간 공방</title>
+  <style>
+    :root {
+      --bg-deep: #050814;
+      --panel-bg: rgba(10, 16, 34, 0.78);
+      --panel-border: rgba(130, 175, 255, 0.24);
+      --accent-gold: #f6c453;
+      --accent-cyan: #5ce1e6;
+      --accent-blue: #4f8cff;
+      --text-main: #f2f6ff;
+      --text-sub: #9eb2d9;
+      --safe-bottom: 112px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #0e1836 0%, #050814 75%);
+      color: var(--text-main);
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #app-shell {
+      position: relative;
+      width: 100vw;
+      height: calc(100vh - var(--safe-bottom));
+      min-height: 440px;
+      overflow: hidden;
+    }
+    #stage-wrap {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      touch-action: none; cursor: grab;
+    }
+    canvas:active { cursor: grabbing; }
+    /* 상단 헤더 및 실시간 천문 텔레메트리 */
+    .top-bar {
+      position: absolute; top: 12px; left: 14px; right: 14px;
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start;
+      gap: 10px; pointer-events: none; z-index: 10;
+    }
+    .brand-card {
+      pointer-events: auto;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(12px);
+      padding: 10px 14px; border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+      max-width: 440px;
+    }
+    .brand-title {
+      font-size: 15px; font-weight: 800; letter-spacing: 0.04em;
+      color: var(--accent-gold); display: flex; align-items: center; gap: 8px;
+    }
+    .brand-sub {
+      font-size: 11.5px; color: var(--text-sub); margin-top: 3px; line-height: 1.4;
+    }
+    .telemetry-bar {
+      pointer-events: auto;
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(12px);
+      padding: 8px 12px; border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+    }
+    .metric-pill {
+      display: flex; flex-direction: column; padding: 2px 8px;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    .metric-pill:last-child { border-right: none; }
+    .metric-label { font-size: 10px; color: var(--text-sub); }
+    .metric-val { font-size: 12.5px; font-weight: 700; color: var(--text-main); font-variant-numeric: tabular-nums; }
+    .phase-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--accent-cyan); font-weight: 700;
+    }
+    /* 하단 얇은 컨트롤 독 (Gemini 하단 안전영역 위에 배치) */
+    .control-dock {
+      position: absolute; left: 14px; right: 14px; bottom: 10px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px);
+      border-radius: 16px;
+      padding: 10px 14px;
+      z-index: 12;
+      box-shadow: 0 10px 32px rgba(0,0,0,0.55);
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .dock-top {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    .btn-group {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .btn {
+      appearance: none; border: 1px solid rgba(140, 185, 255, 0.32);
+      background: rgba(25, 42, 86, 0.72);
+      color: var(--text-main);
+      font-size: 12px; font-weight: 600;
+      padding: 6px 11px; border-radius: 10px;
+      cursor: pointer; transition: all 0.16s ease;
+      display: inline-flex; align-items: center; gap: 5px;
+    }
+    .btn:hover { background: rgba(52, 86, 168, 0.85); border-color: var(--accent-cyan); }
+    .btn.active {
+      background: linear-gradient(135deg, #2b6cb0, #1a365d);
+      border-color: var(--accent-gold); color: #fff;
+      box-shadow: 0 0 12px rgba(246, 196, 83, 0.35);
+    }
+    .notice-line {
+      font-size: 11px; color: var(--text-sub);
+    }
+    .sliders-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .ctrl-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px; padding: 6px 9px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ctrl-head {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 11px; color: var(--text-sub);
+    }
+    .ctrl-head strong {
+      color: var(--accent-gold); font-variant-numeric: tabular-nums; font-size: 11.5px;
+    }
+    input[type="range"] {
+      width: 100%; height: 5px; border-radius: 999px;
+      background: rgba(255,255,255,0.18); outline: none;
+      accent-color: var(--accent-cyan); cursor: pointer;
+    }
+    #fallback-notice {
+      display: none; position: absolute; top: 76px; left: 14px;
+      background: rgba(180, 75, 40, 0.85); border: 1px solid #ffb088;
+      color: #fff; font-size: 11.5px; padding: 6px 10px; border-radius: 8px; z-index: 15;
+    }
+    @media (max-width: 900px) {
+      .sliders-grid { grid-template-columns: repeat(2, 1fr); }
+      .brand-sub { display: none; }
+    }
+    @media (max-width: 520px) {
+      :root { --safe-bottom: 116px; }
+      .sliders-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+      .control-dock { padding: 8px 10px; }
+      .btn { padding: 5px 8px; font-size: 11px; }
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="app-shell">
+    <div id="stage-wrap">
+      <canvas id="gl-canvas" aria-label="ORBITAL CLOCK 천체 운동 및 밤하늘 시뮬레이션 캔버스"></canvas>
+    </div>
+
+    <div id="fallback-notice">WebGL 3D 가속을 사용할 수 없어 동일 천문 좌표를 계산하는 2D 투영 모드로 작동 중입니다.</div>
+
+    <header class="top-bar">
+      <div class="brand-card">
+        <div class="brand-title">
+          <span>ORBITAL CLOCK | 밤하늘의 시간 공방</span>
+        </div>
+        <p class="brand-sub">
+          지구의 자전·공전과 달의 공전을 조작하며 관측자 지평선 위로 떠오르는 별의 일주 궤적과 달의 위상 변화를 함께 탐구하세요.
+          <span style="color:#ffd984;">※ 23.4° 자전축 기울기와 원궤도 근사를 적용한 교육용 과장 배율 모델입니다 (정밀 천문력 아님).</span>
+        </p>
+      </div>
+
+      <div class="telemetry-bar" aria-live="polite">
+        <div class="metric-pill">
+          <span class="metric-label">관측자 하늘 상태</span>
+          <span class="metric-val" id="stat-daynight">밤 (태양 -42°)</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">달의 위상 (조명률)</span>
+          <span class="metric-val phase-badge" id="stat-moonphase">상현달 (50%)</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">북극성 고도 / 지평선 위 별</span>
+          <span class="metric-val" id="stat-polaris">고도 37.5° / 8개</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-label">관측자 달 고도·방위</span>
+          <span class="metric-val" id="stat-moonalt">고도 +34° (남서)</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="control-dock" aria-label="천체 시간 공방 조작판">
+      <div class="dock-top">
+        <div class="btn-group">
+          <button type="button" class="btn active" id="btn-view-space" title="단축키: V">🪐 우주 전체 시점</button>
+          <button type="button" class="btn" id="btn-view-sky" title="단축키: V">🔭 관측자 하늘 시점</button>
+          <button type="button" class="btn" id="btn-play" title="단축키: Space">⏸ 일시정지</button>
+          <button type="button" class="btn" id="btn-home" title="카메라 시선 기본값 복귀">🎯 홈 시선</button>
+          <button type="button" class="btn" id="btn-reset" title="모든 시간과 각도 초기화">↺ 초기화</button>
+        </div>
+        <div class="notice-line" id="hint-line">
+          마우스 드래그·터치로 시선 회전 / 휠·핀치로 확대·축소 / 방향키로 시각·위도 미세 조절
+        </div>
+      </div>
+
+      <div class="sliders-grid">
+        <label class="ctrl-item" for="sl-hour">
+          <div class="ctrl-head"><span>1. 하루 시각 (자전)</span><strong id="val-hour">22:00</strong></div>
+          <input id="sl-hour" type="range" min="0" max="24" step="0.05" value="22" />
+        </label>
+
+        <label class="ctrl-item" for="sl-lat">
+          <div class="ctrl-head"><span>2. 관측 위도 (남·북위)</span><strong id="val-lat">북위 37.5°</strong></div>
+          <input id="sl-lat" type="range" min="-75" max="75" step="0.5" value="37.5" />
+        </label>
+
+        <label class="ctrl-item" for="sl-earth-orbit">
+          <div class="ctrl-head"><span>3. 지구 공전 위치</span><strong id="val-earth-orbit">60° (봄·여름 사이)</strong></div>
+          <input id="sl-earth-orbit" type="range" min="0" max="360" step="1" value="60" />
+        </label>
+
+        <label class="ctrl-item" for="sl-moon-orbit">
+          <div class="ctrl-head"><span>4. 달 공전 각도 (위상)</span><strong id="val-moon-orbit">90° (상현)</strong></div>
+          <input id="sl-moon-orbit" type="range" min="0" max="360" step="1" value="90" />
+        </label>
+
+        <label class="ctrl-item" for="sl-speed">
+          <div class="ctrl-head"><span>5. 시간 흐름 속도</span><strong id="val-speed">1.0x</strong></div>
+          <input id="sl-speed" type="range" min="0" max="5" step="0.25" value="1.0" />
+        </label>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const DEG2RAD = Math.PI / 180;
+      const RAD2DEG = 180 / Math.PI;
+      const OBLIQUITY = 23.4 * DEG2RAD; // 지구 자전축 기울기 23.4도 (북극성 방향 +Y/기울기 축)
+      const EARTH_ORBIT_R = 26.0;       // 교육용 과장 배율: 태양~지구 공전 반지름
+      const EARTH_R = 4.2;              // 지구 반지름
+      const MOON_ORBIT_R = 11.2;        // 달 공전 반지름
+      const MOON_R = 1.18;              // 달 반지름
+      const CELESTIAL_R = 88.0;         // 천구 별 배경 반지름
+
+      // 지구 자전축 단위벡터 (춘분·하지 기준 Z축 방향 23.4도 기울임: 북극이 (0, cos(e), sin(e)))
+      const NORTH_AXIS = {
+        x: 0,
+        y: Math.cos(OBLIQUITY),
+        z: Math.sin(OBLIQUITY)
+      };
+
+      // 초기 상태 및 기본값
+      const DEFAULT_STATE = {
+        solarHour: 22.0,      // 지방 태양시 (0~24h, 12h=정오 태양 방향, 0/24h=자정 반태양 방향)
+        latitudeDeg: 37.5,    // 관측자 위도 (한국 서울 인근 기본값)
+        earthOrbitDeg: 60.0,  // 지구 공전 각도 (0~360도)
+        moonSynodicDeg: 90.0, // 태양-지구 기준 달의 이각 (0=삭, 90=상현, 180=보름, 270=하현)
+        timeSpeed: 1.0,       // 시간 배속
+        viewMode: 'space',    // 'space' | 'sky'
+        playing: true
+      };
+
+      const state = Object.assign({}, DEFAULT_STATE);
+
+      // 카메라 제어 변수
+      const camCtrl = {
+        spaceYaw: 0.55,
+        spacePitch: 0.42,
+        spaceDist: 44.0,
+        skyAzimuth: 0.0,    // 관측자 하늘 시점: 바라보는 방위각 오프셋 (기본 북쪽=0)
+        skyAltitude: 0.48,  // 관측자 하늘 시점: 고도각
+        skyFov: 68
+      };
+
+      // 밤하늘 대표 별 목록 (적경 RA deg, 적위 Dec deg, 이름, 색상, 크기)
+      const STAR_CATALOG = [
+        { name: '북극성(Polaris)', ra: 37.9, dec: 89.2, color: '#fff6c2', size: 2.3, trail: true },
+        { name: '코카브(작은곰)', ra: 222.7, dec: 74.1, color: '#ffd2a1', size: 1.6, trail: true },
+        { name: '두베(북두칠성)', ra: 165.9, dec: 61.7, color: '#ffdfa8', size: 1.7, trail: true },
+        { name: '알카이드(북두칠성)', ra: 206.9, dec: 49.3, color: '#cde5ff', size: 1.6, trail: true },
+        { name: '카시오페이아 α', ra: 10.1, dec: 56.5, color: '#ffe3b3', size: 1.6, trail: true },
+        { name: '카펠라(마차부)', ra: 79.1, dec: 46.0, color: '#fff0b8', size: 1.8, trail: true },
+        { name: '베가(직녀성)', ra: 279.2, dec: 38.8, color: '#bfe0ff', size: 1.9, trail: true },
+        { name: '데네브(백조)', ra: 310.3, dec: 45.3, color: '#d8ecff', size: 1.7, trail: false },
+        { name: '알타이르(견우성)', ra: 297.7, dec: 8.9, color: '#e3f0ff', size: 1.6, trail: false },
+        { name: '아크투루스(목동)', ra: 213.9, dec: 19.2, color: '#ffc288', size: 1.9, trail: true },
+        { name: '베텔게우스(오리온)', ra: 88.8, dec: 7.4, color: '#ff9d6e', size: 1.9, trail: false },
+        { name: '리겔(오리온)', ra: 78.6, dec: -8.2, color: '#b8dcff', size: 1.8, trail: false },
+        { name: '시리우스(큰개)', ra: 101.3, dec: -16.7, color: '#d4ebff', size: 2.2, trail: true },
+        { name: '안타레스(전갈)', ra: 247.3, dec: -26.4, color: '#ff8a61', size: 1.8, trail: false },
+        { name: '남십자성(Acrux)', ra: 186.6, dec: -63.1, color: '#cbe6ff', size: 1.7, trail: false }
+      ];
+
+      // 3차원 벡터 유틸리티 (WebGL과 2D 폴백 모두 동일 수식 공유)
+      function vecAdd(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+      function vecSub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+      function vecScale(v, s) { return { x: v.x * s, y: v.y * s, z: v.z * s }; }
+      function vecDot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+      function vecCross(a, b) {
+        return {
+          x: a.y * b.z - a.z * b.y,
+          y: a.z * b.x - a.x * b.z,
+          z: a.x * b.y - a.y * b.x
+        };
+      }
+      function vecLen(v) { return Math.hypot(v.x, v.y, v.z) || 1e-9; }
+      function vecNorm(v) { const l = vecLen(v); return { x: v.x / l, y: v.y / l, z: v.z / l }; }
+
+      // 로드리게스 회전 공식: 단위벡터 k 축 둘레로 벡터 v를 rad 만큼 회전
+      function rotateAroundAxis(v, k, rad) {
+        const cosA = Math.cos(rad);
+        const sinA = Math.sin(rad);
+        const cross = vecCross(k, v);
+        const dot = vecDot(k, v);
+        return {
+          x: v.x * cosA + cross.x * sinA + k.x * dot * (1 - cosA),
+          y: v.y * cosA + cross.y * sinA + k.y * dot * (1 - cosA),
+          z: v.z * cosA + cross.z * sinA + k.z * dot * (1 - cosA)
+        };
+      }
+
+      // 적경(RA)·적위(Dec)를 기울어진 천구 직교좌표 단위벡터로 변환
+      function eqToWorldDir(raDeg, decDeg) {
+        const ra = raDeg * DEG2RAD;
+        const dec = decDeg * DEG2RAD;
+        // 천구 적도 기준 좌표 (북극이 +Y일 때)
+        const xEq = Math.cos(dec) * Math.cos(ra);
+        const yEq = Math.sin(dec);
+        const zEq = -Math.cos(dec) * Math.sin(ra);
+        // X축 기준 -OBLIQUITY 회전하여 북극을 (0, cos(e), sin(e))로 정렬
+        return vecNorm({
+          x: xEq,
+          y: yEq * Math.cos(OBLIQUITY) - zEq * Math.sin(OBLIQUITY),
+          z: yEq * Math.sin(OBLIQUITY) + zEq * Math.cos(OBLIQUITY)
+        });
+      }
+
+      // 현재 상태로부터 지구·달·관측자·지평좌표계·위상·별 고도를 일괄 계산하는 핵심 물리 함수
+      function computeAstronomySnapshot() {
+        const orbitRad = state.earthOrbitDeg * DEG2RAD;
+        // 1. 태양 중심(0,0,0)에서 지구의 공전 위치 (XZ 황도면 원궤도)
+        const earthPos = {
+          x: EARTH_ORBIT_R * Math.cos(orbitRad),
+          y: 0,
+          z: -EARTH_ORBIT_R * Math.sin(orbitRad)
+        };
+
+        // 지구에서 바라본 태양 방향 단위벡터 (정오 12시 자오선 기준 방향)
+        const toSunDir = vecNorm({ x: -earthPos.x, y: -earthPos.y, z: -earthPos.z });
+
+        // 2. 지구 자전축(NORTH_AXIS)에 수직인 적도면 위에서 정오(태양 쪽) 경도 기준 벡터 산출
+        const projOnAxis = vecScale(NORTH_AXIS, vecDot(toSunDir, NORTH_AXIS));
+        const noonEqVec = vecNorm(vecSub(toSunDir, projOnAxis));
+
+        // 하루 시각(solarHour): 12시일 때 회전각 0, 24시간에 +360도 반시계 자전
+        const spinRad = ((state.solarHour - 12.0) / 24.0) * Math.PI * 2;
+        const obsEqDir = rotateAroundAxis(noonEqVec, NORTH_AXIS, spinRad);
+
+        // 3. 관측자 위도(latitudeDeg)를 반영한 지구 표면 법선(천정 Up), 북쪽(North), 동쪽(East) 단위벡터
+        const latRad = state.latitudeDeg * DEG2RAD;
+        const upDir = vecNorm(
+          vecAdd(
+            vecScale(obsEqDir, Math.cos(latRad)),
+            vecScale(NORTH_AXIS, Math.sin(latRad))
+          )
+        );
+        const eastDir = vecNorm(vecCross(NORTH_AXIS, obsEqDir));
+        const northDir = vecNorm(vecCross(upDir, eastDir));
+
+        // 관측자의 3D 월드 좌표 (지구 중심 + 반지름 * 천정 벡터)
+        const observerPos = vecAdd(earthPos, vecScale(upDir, EARTH_R));
+
+        // 4. 달의 공전 위치 계산 (태양 방향 기준 이각 moonSynodicDeg: 0°=삭, 90°=상현, 180°=망, 270°=하현)
+        // 황도면 대비 약 5도 기울기를 살짝 주어 일식/월식 완전 겹침을 완화하고 입체감 부여
+        const moonWorldAngle = orbitRad + Math.PI + (state.moonSynodicDeg * DEG2RAD);
+        const moonTilt = 5.1 * DEG2RAD;
+        const moonOffset = {
+          x: MOON_ORBIT_R * Math.cos(moonWorldAngle),
+          y: MOON_ORBIT_R * Math.sin(moonWorldAngle) * Math.sin(moonTilt),
+          z: -MOON_ORBIT_R * Math.sin(moonWorldAngle) * Math.cos(moonTilt)
+        };
+        const moonPos = vecAdd(earthPos, moonOffset);
+
+        // 5. 달의 실제 조명 위상 계산 (달에서 본 태양 방향과 달에서 본 지구 방향의 사잇각)
+        const moonToSun = vecNorm({ x: -moonPos.x, y: -moonPos.y, z: -moonPos.z });
+        const moonToEarth = vecNorm(vecSub(earthPos, moonPos));
+        const cosPhase = Math.max(-1, Math.min(1, vecDot(moonToSun, moonToEarth)));
+        const illuminatedFraction = (1 + cosPhase) * 0.5; // 0(삭) ~ 1(보름)
+
+        // 6. 관측자 지평좌표계(North, East, Up)에서 태양과 달의 고도(Altitude) 및 방위각(Azimuth)
+        const sunAltSin = vecDot(toSunDir, upDir);
+        const sunAltDeg = Math.asin(Math.max(-1, Math.min(1, sunAltSin))) * RAD2DEG;
+
+        const obsToMoonDir = vecNorm(vecSub(moonPos, observerPos));
+        const moonAltSin = vecDot(obsToMoonDir, upDir);
+        const moonAltDeg = Math.asin(Math.max(-1, Math.min(1, moonAltSin))) * RAD2DEG;
+        const moonN = vecDot(obsToMoonDir, northDir);
+        const moonE = vecDot(obsToMoonDir, eastDir);
+        const moonAzDeg = ((Math.atan2(moonE, moonN) * RAD2DEG) + 360) % 360;
+
+        // 북극성(NORTH_AXIS) 고도
+        const polarisAltDeg = Math.asin(Math.max(-1, Math.min(1, vecDot(NORTH_AXIS, upDir)))) * RAD2DEG;
+
+        // 지평선 위 별 개수 및 각 별의 지평 좌표
+        let starsAboveHorizon = 0;
+        const starHorizonList = STAR_CATALOG.map((st) => {
+          const dir = eqToWorldDir(st.ra, st.dec);
+          const alt = Math.asin(Math.max(-1, Math.min(1, vecDot(dir, upDir)))) * RAD2DEG;
+          const az = ((Math.atan2(vecDot(dir, eastDir), vecDot(dir, northDir)) * RAD2DEG) + 360) % 360;
+          if (alt > 0) starsAboveHorizon++;
+          return { name: st.name, dir, altDeg: alt, azDeg: az, color: st.color, size: st.size, dec: st.dec, trail: st.trail };
+        });
+
+        return {
+          earthPos,
+          observerPos,
+          moonPos,
+          toSunDir,
+          upDir,
+          northDir,
+          eastDir,
+          spinRad,
+          illuminatedFraction,
+          sunAltDeg,
+          moonAltDeg,
+          moonAzDeg,
+          polarisAltDeg,
+          starsAboveHorizon,
+          starHorizonList
+        };
+      }
+
+      const canvas = document.getElementById('gl-canvas');
+      const stageWrap = document.getElementById('stage-wrap');
+      let useFallback2D = false;
+      let renderer = null, scene = null, camera = null;
+      let earthGroup = null, earthSpinMesh = null, moonMesh = null, observerRig = null;
+      let starPointsGroup = null, trailLinesGroup = null, earthMoonLine = null, sunRayLine = null;
+      let skyDomeMesh = null;
+      let geometryChecksum = 0;
+
+      // 절차적 지구 캔버스 텍스처 생성 (외부 이미지 로드 실패 원천 차단)
+      function createEarthTexture() {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 256;
+        const ctx = c.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 0, 256);
+        grad.addColorStop(0, '#dceeff');
+        grad.addColorStop(0.12, '#143c78');
+        grad.addColorStop(0.5, '#0d3166');
+        grad.addColorStop(0.88, '#143c78');
+        grad.addColorStop(1, '#dceeff');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 256);
+
+        // 대륙 형상 패치 및 위도·경도 격자
+        ctx.fillStyle = '#2d7a53';
+        const continents = [
+          [95, 75, 55, 34], [130, 145, 36, 52], [255, 72, 46, 32],
+          [270, 125, 42, 48], [365, 68, 78, 44], [415, 165, 38, 28]
+        ];
+        continents.forEach(([x, y, rx, ry]) => {
+          ctx.beginPath();
+          ctx.ellipse(x, y, rx, ry, 0.2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.strokeStyle = 'rgba(160, 215, 255, 0.22)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 512; x += 32) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 256); ctx.stroke();
+        }
+        for (let y = 0; y <= 256; y += 32) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+        }
+        // 적도선 강조
+        ctx.strokeStyle = 'rgba(246, 196, 83, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, 128); ctx.lineTo(512, 128); ctx.stroke();
+        return new THREE.CanvasTexture(c);
+      }
+
+      // 절차적 달 크레이터 텍스처
+      function createMoonTexture() {
+        const c = document.createElement('canvas');
+        c.width = 256; c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#d8dde6';
+        ctx.fillRect(0, 0, 256, 128);
+        const mares = [[65, 52, 26], [115, 48, 22], [160, 68, 28], [205, 54, 18], [90, 82, 16]];
+        mares.forEach(([x, y, r]) => {
+          ctx.fillStyle = 'rgba(115, 124, 142, 0.55)';
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        });
+        return new THREE.CanvasTexture(c);
+      }
+
+      // Three.js 3D 장면 초기화
+      function initThreeScene() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('THREE not loaded');
+          renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(stageWrap.clientWidth, stageWrap.clientHeight);
+
+          scene = new THREE.Scene();
+          camera = new THREE.PerspectiveCamera(50, stageWrap.clientWidth / Math.max(1, stageWrap.clientHeight), 0.1, 400);
+
+          // 은은한 우주 배경광 + 태양 중심 점광원 (달의 위상과 지구의 낮/밤을 실제로 만듦)
+          const ambient = new THREE.AmbientLight(0x1b294a, 0.36);
+          scene.add(ambient);
+
+          const sunLight = new THREE.PointLight(0xfff4d2, 2.25, 300, 0.3);
+          sunLight.position.set(0, 0, 0);
+          scene.add(sunLight);
+
+          // 1. 중심 태양과 코로나 후광
+          const sunGeo = new THREE.SphereGeometry(4.9, 36, 36);
+          const sunMat = new THREE.MeshBasicMaterial({ color: 0xffcf54 });
+          const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+          scene.add(sunMesh);
+
+          const haloGeo = new THREE.SphereGeometry(5.9, 32, 32);
+          const haloMat = new THREE.MeshBasicMaterial({
+            color: 0xff9e2c, transparent: true, opacity: 0.24, side: THREE.BackSide
+          });
+          scene.add(new THREE.Mesh(haloGeo, haloMat));
+
+          // 2. 지구 공전 궤도 고리 (반지름 EARTH_ORBIT_R)
+          const orbitPts = [];
+          for (let i = 0; i <= 128; i++) {
+            const a = (i / 128) * Math.PI * 2;
+            orbitPts.push(new THREE.Vector3(EARTH_ORBIT_R * Math.cos(a), 0, -EARTH_ORBIT_R * Math.sin(a)));
+          }
+          const earthOrbitLine = new THREE.LineLoop(
+            new THREE.BufferGeometry().setFromPoints(orbitPts),
+            new THREE.LineBasicMaterial({ color: 0x3b69b8, transparent: true, opacity: 0.55 })
+          );
+          scene.add(earthOrbitLine);
+
+          // 3. 지구 시스템 그룹 (지구 중심 위치로 이동)
+          earthGroup = new THREE.Group();
+          scene.add(earthGroup);
+
+          // 지구 자전축 기울기 그룹 (X축 기준 +23.4도 회전하여 로컬 +Y가 NORTH_AXIS와 일치)
+          const earthTiltGroup = new THREE.Group();
+          earthTiltGroup.rotation.x = OBLIQUITY;
+          earthGroup.add(earthTiltGroup);
+
+          // 자전축 막대 (북극성 방향을 가리키는 황금빛 축)
+          const axisGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -EARTH_R * 1.55, 0),
+            new THREE.Vector3(0, EARTH_R * 1.85, 0)
+          ]);
+          const axisLine = new THREE.Line(axisGeo, new THREE.LineBasicMaterial({ color: 0xf6c453 }));
+          earthTiltGroup.add(axisLine);
+
+          // 지구 구체 메쉬
+          const earthGeo = new THREE.SphereGeometry(EARTH_R, 40, 40);
+          const earthMat = new THREE.MeshStandardMaterial({
+            map: createEarthTexture(),
+            roughness: 0.72,
+            metalness: 0.08
+          });
+          earthSpinMesh = new THREE.Mesh(earthGeo, earthMat);
+          earthTiltGroup.add(earthSpinMesh);
+
+          // 달 공전 궤도선 (지구 중심)
+          const moonOrbitPts = [];
+          const moonTilt = 5.1 * DEG2RAD;
+          for (let i = 0; i <= 96; i++) {
+            const a = (i / 96) * Math.PI * 2;
+            moonOrbitPts.push(new THREE.Vector3(
+              MOON_ORBIT_R * Math.cos(a),
+              MOON_ORBIT_R * Math.sin(a) * Math.sin(moonTilt),
+              -MOON_ORBIT_R * Math.sin(a) * Math.cos(moonTilt)
+            ));
+          }
+          const moonOrbitLine = new THREE.LineLoop(
+            new THREE.BufferGeometry().setFromPoints(moonOrbitPts),
+            new THREE.LineBasicMaterial({ color: 0x7fa3dc, transparent: true, opacity: 0.45 })
+          );
+          earthGroup.add(moonOrbitLine);
+
+          // 4. 달 메쉬 (태양 PointLight 조명을 받아 실제 위상이 렌더링됨)
+          const moonGeo = new THREE.SphereGeometry(MOON_R, 32, 32);
+          const moonMat = new THREE.MeshStandardMaterial({
+            map: createMoonTexture(),
+            roughness: 0.88,
+            metalness: 0.02
+          });
+          moonMesh = new THREE.Mesh(moonGeo, moonMat);
+          scene.add(moonMesh);
+
+          // 5. 지구 표면 관측자 아바타 및 지평선 고리(Horizon Ring) Rig
+          observerRig = new THREE.Group();
+          scene.add(observerRig);
+
+          // 지평선 원반과 방위 고리 (로컬 XZ 평면이 지평면, +Y가 천정 Up, -Z가 북쪽 North, +X가 동쪽 East)
+          const horizonRingGeo = new THREE.RingGeometry(1.85, 2.1, 48);
+          horizonRingGeo.rotateX(-Math.PI / 2);
+          const horizonRingMat = new THREE.MeshBasicMaterial({
+            color: 0x5ce1e6, side: THREE.DoubleSide, transparent: true, opacity: 0.72
+          });
+          observerRig.add(new THREE.Mesh(horizonRingGeo, horizonRingMat));
+
+          const horizonDiskGeo = new THREE.CircleGeometry(1.85, 48);
+          horizonDiskGeo.rotateX(-Math.PI / 2);
+          const horizonDiskMat = new THREE.MeshBasicMaterial({
+            color: 0x0b2545, side: THREE.DoubleSide, transparent: true, opacity: 0.42
+          });
+          observerRig.add(new THREE.Mesh(horizonDiskGeo, horizonDiskMat));
+
+          // 관측자 위치 핀과 북쪽(N) 지시선
+          const pinGeo = new THREE.ConeGeometry(0.24, 0.75, 16);
+          pinGeo.translate(0, 0.38, 0);
+          const pinMesh = new THREE.Mesh(pinGeo, new THREE.MeshBasicMaterial({ color: 0xff6b6b }));
+          observerRig.add(pinMesh);
+
+          // 북쪽(-Z)·동쪽(+X)·천정(+Y) 축 표시선
+          const nLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.03, 0), new THREE.Vector3(0, 0.03, -2.5)]),
+            new THREE.LineBasicMaterial({ color: 0xff7b7b })
+          );
+          const eLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-2.1, 0.03, 0), new THREE.Vector3(2.1, 0.03, 0)]),
+            new THREE.LineBasicMaterial({ color: 0x5ce1e6 })
+          );
+          observerRig.add(nLine, eLine);
+
+          // 관측자 하늘 시점일 때 낮/박명 하늘빛을 표현하는 반투명 천구 돔
+          const domeGeo = new THREE.SphereGeometry(CELESTIAL_R * 0.92, 32, 24);
+          const domeMat = new THREE.MeshBasicMaterial({
+            color: 0x1b4d89, side: THREE.BackSide, transparent: true, opacity: 0.0
+          });
+          skyDomeMesh = new THREE.Mesh(domeGeo, domeMat);
+          scene.add(skyDomeMesh);
+
+          // 6. 천구 별자리 점들과 북극성 중심 일주권(Star Trails) 생성
+          starPointsGroup = new THREE.Group();
+          trailLinesGroup = new THREE.Group();
+          scene.add(starPointsGroup, trailLinesGroup);
+
+          STAR_CATALOG.forEach((st) => {
+            const dir = eqToWorldDir(st.ra, st.dec);
+            const sGeo = new THREE.SphereGeometry(st.size * 0.36, 12, 12);
+            const sMat = new THREE.MeshBasicMaterial({ color: st.color });
+            const sMesh = new THREE.Mesh(sGeo, sMat);
+            sMesh.position.set(dir.x * CELESTIAL_R, dir.y * CELESTIAL_R, dir.z * CELESTIAL_R);
+            sMesh.userData = { name: st.name, dir: dir, baseColor: new THREE.Color(st.color) };
+            starPointsGroup.add(sMesh);
+
+            // 북극성 주변 및 주요 별의 일주 궤적 고리 (지구 자전축 둘레 원궤적)
+            if (st.trail) {
+              const trailPts = [];
+              const segs = 72;
+              for (let i = 0; i <= segs; i++) {
+                const ang = (i / segs) * Math.PI * 2;
+                const rDir = rotateAroundAxis(dir, NORTH_AXIS, ang);
+                trailPts.push(new THREE.Vector3(rDir.x * CELESTIAL_R, rDir.y * CELESTIAL_R, rDir.z * CELESTIAL_R));
+              }
+              const tMat = new THREE.LineBasicMaterial({
+                color: st.dec > 50 ? 0x7fd8ff : 0x5678b5,
+                transparent: true,
+                opacity: st.dec > 50 ? 0.42 : 0.24
+              });
+              const tLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(trailPts), tMat);
+              tLine.userData = { baseDir: dir, dec: st.dec };
+              trailLinesGroup.add(tLine);
+            }
+          });
+
+          // 배경 은하수 미세 별 입자 350개
+          const bgPos = new Float32Array(350 * 3);
+          for (let i = 0; i < 350; i++) {
+            const u = Math.sin(i * 12.9898) * 43758.5453;
+            const v = Math.sin(i * 78.233) * 19341.123;
+            const theta = (u - Math.floor(u)) * Math.PI * 2;
+            const phi = Math.acos(2 * (v - Math.floor(v)) - 1);
+            const r = CELESTIAL_R * 1.05;
+            bgPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            bgPos[i * 3 + 1] = r * Math.cos(phi);
+            bgPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+          }
+          const bgGeo = new THREE.BufferGeometry();
+          bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
+          scene.add(new THREE.Points(bgGeo, new THREE.PointsMaterial({ color: 0x8ea9d8, size: 0.65 })));
+
+          // 태양->지구 빛 방향선 & 관측자->달 시선 가이드라인
+          sunRayLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+            new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.45 })
+          );
+          earthMoonLine = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+            new THREE.LineBasicMaterial({ color: 0x5ce1e6, transparent: true, opacity: 0.5 })
+          );
+          scene.add(sunRayLine, earthMoonLine);
+
+          geometryChecksum =
+            sunGeo.attributes.position.count +
+            earthGeo.attributes.position.count +
+            moonGeo.attributes.position.count +
+            STAR_CATALOG.length * 100;
+        } catch (err) {
+          useFallback2D = true;
+          document.getElementById('fallback-notice').style.display = 'block';
+        }
+      }
+
+      function getMoonPhaseKorean(deg, illumPct) {
+        const d = ((deg % 360) + 360) % 360;
+        let name = '초승달';
+        if (d < 15 || d >= 345) name = '삭 (신월)';
+        else if (d < 75) name = '초승달';
+        else if (d < 105) name = '상현달';
+        else if (d < 165) name = '차오르는 달';
+        else if (d < 195) name = '보름달 (망)';
+        else if (d < 255) name = '이지러지는 달';
+        else if (d < 285) name = '하현달';
+        else name = '그믐달';
+        return `${name} (${illumPct}%)`;
+      }
+
+      function azimuthToCompass(az) {
+        const dirs = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'];
+        return dirs[Math.round(az / 45) % 8];
+      }
+
+      // 매 프레임 천문 스냅샷을 3D 메쉬와 카메라, 상단 UI에 반영
+      function syncSceneAndUI(snap) {
+        // UI 텍스트 업데이트
+        const hh = Math.floor(state.solarHour) % 24;
+        const mm = Math.floor((state.solarHour % 1) * 60);
+        document.getElementById('val-hour').textContent =
+          `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+
+        const latAbs = Math.abs(state.latitudeDeg).toFixed(1);
+        const latPrefix = state.latitudeDeg >= 0 ? '북위 ' : '남위 ';
+        document.getElementById('val-lat').textContent = `${latPrefix}${latAbs}°`;
+
+        const seasonNames = ['춘분 부근', '봄·여름', '하지 부근', '여름·가을', '추분 부근', '가을·겨울', '동지 부근', '겨울·봄'];
+        const sIdx = Math.floor((((state.earthOrbitDeg % 360) + 360) % 360) / 45);
+        document.getElementById('val-earth-orbit').textContent = `${Math.round(state.earthOrbitDeg)}° (${seasonNames[sIdx]})`;
+
+        const illumPct = Math.round(snap.illuminatedFraction * 100);
+        const phaseText = getMoonPhaseKorean(state.moonSynodicDeg, illumPct);
+        document.getElementById('val-moon-orbit').textContent = `${Math.round(state.moonSynodicDeg)}°`;
+        document.getElementById('stat-moonphase').textContent = phaseText;
+
+        document.getElementById('val-speed').textContent = `${state.timeSpeed.toFixed(2)}x`;
+
+        const dayState = snap.sunAltDeg > 2 ? '낮' : (snap.sunAltDeg > -12 ? '박명' : '밤');
+        document.getElementById('stat-daynight').textContent =
+          `${dayState} (태양 ${snap.sunAltDeg >= 0 ? '+' : ''}${snap.sunAltDeg.toFixed(0)}°)`;
+
+        document.getElementById('stat-polaris').textContent =
+          `고도 ${snap.polarisAltDeg.toFixed(1)}° / ${snap.starsAboveHorizon}개`;
+
+        const mSign = snap.moonAltDeg >= 0 ? '+' : '';
+        document.getElementById('stat-moonalt').textContent =
+          `고도 ${mSign}${snap.moonAltDeg.toFixed(0)}° (${azimuthToCompass(snap.moonAzDeg)})`;
+
+        if (useFallback2D) {
+          renderFallback2D(snap);
+          return;
+        }
+
+        // 1. 지구 그룹 및 자전 각도 업데이트
+        earthGroup.position.set(snap.earthPos.x, snap.earthPos.y, snap.earthPos.z);
+        const orbitRad = state.earthOrbitDeg * DEG2RAD;
+        earthSpinMesh.rotation.y = orbitRad + snap.spinRad;
+
+        // 2. 달 위치 및 자전(동주기 자전으로 지구를 향함) 업데이트
+        moonMesh.position.set(snap.moonPos.x, snap.moonPos.y, snap.moonPos.z);
+        moonMesh.lookAt(snap.earthPos.x, snap.earthPos.y, snap.earthPos.z);
+
+        // 3. 관측자 지평선 Rig 위치 및 방향 행렬 정렬 (X=East, Y=Up, Z=-North)
+        observerRig.position.set(snap.observerPos.x, snap.observerPos.y, snap.observerPos.z);
+        const basisMat = new THREE.Matrix4();
+        basisMat.makeBasis(
+          new THREE.Vector3(snap.eastDir.x, snap.eastDir.y, snap.eastDir.z),
+          new THREE.Vector3(snap.upDir.x, snap.upDir.y, snap.upDir.z),
+          new THREE.Vector3(-snap.northDir.x, -snap.northDir.y, -snap.northDir.z)
+        );
+        observerRig.rotation.setFromRotationMatrix(basisMat);
+
+        // 관측자 시점에서 지평선 위/아래 별 밝기 구분
+        starPointsGroup.children.forEach((mesh, idx) => {
+          const stInfo = snap.starHorizonList[idx];
+          if (state.viewMode === 'sky') {
+            mesh.material.color.copy(mesh.userData.baseColor);
+            if (stInfo.altDeg < 0) mesh.material.color.multiplyScalar(0.22);
+          } else {
+            mesh.material.color.copy(mesh.userData.baseColor);
+          }
+        });
+
+        // 태양 광선 및 관측자-달 연결선 갱신
+        const sunAttr = sunRayLine.geometry.attributes.position;
+        sunAttr.setXYZ(0, 0, 0, 0);
+        sunAttr.setXYZ(1, snap.earthPos.x, snap.earthPos.y, snap.earthPos.z);
+        sunAttr.needsUpdate = true;
+
+        const emAttr = earthMoonLine.geometry.attributes.position;
+        emAttr.setXYZ(0, snap.observerPos.x, snap.observerPos.y, snap.observerPos.z);
+        emAttr.setXYZ(1, snap.moonPos.x, snap.moonPos.y, snap.moonPos.z);
+        emAttr.needsUpdate = true;
+
+        // 4. 시점 전환(우주 전체 vs 관측자 하늘)에 따른 카메라 배치
+        if (state.viewMode === 'space') {
+          camera.fov = 50;
+          camera.up.set(0, 1, 0);
+          skyDomeMesh.material.opacity = 0.0;
+          observerRig.scale.set(1, 1, 1);
+
+          // 지구와 달, 태양을 아우르는 궤도 중심점 주변으로 오빗 카메라 배치
+          const focusX = snap.earthPos.x * 0.68;
+          const focusZ = snap.earthPos.z * 0.68;
+          const cx = focusX + camCtrl.spaceDist * Math.cos(camCtrl.spacePitch) * Math.sin(camCtrl.spaceYaw);
+          const cy = camCtrl.spaceDist * Math.sin(camCtrl.spacePitch);
+          const cz = focusZ + camCtrl.spaceDist * Math.cos(camCtrl.spacePitch) * Math.cos(camCtrl.spaceYaw);
+          camera.position.set(cx, cy, cz);
+          camera.lookAt(focusX, 0, focusZ);
+        } else {
+          // 관측자 하늘 시점: 관측자 머리 위에서 실제 천정(upDir)을 카메라 Up으로 설정하고 북극성/밤하늘 조망
+          camera.fov = camCtrl.skyFov;
+          observerRig.scale.set(2.4, 2.4, 2.4);
+
+          // 태양 고도에 따른 낮 하늘빛 농도 반영
+          const dayFactor = Math.max(0, Math.min(1, (snap.sunAltDeg + 8) / 28));
+          skyDomeMesh.position.set(snap.observerPos.x, snap.observerPos.y, snap.observerPos.z);
+          skyDomeMesh.material.opacity = dayFactor * 0.48;
+
+          const eyePos = vecAdd(snap.observerPos, vecScale(snap.upDir, 0.45));
+          camera.position.set(eyePos.x, eyePos.y, eyePos.z);
+          camera.up.set(snap.upDir.x, snap.upDir.y, snap.upDir.z);
+
+          // 관측자 지평좌표계 기준 시선 방향(camCtrl.skyAzimuth, camCtrl.skyAltitude)
+          const cosAlt = Math.cos(camCtrl.skyAltitude);
+          const sinAlt = Math.sin(camCtrl.skyAltitude);
+          const horizDir = vecAdd(
+            vecScale(snap.northDir, Math.cos(camCtrl.skyAzimuth)),
+            vecScale(snap.eastDir, Math.sin(camCtrl.skyAzimuth))
+          );
+          const lookDir = vecNorm(vecAdd(vecScale(horizDir, cosAlt), vecScale(snap.upDir, sinAlt)));
+          const target = vecAdd(eyePos, vecScale(lookDir, 40));
+          camera.lookAt(target.x, target.y, target.z);
+        }
+
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+      }
+
+      // WebGL 실패 시 동일 천문 좌표 계산(snap)을 사용하는 2D 캔버스 대안 렌더러
+      function renderFallback2D(snap) {
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width = stageWrap.clientWidth;
+        const h = canvas.height = stageWrap.clientHeight;
+        ctx.fillStyle = '#060a18';
+        ctx.fillRect(0, 0, w, h);
+
+        const cx = w * 0.5, cy = h * 0.48;
+        const scale = Math.min(w, h) * 0.0095;
+
+        if (state.viewMode === 'space') {
+          // 2D 우주 궤도 투영
+          ctx.strokeStyle = 'rgba(90, 140, 230, 0.35)';
+          ctx.beginPath(); ctx.arc(cx, cy, EARTH_ORBIT_R * scale, 0, Math.PI * 2); ctx.stroke();
+
+          ctx.fillStyle = '#ffcf54';
+          ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.fill();
+
+          const ex = cx + snap.earthPos.x * scale;
+          const ey = cy + snap.earthPos.z * scale;
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath(); ctx.arc(ex, ey, 9, 0, Math.PI * 2); ctx.fill();
+
+          const mx = cx + snap.moonPos.x * scale;
+          const my = cy + snap.moonPos.z * scale;
+          ctx.fillStyle = '#e2e8f0';
+          ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          // 2D 관측자 지평선 투영 (방위각-고도 투영)
+          const rMax = Math.min(w, h) * 0.34;
+          ctx.strokeStyle = '#5ce1e6';
+          ctx.beginPath(); ctx.arc(cx, cy, rMax, 0, Math.PI * 2); ctx.stroke();
+
+          snap.starHorizonList.forEach((st) => {
+            if (st.altDeg < 0) return;
+            const r = rMax * (1 - st.altDeg / 90);
+            const a = (st.azDeg - 90) * DEG2RAD;
+            ctx.fillStyle = st.color;
+            ctx.beginPath();
+            ctx.arc(cx + r * Math.cos(a), cy + r * Math.sin(a), st.size * 1.4, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+      }
+
+      const slHour = document.getElementById('sl-hour');
+      const slLat = document.getElementById('sl-lat');
+      const slEarth = document.getElementById('sl-earth-orbit');
+      const slMoon = document.getElementById('sl-moon-orbit');
+      const slSpeed = document.getElementById('sl-speed');
+      const btnSpace = document.getElementById('btn-view-space');
+      const btnSky = document.getElementById('btn-view-sky');
+      const btnPlay = document.getElementById('btn-play');
+      const btnHome = document.getElementById('btn-home');
+      const btnReset = document.getElementById('btn-reset');
+
+      function syncInputsFromState() {
+        slHour.value = state.solarHour.toFixed(2);
+        slLat.value = state.latitudeDeg;
+        slEarth.value = state.earthOrbitDeg.toFixed(0);
+        slMoon.value = state.moonSynodicDeg.toFixed(0);
+        slSpeed.value = state.timeSpeed;
+        btnSpace.classList.toggle('active', state.viewMode === 'space');
+        btnSky.classList.toggle('active', state.viewMode === 'sky');
+        btnPlay.textContent = state.playing ? '⏸ 일시정지' : '▶ 시간 재생';
+      }
+
+      slHour.addEventListener('input', (e) => { state.solarHour = parseFloat(e.target.value); });
+      slLat.addEventListener('input', (e) => { state.latitudeDeg = parseFloat(e.target.value); });
+      slEarth.addEventListener('input', (e) => { state.earthOrbitDeg = parseFloat(e.target.value); });
+      slMoon.addEventListener('input', (e) => { state.moonSynodicDeg = parseFloat(e.target.value); });
+      slSpeed.addEventListener('input', (e) => { state.timeSpeed = parseFloat(e.target.value); });
+
+      function setViewMode(mode) {
+        state.viewMode = mode;
+        syncInputsFromState();
+      }
+      btnSpace.addEventListener('click', () => setViewMode('space'));
+      btnSky.addEventListener('click', () => setViewMode('sky'));
+
+      btnPlay.addEventListener('click', () => {
+        state.playing = !state.playing;
+        syncInputsFromState();
+      });
+
+      btnHome.addEventListener('click', () => {
+        camCtrl.spaceYaw = 0.55;
+        camCtrl.spacePitch = 0.42;
+        camCtrl.spaceDist = 44.0;
+        camCtrl.skyAzimuth = 0.0;
+        camCtrl.skyAltitude = Math.max(0.25, Math.abs(state.latitudeDeg) * DEG2RAD * 0.85);
+        camCtrl.skyFov = 68;
+      });
+
+      btnReset.addEventListener('click', () => {
+        Object.assign(state, DEFAULT_STATE);
+        btnHome.click();
+        syncInputsFromState();
+      });
+
+      // 마우스 및 터치 드래그/핀치 줌 시선 조작
+      let isDragging = false, prevX = 0, prevY = 0, pinchDist = 0;
+
+      canvas.addEventListener('mousedown', (e) => {
+        isDragging = true; prevX = e.clientX; prevY = e.clientY;
+      });
+      window.addEventListener('mouseup', () => { isDragging = false; });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - prevX;
+        const dy = e.clientY - prevY;
+        prevX = e.clientX; prevY = e.clientY;
+        applyCameraDrag(dx, dy);
+      });
+
+      function applyCameraDrag(dx, dy) {
+        if (state.viewMode === 'space') {
+          camCtrl.spaceYaw -= dx * 0.0065;
+          camCtrl.spacePitch = Math.max(-1.25, Math.min(1.35, camCtrl.spacePitch + dy * 0.0065));
+        } else {
+          camCtrl.skyAzimuth = (camCtrl.skyAzimuth - dx * 0.005 + Math.PI * 2) % (Math.PI * 2);
+          camCtrl.skyAltitude = Math.max(-0.15, Math.min(1.48, camCtrl.skyAltitude + dy * 0.005));
+        }
+      }
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (state.viewMode === 'space') {
+          camCtrl.spaceDist = Math.max(16, Math.min(82, camCtrl.spaceDist + e.deltaY * 0.03));
+        } else {
+          camCtrl.skyFov = Math.max(35, Math.min(92, camCtrl.skyFov + e.deltaY * 0.03));
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          prevX = e.touches[0].clientX;
+          prevY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+          isDragging = false;
+          pinchDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && isDragging) {
+          const dx = e.touches[0].clientX - prevX;
+          const dy = e.touches[0].clientY - prevY;
+          prevX = e.touches[0].clientX;
+          prevY = e.touches[0].clientY;
+          applyCameraDrag(dx, dy);
+        } else if (e.touches.length === 2) {
+          const d = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          const delta = pinchDist - d;
+          pinchDist = d;
+          if (state.viewMode === 'space') {
+            camCtrl.spaceDist = Math.max(16, Math.min(82, camCtrl.spaceDist + delta * 0.08));
+          } else {
+            camCtrl.skyFov = Math.max(35, Math.min(92, camCtrl.skyFov + delta * 0.08));
+          }
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchend', () => { isDragging = false; });
+
+      // 키보드 접근성 조작 (방향키로 시각/위도 조절, 스페이스바 일시정지, V 시점 전환)
+      window.addEventListener('keydown', (e) => {
+        if (e.target && e.target.tagName === 'INPUT') return;
+        if (e.code === 'Space') {
+          e.preventDefault();
+          btnPlay.click();
+        } else if (e.key === 'v' || e.key === 'V') {
+          setViewMode(state.viewMode === 'space' ? 'sky' : 'space');
+        } else if (e.key === 'ArrowRight') {
+          state.solarHour = (state.solarHour + 0.25) % 24;
+          syncInputsFromState();
+        } else if (e.key === 'ArrowLeft') {
+          state.solarHour = (state.solarHour - 0.25 + 24) % 24;
+          syncInputsFromState();
+        } else if (e.key === 'ArrowUp') {
+          state.latitudeDeg = Math.min(75, state.latitudeDeg + 1.5);
+          syncInputsFromState();
+        } else if (e.key === 'ArrowDown') {
+          state.latitudeDeg = Math.max(-75, state.latitudeDeg - 1.5);
+          syncInputsFromState();
+        }
+      });
+
+      // 반응형 리사이즈 대응
+      function handleResize() {
+        if (!renderer || !camera) return;
+        const w = stageWrap.clientWidth;
+        const h = stageWrap.clientHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / Math.max(1, h);
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', handleResize);
+
+      // 읽기 전용 진단 인터페이스 (실제 물리 계산 샘플 및 지오메트리 체크섬 제공)
+      Object.defineProperty(window, 'appDiagnostics', {
+        writable: false,
+        configurable: false,
+        value: function () {
+          const snap = computeAstronomySnapshot();
+          return Object.freeze({
+            app: 'ORBITAL CLOCK | 밤하늘의 시간 공방',
+            mode: useFallback2D ? '2d-fallback' : 'webgl-3d',
+            viewMode: state.viewMode,
+            geometryChecksum: geometryChecksum,
+            parameters: Object.assign({}, state),
+            samples: {
+              earthPosition: snap.earthPos,
+              observerPosition: snap.observerPos,
+              moonPosition: snap.moonPos,
+              observerUpVector: snap.upDir,
+              moonIlluminatedFraction: Number(snap.illuminatedFraction.toFixed(4)),
+              sunAltitudeDeg: Number(snap.sunAltDeg.toFixed(2)),
+              moonAltitudeDeg: Number(snap.moonAltDeg.toFixed(2)),
+              polarisAltitudeDeg: Number(snap.polarisAltDeg.toFixed(2)),
+              starsAboveHorizon: snap.starsAboveHorizon
+            }
+          });
+        }
+      });
+
+      // 메인 애니메이션 루프
+      let lastTime = performance.now();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.1, (now - lastTime) / 1000);
+        lastTime = now;
+
+        if (state.playing && state.timeSpeed > 0) {
+          // 1초당 기본 1.2시간 자전, 그에 비례하여 달 공전과 지구 공전이 연동 진행
+          const dHours = dt * 1.25 * state.timeSpeed;
+          state.solarHour = (state.solarHour + dHours) % 24;
+          state.moonSynodicDeg = (state.moonSynodicDeg + dHours * 0.52) % 360;
+          state.earthOrbitDeg = (state.earthOrbitDeg + dHours * 0.04) % 360;
+          slHour.value = state.solarHour.toFixed(2);
+          slMoon.value = state.moonSynodicDeg.toFixed(0);
+          slEarth.value = state.earthOrbitDeg.toFixed(0);
+        }
+
+        const snap = computeAstronomySnapshot();
+        syncSceneAndUI(snap);
+      }
+
+      window.onload = function () {
+        initThreeScene();
+        syncInputsFromState();
+        handleResize();
+        requestAnimationFrame(animate);
+      };
+    })();
+  </script>
+</body>
+</html>

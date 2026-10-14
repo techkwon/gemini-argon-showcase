@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMINI 4 ARGON — 60FPS Motion Graphics Showreel Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 for 3D WebGL Motion Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts: Space Grotesk, Inter, Noto Sans KR, JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --argon-violet: #8b5cf6;
+            --argon-cyan: #06b6d4;
+            --argon-blue: #3b82f6;
+            --argon-magenta: #ec4899;
+            --argon-bg: #05050a;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--argon-bg);
+            color: #ffffff;
+            font-family: 'Noto Sans KR', 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        .font-display {
+            font-family: 'Space Grotesk', 'Noto Sans KR', sans-serif;
+        }
+
+        .font-mono-tech {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Chromatic Aberration & Glitch Effects */
+        .chromatic-text {
+            text-shadow: 
+                -3px 0px 0px rgba(6, 182, 212, 0.85),
+                3px 0px 0px rgba(236, 72, 153, 0.85),
+                0px 0px 35px rgba(139, 92, 246, 0.65);
+        }
+
+        .argon-glow {
+            box-shadow: 
+                0 0 25px rgba(139, 92, 246, 0.35),
+                inset 0 0 20px rgba(6, 182, 212, 0.2);
+        }
+
+        .argon-border-gradient {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(6, 182, 212, 0.1), rgba(236, 72, 153, 0.2));
+            border: 1px solid rgba(139, 92, 246, 0.45);
+            backdrop-filter: blur(16px);
+        }
+
+        /* Scanline & CRT subtle film grain overlay */
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.22) 50%,
+                rgba(0, 0, 0, 0.22)
+            );
+            background-size: 100% 4px;
+        }
+
+        /* Aspect Ratio Containers for Stage */
+        #stage-wrapper {
+            transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .aspect-16-9 {
+            width: 100%;
+            height: 100%;
+        }
+
+        .aspect-9-16 {
+            width: min(100vw, 56.25vh);
+            height: min(100vh, 177.78vw);
+            max-height: calc(100vh - 140px);
+            max-width: calc((100vh - 140px) * 9 / 16);
+            margin: auto;
+            border-radius: 24px;
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            box-shadow: 0 0 80px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Custom Range Slider for Timeline Scrubber */
+        input[type=range].timeline-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type=range].timeline-slider::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.15);
+        }
+        input[type=range].timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #06b6d4;
+            box-shadow: 0 0 12px #06b6d4, 0 0 24px #8b5cf6;
+            margin-top: -5px;
+            transition: transform 0.15s ease;
+        }
+        input[type=range].timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+        }
+
+        /* Scene Transition Helpers */
+        .scene-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            will-change: transform, opacity, filter;
+        }
+        .scene-layer.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.92); opacity: 0.8; }
+            50% { transform: scale(1.06); opacity: 0.35; }
+            100% { transform: scale(0.92); opacity: 0.8; }
+        }
+        .animate-pulse-ring {
+            animation: pulse-ring 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="h-screen w-screen flex flex-col justify-between bg-[#04040a] select-none overflow-hidden">
+
+    <!-- TOP DIRECTOR HUD & TELEMETRY BAR -->
+    <header class="z-40 w-full px-4 py-2.5 bg-[#070712]/90 border-b border-violet-500/25 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
+        <!-- Left Brand & Element Tag -->
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-600 via-cyan-500 to-fuchsia-600 p-[1px] shadow-lg shadow-violet-500/30">
+                <div class="w-full h-full bg-[#06060f] rounded-[7px] flex flex-col items-center justify-center leading-none">
+                    <span class="text-[9px] font-mono-tech text-cyan-400 font-bold">18</span>
+                    <span class="text-sm font-display font-black text-white">Ar</span>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-display font-extrabold text-sm md:text-base tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-cyan-200 to-violet-400">
+                        GEMINI 4 ARGON
+                    </span>
+                    <span class="px-2 py-0.5 text-[10px] font-mono-tech font-bold uppercase rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                        SHOWREEL ENGINE v4.0
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400 hidden sm:block">
+                    60FPS WebGL Shader + Kinetic Typography + Procedural Synth + AI Neural Voice
+                </p>
+            </div>
+        </div>
+
+        <!-- Center Scene Quick-Jump Pills -->
+        <div class="hidden xl:flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800" id="scene-pills">
+            <button data-scene="0" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all bg-violet-600 text-white">
+                01. IGNITION
+            </button>
+            <button data-scene="1" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white">
+                02. 1M TOKENS
+            </button>
+            <button data-scene="2" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white">
+                03. VALS #1
+            </button>
+            <button data-scene="3" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white">
+                04. 2.7X RUST
+            </button>
+            <button data-scene="4" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white">
+                05. AGENTIC
+            </button>
+            <button data-scene="5" class="scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white">
+                06. FINALE
+            </button>
+        </div>
+
+        <!-- Right Studio Actions: Aspect Ratio, Gemini TTS, Video Export -->
+        <div class="flex items-center gap-2">
+            <!-- Aspect Ratio Switcher -->
+            <div class="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-slate-700/70">
+                <button id="btn-aspect-16-9" class="px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-all" title="16:9 와이드스크린">
+                    16:9
+                </button>
+                <button id="btn-aspect-9-16" class="px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold text-slate-400 hover:text-white transition-all" title="9:16 숏폼/릴스/쇼츠">
+                    9:16 숏폼
+                </button>
+            </div>
+
+            <!-- High-Def Gemini Neural TTS Generator Button -->
+            <button id="btn-gemini-tts" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-violet-600/80 to-fuchsia-600/80 hover:from-violet-500 hover:to-fuchsia-500 text-white border border-violet-400/40 shadow-md shadow-violet-900/40 flex items-center gap-1.5 transition-all">
+                <span id="tts-status-dot" class="w-2 h-2 rounded-full bg-cyan-300 animate-ping"></span>
+                <span id="tts-btn-label">🎙️ Gemini 고음질 성우 합성</span>
+            </button>
+
+            <!-- 1-Click 60FPS WebM Video Recorder -->
+            <button id="btn-record" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-rose-600/90 text-slate-200 hover:text-white border border-slate-600 hover:border-rose-400 flex items-center gap-1.5 transition-all">
+                <span id="rec-dot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span id="rec-label">🎬 60FPS 영상 녹화</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN MOTION GRAPHICS VIEWPORT STAGE -->
+    <main class="relative flex-1 w-full overflow-hidden flex items-center justify-center bg-[#030308] p-0 md:p-2">
+        <div id="stage-wrapper" class="relative aspect-16-9 overflow-hidden bg-[#05050c] flex items-center justify-center">
+            
+            <!-- LAYER 1: Three.js 3D WebGL Canvas -->
+            <canvas id="webgl-canvas" class="absolute inset-0 w-full h-full block z-0"></canvas>
+
+            <!-- LAYER 2: 2D High-DPI HUD, Audio Spectrum, Shockwaves & Composite Recording Canvas -->
+            <canvas id="hud-canvas" class="absolute inset-0 w-full h-full block z-10 pointer-events-none"></canvas>
+
+            <!-- Subtle Scanline & Vignette Film Overlay -->
+            <div class="absolute inset-0 scanlines pointer-events-none z-20 opacity-35"></div>
+            <div class="absolute inset-0 pointer-events-none z-20" style="background: radial-gradient(circle at center, transparent 45%, rgba(2, 2, 7, 0.85) 100%);"></div>
+
+            <!-- TOP-LEFT & TOP-RIGHT IN-FRAME TELEMETRY HUD -->
+            <div class="absolute top-4 left-5 right-5 z-30 flex justify-between items-start pointer-events-none font-mono-tech text-[11px] text-cyan-400/80">
+                <div class="flex flex-col gap-0.5">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <span id="hud-model-id" class="font-bold tracking-widest text-white">MODEL // GEMINI-4-ARGON</span>
+                    </div>
+                    <span id="hud-scene-code" class="text-violet-400">SEQ_01 :: NOBLE_GAS_IGNITION</span>
+                </div>
+                <div class="text-right flex flex-col gap-0.5">
+                    <span id="hud-fps" class="text-emerald-400 font-bold">60.0 FPS // WEBGL_2.0</span>
+                    <span id="hud-timecode" class="text-slate-300">TC 00:00:00:00</span>
+                </div>
+            </div>
+
+            <!-- =====================================================================
+                 LAYER 3: KINETIC TYPOGRAPHY & INFOGRAPHIC SCENES (6 SCENES, 36 SECONDS)
+                 ===================================================================== -->
+            <div id="kinetic-stage" class="relative z-30 w-full h-full flex items-center justify-center px-6">
+
+                <!-- SCENE 1 (0.0s - 6.0s): THE IGNITION — ELEMENT 18 ARGON -->
+                <section id="scene-0" class="scene-layer active text-center max-w-5xl mx-auto">
+                    <div id="s0-badge" class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full argon-border-gradient mb-4">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                        <span class="font-mono-tech text-xs md:text-sm font-bold tracking-widest text-cyan-300 uppercase">
+                            GOOGLE DEEPMIND // FRONTIER RELEASE
+                        </span>
+                    </div>
+
+                    <div id="s0-pretitle" class="font-mono-tech text-sm md:text-xl text-fuchsia-400 font-bold tracking-[0.25em] uppercase mb-2">
+                        OPUS 5.5? GPT-6 ASTRA? STEP ASIDE.
+                    </div>
+
+                    <h1 id="s0-title" class="font-display font-black text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-tight leading-none chromatic-text">
+                        GEMINI 4 <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-violet-400 to-fuchsia-400">ARGON</span>
+                    </h1>
+
+                    <p id="s0-sub" class="mt-5 text-base sm:text-xl md:text-2xl text-slate-200 font-medium max-w-2xl mx-auto leading-relaxed">
+                        원소번호 18번 <span class="text-cyan-300 font-bold">아르곤(Ar)</span> — 흔들리지 않는 안정성과<br class="hidden sm:inline"/>
+                        고전압 플라즈마 추론으로 완성된 <span class="text-violet-300 font-bold">최상위 프론티어 지능</span>
+                    </p>
+
+                    <!-- Periodic Element Mini Card -->
+                    <div id="s0-element-card" class="mt-6 grid grid-cols-3 gap-3 max-w-md mx-auto w-full">
+                        <div class="argon-border-gradient rounded-xl p-2.5 text-center">
+                            <div class="text-[10px] font-mono-tech text-slate-400">ATOMIC NO.</div>
+                            <div class="text-lg md:text-xl font-display font-black text-cyan-300">18 Ar</div>
+                        </div>
+                        <div class="argon-border-gradient rounded-xl p-2.5 text-center">
+                            <div class="text-[10px] font-mono-tech text-slate-400">MASS / STATE</div>
+                            <div class="text-lg md:text-xl font-display font-black text-violet-300">39.948 u</div>
+                        </div>
+                        <div class="argon-border-gradient rounded-xl p-2.5 text-center">
+                            <div class="text-[10px] font-mono-tech text-slate-400">REASONING</div>
+                            <div class="text-lg md:text-xl font-display font-black text-fuchsia-300">ULTRA HIGH</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SCENE 2 (6.0s - 12.0s): 1,000,000 OUTPUT TOKENS (15.6X EXPANSION) -->
+                <section id="scene-1" class="scene-layer text-center max-w-5xl mx-auto w-full">
+                    <div class="font-mono-tech text-xs md:text-sm text-cyan-400 tracking-[0.3em] uppercase font-bold mb-2">
+                        LONG-HORIZON REASONING &amp; DECODE WORKSPACE
+                    </div>
+
+                    <div class="flex flex-col items-center justify-center my-2">
+                        <div id="s1-counter" class="font-display font-black text-6xl sm:text-8xl md:text-9xl tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 via-white to-violet-400 chromatic-text">
+                            1,000,000
+                        </div>
+                        <div class="font-mono-tech text-lg sm:text-2xl md:text-3xl font-extrabold text-violet-300 tracking-widest mt-1">
+                            MAX OUTPUT TOKENS
+                        </div>
+                    </div>
+
+                    <!-- Comparison Bar: 64K vs 1,000,000 (15.6x) -->
+                    <div class="mt-6 max-w-3xl mx-auto w-full argon-border-gradient rounded-2xl p-4 sm:p-6 text-left">
+                        <div class="flex justify-between items-center text-xs font-mono-tech text-slate-400 mb-2">
+                            <span>PREVIOUS GENERATION LIMIT (64,000 TOKENS)</span>
+                            <span class="text-slate-300 font-bold">1.0x</span>
+                        </div>
+                        <div class="w-full h-3 bg-slate-800/90 rounded-full overflow-hidden mb-4">
+                            <div class="h-full bg-slate-500 rounded-full" style="width: 6.4%;"></div>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs sm:text-sm font-mono-tech text-cyan-300 mb-2">
+                            <span class="font-bold">GEMINI 4 ARGON LONG DECODE (1,000,000 TOKENS)</span>
+                            <span id="s1-multiplier" class="px-2 py-0.5 rounded bg-cyan-500/20 border border-cyan-400/50 text-cyan-200 font-black">
+                                15.6x EXPANDED
+                            </span>
+                        </div>
+                        <div class="w-full h-5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-cyan-500/40">
+                            <div id="s1-bar-fill" class="h-full rounded-full bg-gradient-to-r from-violet-600 via-cyan-400 to-fuchsia-500 shadow-[0_0_20px_#06b6d4]" style="width: 100%;"></div>
+                        </div>
+                        <p class="mt-3 text-xs sm:text-sm text-slate-300 text-center">
+                            단순 입력 컨텍스트가 아닌 <strong class="text-white">순수 추론 및 결과 생성 출력 한도 100만 토큰</strong>으로 수 시간의 다단계 업무를 한 번에 완수
+                        </p>
+                    </div>
+                </section>
+
+                <!-- SCENE 3 (12.0s - 18.5s): VALS INDEX #1 — ENTERPRISE DOMINANCE -->
+                <section id="scene-2" class="scene-layer max-w-5xl mx-auto w-full">
+                    <div class="text-center mb-5">
+                        <span class="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono-tech text-xs font-bold uppercase tracking-widest">
+                            REAL-WORLD ENTERPRISE BENCHMARK #1
+                        </span>
+                        <h2 class="font-display font-black text-4xl sm:text-6xl md:text-7xl mt-2 tracking-tight text-white chromatic-text">
+                            VALS INDEX <span id="s2-score" class="text-cyan-400">68.90%</span> 1위 달성
+                        </h2>
+                        <p class="text-xs sm:text-base text-slate-300 mt-1">
+                            금융 · 법률(Harvey #1) · 코딩 · 세무 실무 종합 평가에서 경쟁 플래그십 완벽 제압
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                        <!-- Card 1: Vals Index -->
+                        <div class="argon-border-gradient rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-mono-tech text-xs text-cyan-300 font-bold">VALS INDEX (OVERALL)</span>
+                                    <span class="px-2 py-0.5 rounded bg-cyan-500 text-slate-950 font-mono-tech text-[10px] font-black">RANK #1</span>
+                                </div>
+                                <div class="text-3xl sm:text-4xl font-display font-black text-white mt-2">68.90%</div>
+                            </div>
+                            <div class="mt-4 space-y-2 text-xs font-mono-tech">
+                                <div>
+                                    <div class="flex justify-between text-cyan-300 font-bold mb-1">
+                                        <span>Gemini 4 Argon</span><span>68.9%</span>
+                                    </div>
+                                    <div class="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                                        <div id="s2-bar-1" class="h-full bg-gradient-to-r from-cyan-400 to-violet-500" style="width: 92%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-slate-400 mb-1">
+                                        <span>Claude Opus 5.5</span><span>64.2%</span>
+                                    </div>
+                                    <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-slate-600" style="width: 78%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-slate-400 mb-1">
+                                        <span>GPT-6 Astra</span><span>63.8%</span>
+                                    </div>
+                                    <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-slate-600" style="width: 76%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Harvey Legal & Financial Quant -->
+                        <div class="argon-border-gradient rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-mono-tech text-xs text-violet-300 font-bold">HARVEY LEGAL &amp; FIN</span>
+                                    <span class="px-2 py-0.5 rounded bg-violet-400 text-slate-950 font-mono-tech text-[10px] font-black">LEADER</span>
+                                </div>
+                                <div class="text-3xl sm:text-4xl font-display font-black text-white mt-2">M&amp;A · 세무 · 판례</div>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-3 leading-relaxed">
+                                대규모 비정형 계약서·원장 대조·복잡한 스프레드시트 수식 검증에서 <span class="text-cyan-300 font-bold">최고 수준의 인용 무결성(Citation Fidelity)</span> 기록
+                            </p>
+                            <div class="mt-3 pt-2 border-t border-slate-700/60 flex justify-between text-[11px] font-mono-tech text-emerald-300">
+                                <span>NowAI-Bench (ServiceNow)</span>
+                                <span>+20% Task Success</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Terminal-Bench & Cyber -->
+                        <div class="argon-border-gradient rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-center">
+                                    <span class="font-mono-tech text-xs text-fuchsia-300 font-bold">PROJECT FAIRWIND</span>
+                                    <span class="px-2 py-0.5 rounded bg-fuchsia-400 text-slate-950 font-mono-tech text-[10px] font-black">14 / 15 PASS</span>
+                                </div>
+                                <div class="text-3xl sm:text-4xl font-display font-black text-white mt-2">57.58%</div>
+                            </div>
+                            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                                <strong class="text-white">Terminal-Bench 4.0</strong> 57.58% 및 구글 프론티어 사이버보안 챌린지 <strong class="text-fuchsia-300">15개 중 14개 통과</strong>
+                            </p>
+                            <div class="mt-3 pt-2 border-t border-slate-700/60 flex justify-between text-[11px] font-mono-tech text-cyan-300">
+                                <span>Security Clearance</span>
+                                <span>VERIFIED DEFENSE</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SCENE 4 (18.5s - 25.0s): 32,000 LINES OF RUST — 2.7X FASTER AUTONOMOUS ENGINEERING -->
+                <section id="scene-3" class="scene-layer max-w-5xl mx-auto w-full">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center w-full">
+                        <!-- Left Kinetic Stat Column -->
+                        <div class="lg:col-span-6 text-left space-y-3">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-mono-tech text-xs font-bold">
+                                CASE STUDY // GOOGLE libgav1 VIDEO DECODER
+                            </div>
+                            <h2 class="font-display font-black text-4xl sm:text-6xl leading-none text-white chromatic-text">
+                                32,000줄 <span class="text-cyan-400">Rust</span><br/>
+                                자율 리팩토링
+                            </h2>
+                            <p class="text-sm sm:text-base text-slate-300 leading-relaxed">
+                                단순 코드 생성을 넘어 <strong class="text-white">성능 측정 → 병목 분석 → 코드 수정 → 테스트 검증</strong>을 스스로 반복 수행하여 기존 Rust 코어 대비 <strong class="text-cyan-300">2.7배 빠른 실행 속도</strong> 달성
+                            </p>
+                            <div class="flex items-center gap-4 pt-2">
+                                <div class="argon-border-gradient px-4 py-3 rounded-xl">
+                                    <div class="text-[10px] font-mono-tech text-slate-400">SPEEDUP</div>
+                                    <div id="s3-speed" class="text-3xl sm:text-4xl font-display font-black text-emerald-400">2.70x</div>
+                                </div>
+                                <div class="argon-border-gradient px-4 py-3 rounded-xl">
+                                    <div class="text-[10px] font-mono-tech text-slate-400">LINES REPLACED</div>
+                                    <div id="s3-lines" class="text-3xl sm:text-4xl font-display font-black text-violet-300">32,000+</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Live Autonomous Code Terminal -->
+                        <div class="lg:col-span-6 argon-border-gradient rounded-2xl overflow-hidden shadow-2xl border border-cyan-500/40">
+                            <div class="bg-slate-900/95 px-4 py-2 border-b border-slate-800 flex items-center justify-between">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                                    <span class="ml-2 font-mono-tech text-[11px] text-slate-300">argon-agent :: libgav1_decoder.rs</span>
+                                </div>
+                                <span class="font-mono-tech text-[10px] text-emerald-400 font-bold">● AUTONOMOUS LOOP</span>
+                            </div>
+                            <div class="p-4 font-mono-tech text-xs sm:text-sm space-y-2 bg-[#060611]/90 text-left">
+                                <div class="text-slate-400">$ gemini-4-argon --agentic-optimize ./src/dsp/loop_restoration.rs</div>
+                                <div class="text-cyan-300">[STEP 1] Profiling SIMD vectorization &amp; cache locality...</div>
+                                <div class="text-violet-300">[STEP 2] Refactoring 32,000 LOC Rust AV1 pipeline...</div>
+                                <div class="p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px] leading-relaxed text-emerald-300">
+                                    + #[target_feature(enable = "avx2,neon")]<br/>
+                                    + pub unsafe fn wiener_filter_argon_opt(...) {<br/>
+                                    + &nbsp;&nbsp;// Zero-copy aligned tensor stride Verified ✓<br/>
+                                    + }
+                                </div>
+                                <div class="flex items-center justify-between pt-1 text-xs">
+                                    <span class="text-amber-300">UNIT TESTS: 1,420 / 1,420 PASSED</span>
+                                    <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">THROUGHPUT: 270% ▲</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SCENE 5 (25.0s - 31.0s): FULL-STACK AGENTIC CAPABILITIES & 95% CACHE DISCOUNT -->
+                <section id="scene-4" class="scene-layer max-w-5xl mx-auto w-full text-center">
+                    <div class="font-mono-tech text-xs md:text-sm text-fuchsia-400 font-bold tracking-[0.25em] uppercase mb-2">
+                        BUILT FOR AUTONOMOUS MULTI-STEP WORKFLOWS
+                    </div>
+                    <h2 class="font-display font-black text-4xl sm:text-6xl text-white chromatic-text mb-6">
+                        초격차 에이전틱 생태계 &amp; 압도적 효율
+                    </h2>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full mb-5">
+                        <div class="argon-border-gradient rounded-2xl p-4 text-center">
+                            <div class="text-2xl sm:text-3xl mb-1">🖥️</div>
+                            <div class="font-display font-bold text-sm sm:text-base text-white">Computer Use</div>
+                            <div class="text-[11px] text-slate-400 mt-1">GUI·터미널 자율 조작</div>
+                        </div>
+                        <div class="argon-border-gradient rounded-2xl p-4 text-center">
+                            <div class="text-2xl sm:text-3xl mb-1">🎬</div>
+                            <div class="font-display font-bold text-sm sm:text-base text-white">Agentic Video</div>
+                            <div class="text-[11px] text-slate-400 mt-1">복합 영상·문서 심층 이해</div>
+                        </div>
+                        <div class="argon-border-gradient rounded-2xl p-4 text-center">
+                            <div class="text-2xl sm:text-3xl mb-1">⚡</div>
+                            <div class="font-display font-bold text-sm sm:text-base text-white">Code Execution</div>
+                            <div class="text-[11px] text-slate-400 mt-1">샌드박스 실시간 검증</div>
+                        </div>
+                        <div class="argon-border-gradient rounded-2xl p-4 text-center">
+                            <div class="text-2xl sm:text-3xl mb-1">🌐</div>
+                            <div class="font-display font-bold text-sm sm:text-base text-white">Search &amp; Maps</div>
+                            <div class="text-[11px] text-slate-400 mt-1">실시간 그라운딩 팩트체크</div>
+                        </div>
+                    </div>
+
+                    <!-- API Pricing Highlight Banner -->
+                    <div class="argon-border-gradient rounded-2xl p-4 sm:p-5 max-w-3xl mx-auto w-full flex flex-wrap items-center justify-around gap-4 border border-violet-400/50">
+                        <div>
+                            <div class="text-[10px] font-mono-tech text-slate-400 uppercase">INPUT / 1M TOKENS</div>
+                            <div class="text-2xl sm:text-3xl font-display font-black text-cyan-300">$4.00</div>
+                        </div>
+                        <div class="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
+                        <div>
+                            <div class="text-[10px] font-mono-tech text-slate-400 uppercase">OUTPUT / 1M TOKENS</div>
+                            <div class="text-2xl sm:text-3xl font-display font-black text-violet-300">$20.00</div>
+                        </div>
+                        <div class="h-8 w-[1px] bg-slate-700 hidden sm:block"></div>
+                        <div>
+                            <div class="text-[10px] font-mono-tech text-emerald-300 uppercase">IMPLICIT CACHE DISCOUNT</div>
+                            <div class="text-2xl sm:text-3xl font-display font-black text-emerald-400">-95% OFF</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SCENE 6 (31.0s - 36.0s): GRAND FINALE — THE NEW FRONTIER -->
+                <section id="scene-5" class="scene-layer text-center max-w-4xl mx-auto">
+                    <div class="relative inline-flex items-center justify-center mb-5">
+                        <div class="absolute w-28 h-28 rounded-full bg-violet-500/30 blur-2xl animate-pulse-ring"></div>
+                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-violet-600 via-cyan-400 to-fuchsia-500 p-[2px] shadow-[0_0_50px_rgba(6,182,212,0.7)]">
+                            <div class="w-full h-full bg-[#05050d] rounded-[14px] flex flex-col items-center justify-center">
+                                <span class="font-mono-tech text-xs text-cyan-300 font-bold">18</span>
+                                <span class="font-display text-3xl font-black text-white">Ar</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="font-mono-tech text-xs sm:text-sm text-cyan-300 tracking-[0.35em] uppercase font-bold mb-2">
+                        THE NEW STANDARD OF FRONTIER INTELLIGENCE
+                    </div>
+
+                    <h2 class="font-display font-black text-5xl sm:text-7xl md:text-8xl tracking-tight text-white chromatic-text leading-none">
+                        GEMINI 4 ARGON
+                    </h2>
+
+                    <p class="mt-4 text-base sm:text-xl text-slate-200 font-medium">
+                        오퍼스를 넘어선 자율 추론의 정점 — <span class="text-cyan-300 font-mono-tech font-bold">gemini-4-argon</span>
+                    </p>
+
+                    <div class="mt-6 flex flex-wrap items-center justify-center gap-3 pointer-events-auto">
+                        <button id="btn-replay-finale" class="px-6 py-3 rounded-xl font-display font-bold text-sm bg-gradient-to-r from-violet-600 via-cyan-500 to-fuchsia-600 text-white shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:scale-105 transition-transform">
+                            ⚡ 쇼릴 다시 재생 (REPLAY SHOWREEL)
+                        </button>
+                        <div class="px-4 py-3 rounded-xl font-mono-tech text-xs argon-border-gradient text-slate-200">
+                            Google AI Studio · Vertex AI · Cloud
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- SUBTITLE / VOICEOVER TELEPROMPTER BAR AT BOTTOM OF STAGE -->
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-3xl pointer-events-none text-center">
+                <div class="inline-block px-4 py-2 rounded-xl bg-black/75 border border-violet-500/30 backdrop-blur-md shadow-lg">
+                    <p id="subtitle-text" class="text-xs sm:text-sm md:text-base font-medium text-slate-100 tracking-wide">
+                        🔊 [재생] 버튼을 누르면 사이버펑크 신디사이저 BGM, 효과음, AI 보이스 내레이션과 함께 60FPS 쇼릴이 시작됩니다.
+                    </p>
+                </div>
+            </div>
+
+            <!-- INITIAL CLICK-TO-LAUNCH AUDIO/MOTION OVERLAY -->
+            <div id="start-overlay" class="absolute inset-0 z-50 bg-[#04040b]/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center transition-opacity duration-500">
+                <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-600 via-cyan-400 to-fuchsia-600 p-[2px] mb-5 shadow-[0_0_50px_rgba(139,92,246,0.6)] animate-pulse">
+                    <div class="w-full h-full bg-[#05050f] rounded-[14px] flex flex-col items-center justify-center">
+                        <span class="text-xs font-mono-tech text-cyan-400 font-bold">18</span>
+                        <span class="text-3xl font-display font-black text-white">Ar</span>
+                    </div>
+                </div>
+                <div class="font-mono-tech text-xs text-cyan-400 tracking-[0.25em] uppercase font-bold mb-2">
+                    FULL-SPEC PROCEDURAL MOTION GRAPHICS
+                </div>
+                <h2 class="font-display font-black text-3xl sm:text-5xl text-white chromatic-text mb-3">
+                    GEMINI 4 ARGON SHOWREEL
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-300 max-w-lg mb-6 leading-relaxed">
+                    클로드 오퍼스 5.5 모션그래픽 트렌드를 뛰어넘는 <strong>실시간 3D WebGL 플라즈마/테서랙트 파티클 + 키네틱 타이포그래피 + 프로시저럴 신디사이저 BGM/효과음 + AI 보이스 내레이션</strong> 통합 쇼릴입니다.
+                </p>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <button id="btn-launch-showreel" class="px-7 py-3.5 rounded-xl font-display font-extrabold text-base bg-gradient-to-r from-violet-600 via-cyan-500 to-fuchsia-600 text-white shadow-[0_0_40px_rgba(6,182,212,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
+                        <span>▶ 사운드 + 모션그래픽 쇼릴 시작</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- BOTTOM TIMELINE SCRUBBER & AUDIO MIXER DECK -->
+    <footer class="z-40 w-full px-4 py-2.5 bg-[#070712]/95 border-t border-violet-500/25 backdrop-blur-md flex flex-col gap-2">
+        <!-- Timeline Scrubber Row -->
+        <div class="flex items-center gap-3 w-full">
+            <button id="btn-play-pause" class="w-9 h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center font-bold shadow-md shadow-violet-900/50 transition-all" title="재생 / 일시정지 (Space)">
+                ▶
+            </button>
+            <button id="btn-restart" class="w-8 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-sm border border-slate-700 transition-all" title="처음부터 (R)">
+                ↺
+            </button>
+
+            <span id="time-current" class="font-mono-tech text-xs text-cyan-300 font-bold w-12 text-right">00.0s</span>
+
+            <div class="relative flex-1 flex items-center">
+                <input id="timeline-scrubber" type="range" min="0" max="36" step="0.01" value="0" class="timeline-slider w-full z-10" />
+                <!-- Scene Markers on Timeline -->
+                <div class="absolute inset-x-0 h-1.5 pointer-events-none flex justify-between px-1 opacity-40">
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="0s: Scene 1"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="6s: Scene 2"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="12s: Scene 3"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="18.5s: Scene 4"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="25s: Scene 5"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="31s: Scene 6"></span>
+                    <span class="w-[1px] h-3 -mt-0.5 bg-cyan-400" title="36s: End"></span>
+                </div>
+            </div>
+
+            <span id="time-total" class="font-mono-tech text-xs text-slate-400 w-12">36.0s</span>
+
+            <!-- Audio Channel Toggles -->
+            <div class="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                <button id="toggle-bgm" class="px-2.5 py-1 rounded-md text-[11px] font-mono-tech font-bold bg-violet-500/20 text-violet-300 border border-violet-500/40 transition-all">
+                    🎵 BGM ON
+                </button>
+                <button id="toggle-sfx" class="px-2.5 py-1 rounded-md text-[11px] font-mono-tech font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-all">
+                    💥 SFX ON
+                </button>
+                <button id="toggle-voice" class="px-2.5 py-1 rounded-md text-[11px] font-mono-tech font-bold bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 transition-all">
+                    🗣️ VOICE ON
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /*************************************************************************
+         * 1. MASTER TIMELINE & SCENE DATA (36.0 SECONDS TOTAL SHOWREEL)
+         *************************************************************************/
+        const TOTAL_DURATION = 36.0;
+        const SCENES = [
+            {
+                id: 0,
+                code: "SEQ_01 :: NOBLE_GAS_IGNITION",
+                start: 0.0,
+                end: 6.0,
+                narration: "오퍼스와 아스트라를 넘어, 프론티어 인텔리전스의 새로운 기준. 구글 딥마인드, 제미나이 포 아르곤을 공개합니다.",
+                canvasHeadline: "GEMINI 4 ARGON",
+                canvasSub: "ELEMENT 18 // FRONTIER INTELLIGENCE"
+            },
+            {
+                id: 1,
+                code: "SEQ_02 :: 1M_TOKEN_LONG_DECODE",
+                start: 6.0,
+                end: 12.0,
+                narration: "출력 한도 백만 토큰. 기존 대비 15.6배 확장된 압도적 사고 공간으로 멈추지 않는 다단계 추론을 완성합니다.",
+                canvasHeadline: "1,000,000 TOKENS",
+                canvasSub: "15.6X EXPANDED LONG DECODE WORKSPACE"
+            },
+            {
+                id: 2,
+                code: "SEQ_03 :: VALS_INDEX_RANK_1",
+                start: 12.0,
+                end: 18.5,
+                narration: "금융, 법률, 코딩, 세무 실무 종합 평가 발스 인덱스 68.9% 전체 1위. 벤치마크를 넘어 실제 비즈니스를 지배합니다.",
+                canvasHeadline: "VALS INDEX 68.90% #1",
+                canvasSub: "BEATING OPUS 5.5 & GPT-6 ASTRA IN REAL WORK"
+            },
+            {
+                id: 3,
+                code: "SEQ_04 :: 32K_RUST_REFACTOR",
+                start: 18.5,
+                end: 25.0,
+                narration: "3만 2천 줄의 러스트 코어를 스스로 재설계하고 검증해 2.7배의 속도 혁신을 달성한 자율 엔지니어링 에이전트.",
+                canvasHeadline: "2.7X FASTER RUST",
+                canvasSub: "32,000 LINES AUTONOMOUSLY REFACTORED"
+            },
+            {
+                id: 4,
+                code: "SEQ_05 :: AGENTIC_ECOSYSTEM",
+                start: 25.0,
+                end: 31.0,
+                narration: "컴퓨터 제어와 에이전틱 비디오 분석, 그리고 95% 캐시 비용 절감까지. 엔터프라이즈의 모든 한계를 돌파합니다.",
+                canvasHeadline: "AGENTIC ECOSYSTEM",
+                canvasSub: "COMPUTER USE // VIDEO // -95% CACHE COST"
+            },
+            {
+                id: 5,
+                code: "SEQ_06 :: GRAND_FINALE",
+                start: 31.0,
+                end: 36.0,
+                narration: "제미나이 포 아르곤. 지금 구글 AI 스튜디오와 버텍스 AI에서 가장 완벽한 지능을 경험하십시오.",
+                canvasHeadline: "GEMINI 4 ARGON",
+                canvasSub: "THE NEW FRONTIER IS HERE // GOOGLE DEEPMIND"
+            }
+        ];
+
+        const state = {
+            isPlaying: false,
+            currentTime: 0.0,
+            lastFrameTime: performance.now(),
+            activeSceneIndex: -1,
+            bgmEnabled: true,
+            sfxEnabled: true,
+            voiceEnabled: true,
+            aspectRatio: '16:9',
+            fps: 60,
+            frameCounter: 0,
+            fpsTimer: performance.now(),
+            shockwaves: [],
+            glitchIntensity: 0,
+            cameraShake: 0,
+            geminiTtsBuffers: {}, // Cached AudioBuffers per scene index
+            geminiTtsReady: false,
+            geminiTtsLoading: false,
+            activeVoiceSource: null,
+            isRecording: false,
+            mediaRecorder: null,
+            recordedChunks: []
+        };
+
+        /*************************************************************************
+         * 2. PROCEDURAL WEB AUDIO ENGINE (BGM + SFX + ANALYSER + RECORDING STREAM)
+         *************************************************************************/
+        class ArgonAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.masterGain = null;
+                this.bgmGain = null;
+                this.sfxGain = null;
+                this.voiceGain = null;
+                this.analyser = null;
+                this.freqData = null;
+                this.streamDest = null;
+                this.bgmInterval = null;
+                this.stepIndex = 0;
+                this.noiseBuffer = null;
+            }
+
+            init() {
+                if (this.ctx) {
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    return;
+                }
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.9;
+
+                this.bgmGain = this.ctx.createGain();
+                this.bgmGain.gain.value = state.bgmEnabled ? 0.42 : 0;
+
+                this.sfxGain = this.ctx.createGain();
+                this.sfxGain.gain.value = state.sfxEnabled ? 0.65 : 0;
+
+                this.voiceGain = this.ctx.createGain();
+                this.voiceGain.gain.value = state.voiceEnabled ? 1.0 : 0;
+
+                this.analyser = this.ctx.createAnalyser();
+                this.analyser.fftSize = 128;
+                this.analyser.smoothingTimeConstant = 0.78;
+                this.freqData = new Uint8Array(this.analyser.frequencyBinCount);
+
+                // MediaStreamDestination for built-in video+audio recording
+                this.streamDest = this.ctx.createMediaStreamDestination();
+
+                this.bgmGain.connect(this.masterGain);
+                this.sfxGain.connect(this.masterGain);
+                this.voiceGain.connect(this.masterGain);
+
+                this.masterGain.connect(this.analyser);
+                this.analyser.connect(this.ctx.destination);
+                this.masterGain.connect(this.streamDest);
+
+                // Pre-build white/pink noise buffer for whooshes, snares, and risers
+                const bufferSize = this.ctx.sampleRate * 2;
+                this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = this.noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+            }
+
+            startBGM() {
+                this.init();
+                this.stopBGM();
+                // 128 BPM 16th-note sequencer (approx 117ms per 16th note)
+                const stepMs = (60 / 128 / 4) * 1000;
+                // D Minor / Phrygian Dark Sci-Fi Synthwave Progression
+                const bassNotes = [
+                    73.42, 73.42, 146.83, 73.42,  73.42, 73.42, 146.83, 73.42,
+                    87.31, 87.31, 174.61, 87.31,  65.41, 65.41, 130.81, 69.30
+                ];
+                const arpNotes = [
+                    293.66, 349.23, 440.00, 587.33, 440.00, 349.23, 523.25, 440.00,
+                    293.66, 349.23, 466.16, 587.33, 659.25, 587.33, 440.00, 349.23
+                ];
+
+                this.bgmInterval = setInterval(() => {
+                    if (!state.isPlaying || !this.ctx) return;
+                    const now = this.ctx.currentTime;
+                    const step = this.stepIndex % 16;
+
+                    // 1. Punchy Four-on-the-floor Kick (steps 0, 4, 8, 12)
+                    if (step % 4 === 0) {
+                        this.triggerKick(now);
+                    }
+                    // 2. Crisp Cyber Snare (steps 4, 12)
+                    if (step === 4 || step === 12) {
+                        this.triggerSnare(now);
+                    }
+                    // 3. 16th-note Hi-Hat
+                    this.triggerHat(now, step % 2 === 0 ? 0.12 : 0.05);
+
+                    // 4. Driving Rolling Synth Bass
+                    this.triggerBass(now, bassNotes[step]);
+
+                    // 5. High-Voltage Argon Arpeggiator
+                    const sceneIntensity = 1 + (state.activeSceneIndex * 0.15);
+                    this.triggerArp(now, arpNotes[step] * (state.activeSceneIndex === 5 ? 1.5 : 1), sceneIntensity);
+
+                    this.stepIndex++;
+                }, stepMs);
+            }
+
+            stopBGM() {
+                if (this.bgmInterval) {
+                    clearInterval(this.bgmInterval);
+                    this.bgmInterval = null;
+                }
+            }
+
+            triggerKick(now) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(135, now);
+                osc.frequency.exponentialRampToValueAtTime(32, now + 0.14);
+
+                gain.gain.setValueAtTime(0.85, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+                osc.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(now);
+                osc.stop(now + 0.23);
+            }
+
+            triggerSnare(now) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(900, now);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.32, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.bgmGain);
+                noise.start(now);
+                noise.stop(now + 0.16);
+            }
+
+            triggerHat(now, amp) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(8500, now);
+                filter.Q.value = 2.0;
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(amp, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.bgmGain);
+                noise.start(now);
+                noise.stop(now + 0.055);
+            }
+
+            triggerBass(now, freq) {
+                const osc = this.ctx.createOscillator();
+                const filter = this.ctx.createBiquadFilter();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now);
+
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(650, now);
+                filter.frequency.exponentialRampToValueAtTime(140, now + 0.11);
+                filter.Q.value = 4.5;
+
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(now);
+                osc.stop(now + 0.13);
+            }
+
+            triggerArp(now, freq, intensity = 1) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now);
+
+                gain.gain.setValueAtTime(0.14 * Math.min(intensity, 1.5), now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+                osc.connect(gain);
+                gain.connect(this.bgmGain);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            }
+
+            /* --- PROCEDURAL CINEMATIC SOUND EFFECTS (SFX) --- */
+            playTransitionImpact() {
+                if (!this.ctx || !state.sfxEnabled) return;
+                const now = this.ctx.currentTime;
+
+                // 1. Sub-Bass Drop + Cinematic Braaam Chord
+                const freqs = [55, 110, 146.83, 220];
+                freqs.forEach((f, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = idx === 0 ? 'sine' : 'sawtooth';
+                    osc.frequency.setValueAtTime(f * 1.15, now);
+                    osc.frequency.exponentialRampToValueAtTime(f * 0.5, now + 0.65);
+
+                    gain.gain.setValueAtTime(idx === 0 ? 0.7 : 0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+                    osc.connect(gain);
+                    gain.connect(this.sfxGain);
+                    osc.start(now);
+                    osc.stop(now + 0.72);
+                });
+
+                // 2. High-Speed Whoosh Noise Sweep
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.noiseBuffer;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.Q.value = 3.0;
+                filter.frequency.setValueAtTime(300, now);
+                filter.frequency.exponentialRampToValueAtTime(3800, now + 0.18);
+                filter.frequency.exponentialRampToValueAtTime(220, now + 0.45);
+
+                const nGain = this.ctx.createGain();
+                nGain.gain.setValueAtTime(0.45, now);
+                nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+
+                noise.connect(filter);
+                filter.connect(nGain);
+                nGain.connect(this.sfxGain);
+                noise.start(now);
+                noise.stop(now + 0.5);
+            }
+
+            playTelemetryTick() {
+                if (!this.ctx || !state.sfxEnabled) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1800 + Math.random() * 600, now);
+                gain.gain.setValueAtTime(0.07, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+                osc.connect(gain);
+                gain.connect(this.sfxGain);
+                osc.start(now);
+                osc.stop(now + 0.03);
+            }
+
+            getSpectrumData() {
+                if (!this.analyser) return null;
+                this.analyser.getByteFrequencyData(this.freqData);
+                return this.freqData;
+            }
+        }
+
+        const audioEngine = new ArgonAudioEngine();
+
+        /*************************************************************************
+         * 3. DUAL AI VOICEOVER ENGINE (WEB SPEECH API + GEMINI 2.5 FLASH TTS)
+         *************************************************************************/
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWavBlob(pcm16, sampleRate = 24000) {
+            const numChannels = 1;
+            const byteRate = sampleRate * numChannels * 2;
+            const blockAlign = numChannels * 2;
+            const dataSize = pcm16.length * 2;
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            const writeStr = (offset, str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset + i, str.charCodeAt(i));
+                }
+            };
+
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, 16, true);
+            writeStr(36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true);
+            }
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        async function fetchWithBackoff(url, options, retries = 3) {
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const res = await fetch(url, options);
+                    if (res.ok) return await res.json();
+                } catch (e) {
+                    // Exponential backoff retry
+                }
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+            }
+            throw new Error("TTS API Request Failed");
+        }
+
+        async function synthesizeGeminiNeuralVoice() {
+            if (state.geminiTtsLoading || state.geminiTtsReady) return;
+            state.geminiTtsLoading = true;
+            audioEngine.init();
+
+            const btnLabel = document.getElementById('tts-btn-label');
+            const dot = document.getElementById('tts-status-dot');
+            btnLabel.textContent = "⏳ Gemini 성우 합성 중 (0/6)...";
+            dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            try {
+                for (let i = 0; i < SCENES.length; i++) {
+                    btnLabel.textContent = `⏳ Gemini 성우 합성 중 (${i + 1}/${SCENES.length})...`;
+                    const promptText = `Say in a confident, dramatic, futuristic Korean trailer narrator voice: ${SCENES[i].narration}`;
+                    const payload = {
+                        contents: [{ parts: [{ text: promptText }] }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: {
+                                    prebuiltVoiceConfig: { voiceName: "Kore" }
+                                }
+                            }
+                        },
+                        model: "gemini-2.5-flash-preview-tts"
+                    };
+
+                    const result = await fetchWithBackoff(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    const audioData = part?.inlineData?.data;
+                    const mimeType = part?.inlineData?.mimeType || "audio/L16;rate=24000";
+
+                    if (audioData) {
+                        const rateMatch = mimeType.match(/rate=(\d+)/);
+                        const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                        const pcmBuffer = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmBuffer);
+                        const wavBlob = pcmToWavBlob(pcm16, sampleRate);
+                        const arrayBuf = await wavBlob.arrayBuffer();
+                        const decodedAudio = await audioEngine.ctx.decodeAudioData(arrayBuf);
+                        state.geminiTtsBuffers[i] = decodedAudio;
+                    }
+                }
+
+                state.geminiTtsReady = true;
+                state.geminiTtsLoading = false;
+                btnLabel.textContent = "✅ Gemini Neural 성우 활성화됨";
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+
+                // Restart showreel from 0s with high-definition neural voice
+                seekTo(0);
+                if (!state.isPlaying) togglePlay(true);
+            } catch (err) {
+                state.geminiTtsLoading = false;
+                btnLabel.textContent = "🔊 브라우저 기본 성우 모드 (재시도 가능)";
+                dot.className = "w-2 h-2 rounded-full bg-cyan-400";
+            }
+        }
+
+        function speakSceneNarration(sceneIndex) {
+            const scene = SCENES[sceneIndex];
+            if (!scene) return;
+
+            // Update subtitle bar immediately
+            document.getElementById('subtitle-text').textContent = `🎙️ "${scene.narration}"`;
+
+            if (!state.voiceEnabled) return;
+
+            // Stop previous voice
+            if (state.activeVoiceSource) {
+                try { state.activeVoiceSource.stop(); } catch (e) {}
+                state.activeVoiceSource = null;
+            }
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+
+            // Priority 1: Play cached Gemini 2.5 Flash Neural TTS Buffer if synthesized
+            if (state.geminiTtsReady && state.geminiTtsBuffers[sceneIndex] && audioEngine.ctx) {
+                const source = audioEngine.ctx.createBufferSource();
+                source.buffer = state.geminiTtsBuffers[sceneIndex];
+                source.connect(audioEngine.voiceGain);
+                source.start(0);
+                state.activeVoiceSource = source;
+                return;
+            }
+
+            // Priority 2: Instant Zero-Latency Web Speech API Korean Narration
+            if ('speechSynthesis' in window) {
+                const utter = new SpeechSynthesisUtterance(scene.narration);
+                utter.lang = 'ko-KR';
+                utter.rate = 1.12;
+                utter.pitch = 0.95;
+                const voices = window.speechSynthesis.getVoices();
+                const korVoice = voices.find(v => v.lang.includes('ko') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Heami') || v.name.includes('Yuna')))
+                              || voices.find(v => v.lang.includes('ko'));
+                if (korVoice) utter.voice = korVoice;
+                window.speechSynthesis.speak(utter);
+            }
+        }
+
+        /*************************************************************************
+         * 4. THREE.JS 3D WEBGL MOTION GRAPHICS ENGINE (3,200 MORPHING PARTICLES)
+         *************************************************************************/
+        const webglCanvas = document.getElementById('webgl-canvas');
+        const scene3D = new THREE.Scene();
+        scene3D.fog = new THREE.FogExp2(0x05050c, 0.018);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 28);
+
+        const renderer = new THREE.WebGLRenderer({
+            canvas: webglCanvas,
+            antialias: true,
+            alpha: false,
+            preserveDrawingBuffer: true
+        });
+        renderer.setClearColor(0x04040a, 1);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Central Argon Core Wireframe Icosahedron + Inner Plasma Sphere
+        const coreGroup = new THREE.Group();
+        scene3D.add(coreGroup);
+
+        const icoGeo = new THREE.IcosahedronGeometry(5.2, 2);
+        const icoMat = new THREE.MeshBasicMaterial({
+            color: 0x06b6d4,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.32
+        });
+        const coreWireframe = new THREE.Mesh(icoGeo, icoMat);
+        coreGroup.add(coreWireframe);
+
+        const innerGeo = new THREE.OctahedronGeometry(3.2, 3);
+        const innerMat = new THREE.MeshBasicMaterial({
+            color: 0x8b5cf6,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.45
+        });
+        const innerCore = new THREE.Mesh(innerGeo, innerMat);
+        coreGroup.add(innerCore);
+
+        // 3 Orbital Electron Rings (Argon = 3 shells: 2, 8, 8)
+        const orbitalRings = [];
+        const shellRadii = [6.8, 9.8, 13.0];
+        shellRadii.forEach((radius, idx) => {
+            const ringGeo = new THREE.TorusGeometry(radius, 0.045, 16, 120);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: idx === 0 ? 0x06b6d4 : (idx === 1 ? 0x8b5cf6 : 0xec4899),
+                transparent: true,
+                opacity: 0.45
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / (2.2 + idx * 0.5);
+            ring.rotation.y = idx * 0.8;
+            coreGroup.add(ring);
+            orbitalRings.push(ring);
+        });
+
+        // 3,200 Morphing Particles with 6 Target Formations (One per Scene)
+        const PARTICLE_COUNT = 3200;
+        const pGeometry = new THREE.BufferGeometry();
+        const currentPositions = new Float32Array(PARTICLE_COUNT * 3);
+        const colors = new Float32Array(PARTICLE_COUNT * 3);
+        const targetFormations = [[], [], [], [], [], []];
+
+        const palette = [
+            new THREE.Color(0x06b6d4), // Argon Cyan
+            new THREE.Color(0x8b5cf6), // Argon Violet
+            new THREE.Color(0xec4899), // Plasma Magenta
+            new THREE.Color(0x60a5fa)  // Electric Blue
+        ];
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const c = palette[i % palette.length];
+            colors[i * 3] = c.r;
+            colors[i * 3 + 1] = c.g;
+            colors[i * 3 + 2] = c.b;
+
+            // FORMATION 0: Atomic Argon-18 Orbital Shells
+            const shell = shellRadii[i % 3] + (Math.random() - 0.5) * 1.4;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            targetFormations[0].push(
+                shell * Math.sin(phi) * Math.cos(theta),
+                shell * Math.sin(phi) * Math.sin(theta),
+                shell * Math.cos(phi)
+            );
+
+            // FORMATION 1: 1,000,000 Token Hypercube / Tesseract Warp Tunnel
+            const lane = (i % 4) - 1.5;
+            const zDepth = ((i / PARTICLE_COUNT) * 60) - 30;
+            const boxEdge = 11;
+            const side = i % 4;
+            let tx = (Math.random() - 0.5) * boxEdge * 2;
+            let ty = (Math.random() - 0.5) * boxEdge * 2;
+            if (side === 0) tx = -boxEdge;
+            if (side === 1) tx = boxEdge;
+            if (side === 2) ty = -boxEdge;
+            if (side === 3) ty = boxEdge;
+            targetFormations[1].push(tx, ty, zDepth);
+
+            // FORMATION 2: Vals Index #1 Ascending Data Pillars
+            const col = (i % 5) - 2;
+            const px = col * 6.5 + (Math.random() - 0.5) * 2.2;
+            const maxH = (col + 3) * 4.2;
+            const py = (Math.random() * maxH) - 10;
+            const pz = (Math.random() - 0.5) * 6;
+            targetFormations[2].push(px, py, pz);
+
+            // FORMATION 3: 32,000 Lines of Rust Double-Helix DNA / Code Matrix
+            const tHelix = (i / PARTICLE_COUNT) * Math.PI * 10;
+            const strand = i % 2 === 0 ? 1 : -1;
+            targetFormations[3].push(
+                Math.cos(tHelix) * 9 * strand + (Math.random() - 0.5),
+                ((i / PARTICLE_COUNT) * 34) - 17,
+                Math.sin(tHelix) * 9 * strand + (Math.random() - 0.5)
+            );
+
+            // FORMATION 4: Multi-Agent Constellation Network Sphere
+            const rNet = 14 + (i % 7) * 1.2;
+            targetFormations[4].push(
+                rNet * Math.sin(phi) * Math.cos(theta),
+                rNet * Math.cos(phi) * 0.75,
+                rNet * Math.sin(phi) * Math.sin(theta)
+            );
+
+            // FORMATION 5: Gemini 4-Point Star Supernova Emblem
+            const angle = (i / PARTICLE_COUNT) * Math.PI * 2;
+            const starRadius = (Math.pow(Math.abs(Math.cos(angle * 2)), 2.5) * 14 + 2) * Math.random();
+            targetFormations[5].push(
+                Math.cos(angle) * starRadius,
+                Math.sin(angle) * starRadius,
+                (Math.random() - 0.5) * 4
+            );
+
+            // Initialize at Formation 0
+            currentPositions[i * 3] = targetFormations[0][i * 3];
+            currentPositions[i * 3 + 1] = targetFormations[0][i * 3 + 1];
+            currentPositions[i * 3 + 2] = targetFormations[0][i * 3 + 2];
+        }
+
+        pGeometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
+        pGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const pMaterial = new THREE.PointsMaterial({
+            size: 0.22,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particleSystem = new THREE.Points(pGeometry, pMaterial);
+        scene3D.add(particleSystem);
+
+        // Interactive Mouse Parallax
+        const mouse = { x: 0, y: 0 };
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth - 0.5) * 2;
+            mouse.y = -(e.clientY / window.innerHeight - 0.5) * 2;
+        });
+
+        /*************************************************************************
+         * 5. 2D HUD OVERLAY, AUDIO SPECTRUM, SHOCKWAVES & COMPOSITE RECORDER
+         *************************************************************************/
+        const hudCanvas = document.getElementById('hud-canvas');
+        const hudCtx = hudCanvas.getContext('2d');
+
+        // Offscreen composite canvas for 60FPS WebM Video Recording (combines 3D + 2D HUD + Titles)
+        const compositeCanvas = document.createElement('canvas');
+        const compCtx = compositeCanvas.getContext('2d');
+
+        function resizeStage() {
+            const wrapper = document.getElementById('stage-wrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const w = Math.max(rect.width, 320);
+            const h = Math.max(rect.height, 240);
+
+            renderer.setSize(w, h, false);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            hudCanvas.width = w * dpr;
+            hudCanvas.height = h * dpr;
+            hudCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            compositeCanvas.width = 1280;
+            compositeCanvas.height = state.aspectRatio === '9:16' ? 2275 : 720;
+        }
+
+        window.addEventListener('resize', resizeStage);
+
+        function spawnShockwave(color = '#06b6d4') {
+            const wrapper = document.getElementById('stage-wrapper');
+            const rect = wrapper.getBoundingClientRect();
+            state.shockwaves.push({
+                x: rect.width / 2,
+                y: rect.height / 2,
+                radius: 20,
+                maxRadius: Math.max(rect.width, rect.height) * 0.75,
+                alpha: 0.9,
+                color
+            });
+            state.glitchIntensity = 1.0;
+            state.cameraShake = 0.85;
+        }
+
+        function render2DHud(dt) {
+            const wrapper = document.getElementById('stage-wrapper');
+            const w = wrapper.clientWidth;
+            const h = wrapper.clientHeight;
+            hudCtx.clearRect(0, 0, w, h);
+
+            // 1. Subtle Corner Targeting Brackets
+            hudCtx.strokeStyle = 'rgba(6, 182, 212, 0.35)';
+            hudCtx.lineWidth = 1.5;
+            const bSize = 18;
+            const pad = 16;
+            // Top-Left
+            hudCtx.beginPath();
+            hudCtx.moveTo(pad, pad + bSize); hudCtx.lineTo(pad, pad); hudCtx.lineTo(pad + bSize, pad);
+            // Top-Right
+            hudCtx.moveTo(w - pad - bSize, pad); hudCtx.lineTo(w - pad, pad); hudCtx.lineTo(w - pad, pad + bSize);
+            // Bottom-Left
+            hudCtx.moveTo(pad, h - pad - bSize); hudCtx.lineTo(pad, h - pad); hudCtx.lineTo(pad + bSize, h - pad);
+            // Bottom-Right
+            hudCtx.moveTo(w - pad - bSize, h - pad); hudCtx.lineTo(w - pad, h - pad); hudCtx.lineTo(w - pad, h - pad - bSize);
+            hudCtx.stroke();
+
+            // 2. Expanding Shockwave Rings on Beat / Scene Cuts
+            for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+                const sw = state.shockwaves[i];
+                sw.radius = Math.max(0.1, sw.radius + Math.max(0, dt) * 950);
+                sw.alpha *= 0.92;
+                hudCtx.save();
+                hudCtx.beginPath();
+                hudCtx.arc(sw.x, sw.y, Math.max(0.1, sw.radius), 0, Math.PI * 2);
+                hudCtx.strokeStyle = sw.color;
+                hudCtx.globalAlpha = Math.max(0, sw.alpha);
+                hudCtx.lineWidth = 3;
+                hudCtx.stroke();
+                hudCtx.restore();
+                if (sw.radius > sw.maxRadius || sw.alpha < 0.02) {
+                    state.shockwaves.splice(i, 1);
+                }
+            }
+
+            // 3. Real-Time Audio Frequency Spectrum Bars (Bottom Left & Right)
+            const freqData = audioEngine.getSpectrumData();
+            const barCount = 28;
+            const barWidth = 4;
+            const gap = 3;
+            const baseY = h - 22;
+
+            for (let i = 0; i < barCount; i++) {
+                let val = 0;
+                if (freqData && state.isPlaying) {
+                    val = (freqData[i] / 255) * 48;
+                } else {
+                    val = (Math.sin(state.currentTime * 6 + i * 0.4) * 0.5 + 0.5) * 10;
+                }
+                const bh = Math.max(3, val);
+                hudCtx.fillStyle = i % 2 === 0 ? 'rgba(6, 182, 212, 0.65)' : 'rgba(139, 92, 246, 0.65)';
+                // Left visualizer
+                hudCtx.fillRect(28 + i * (barWidth + gap), baseY - bh, barWidth, bh);
+                // Right mirrored visualizer
+                hudCtx.fillRect(w - 28 - (i + 1) * (barWidth + gap), baseY - bh, barWidth, bh);
+            }
+
+            // 4. Glitch Scan-Slice Bars during Scene Transitions
+            if (state.glitchIntensity > 0.05) {
+                const slices = 6;
+                for (let s = 0; s < slices; s++) {
+                    const sy = Math.random() * h;
+                    const sh = 4 + Math.random() * 18;
+                    const sx = (Math.random() - 0.5) * 60 * state.glitchIntensity;
+                    hudCtx.fillStyle = s % 2 === 0 ? 'rgba(6, 182, 212, 0.22)' : 'rgba(236, 72, 153, 0.22)';
+                    hudCtx.fillRect(sx, sy, w, sh);
+                }
+                state.glitchIntensity *= 0.88;
+            }
+        }
+
+        /*************************************************************************
+         * 6. KINETIC TYPOGRAPHY CHOREOGRAPHY & TIMELINE SYNCHRONIZATION
+         *************************************************************************/
+        let lastTickCounter = 0;
+
+        function updateKineticScenes(t) {
+            // Find which scene owns time `t`
+            let sceneIdx = SCENES.findIndex(s => t >= s.start && t < s.end);
+            if (sceneIdx === -1) sceneIdx = SCENES.length - 1;
+
+            // Trigger Scene Cut if changed
+            if (sceneIdx !== state.activeSceneIndex) {
+                state.activeSceneIndex = sceneIdx;
+
+                // Toggle active class on DOM scenes
+                SCENES.forEach((s, idx) => {
+                    const el = document.getElementById(`scene-${idx}`);
+                    if (el) el.classList.toggle('active', idx === sceneIdx);
+                });
+
+                // Highlight top navigation pill
+                document.querySelectorAll('.scene-jump-btn').forEach((btn, idx) => {
+                    if (idx === sceneIdx) {
+                        btn.className = "scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all bg-violet-600 text-white shadow-md shadow-violet-500/40";
+                    } else {
+                        btn.className = "scene-jump-btn px-2.5 py-1 rounded-lg text-xs font-mono-tech font-bold transition-all text-slate-400 hover:text-white";
+                    }
+                });
+
+                // Update HUD Telemetry
+                document.getElementById('hud-scene-code').textContent = SCENES[sceneIdx].code;
+
+                // Trigger Shockwave + Procedural Transition Impact + AI Voiceover
+                spawnShockwave(sceneIdx % 2 === 0 ? '#06b6d4' : '#ec4899');
+                if (state.isPlaying) {
+                    audioEngine.playTransitionImpact();
+                    speakSceneNarration(sceneIdx);
+                }
+            }
+
+            // Local progress within current scene (0.0 -> 1.0)
+            const currentScene = SCENES[sceneIdx];
+            const sceneElapsed = Math.max(0, t - currentScene.start);
+            const sceneDuration = currentScene.end - currentScene.start;
+            const progress = Math.min(1, sceneElapsed / sceneDuration);
+
+            // Smooth spring entry & exit scale/opacity on active scene container
+            const activeEl = document.getElementById(`scene-${sceneIdx}`);
+            if (activeEl) {
+                const entryProgress = Math.min(1, sceneElapsed / 0.45);
+                const easeOutBack = 1 + 1.7 * Math.pow(entryProgress - 1, 3) + 0.7 * Math.pow(entryProgress - 1, 2);
+                const scale = 0.88 + 0.12 * easeOutBack;
+                activeEl.style.transform = `scale(${scale.toFixed(3)})`;
+                activeEl.style.opacity = Math.min(1, sceneElapsed / 0.25);
+            }
+
+            // Scene-specific live animated counters & kinetic bars
+            if (sceneIdx === 1) {
+                // Scene 2: 64,000 -> 1,000,000 Output Tokens Counter
+                const countProg = Math.min(1, sceneElapsed / 2.2);
+                const eased = 1 - Math.pow(1 - countProg, 3);
+                const val = Math.floor(64000 + (1000000 - 64000) * eased);
+                document.getElementById('s1-counter').textContent = val.toLocaleString();
+                const mult = (1.0 + (15.6 - 1.0) * eased).toFixed(1);
+                document.getElementById('s1-multiplier').textContent = `${mult}x EXPANDED`;
+                document.getElementById('s1-bar-fill').style.width = `${(6.4 + 93.6 * eased).toFixed(1)}%`;
+
+                if (state.isPlaying && countProg < 1 && t - lastTickCounter > 0.08) {
+                    audioEngine.playTelemetryTick();
+                    lastTickCounter = t;
+                }
+            } else if (sceneIdx === 2) {
+                // Scene 3: Vals Index 0.00% -> 68.90%
+                const countProg = Math.min(1, sceneElapsed / 1.8);
+                const eased = 1 - Math.pow(1 - countProg, 3);
+                const score = (68.90 * eased).toFixed(2);
+                document.getElementById('s2-score').textContent = `${score}%`;
+                document.getElementById('s2-bar-1').style.width = `${(92 * eased).toFixed(1)}%`;
+            } else if (sceneIdx === 3) {
+                // Scene 4: 1.00x -> 2.70x Speedup & 32,000 LOC
+                const countProg = Math.min(1, sceneElapsed / 2.0);
+                const eased = 1 - Math.pow(1 - countProg, 3);
+                const speed = (1.0 + 1.7 * eased).toFixed(2);
+                const lines = Math.floor(32000 * eased);
+                document.getElementById('s3-speed').textContent = `${speed}x`;
+                document.getElementById('s3-lines').textContent = `${lines.toLocaleString()}+`;
+            }
+        }
+
+        /*************************************************************************
+         * 7. MASTER 60FPS ANIMATION LOOP & 1-CLICK VIDEO RECORDER
+         *************************************************************************/
+        function renderCompositeFrameForVideo() {
+            if (!state.isRecording) return;
+            const cw = compositeCanvas.width;
+            const ch = compositeCanvas.height;
+
+            // 1. Draw 3D WebGL Canvas
+            compCtx.fillStyle = '#04040a';
+            compCtx.fillRect(0, 0, cw, ch);
+            compCtx.drawImage(webglCanvas, 0, 0, cw, ch);
+
+            // 2. Draw 2D HUD & Audio Visualizer Canvas
+            compCtx.drawImage(hudCanvas, 0, 0, cw, ch);
+
+            // 3. Draw Crisp Kinetic Headlines & Subtitle onto Composite Video Stream
+            const scene = SCENES[Math.max(0, state.activeSceneIndex)];
+            compCtx.save();
+            compCtx.textAlign = 'center';
+            compCtx.fillStyle = '#06b6d4';
+            compCtx.font = 'bold 22px "JetBrains Mono", monospace';
+            compCtx.fillText(scene.canvasSub, cw / 2, ch * 0.42);
+
+            compCtx.fillStyle = '#ffffff';
+            compCtx.shadowColor = '#8b5cf6';
+            compCtx.shadowBlur = 28;
+            compCtx.font = '900 74px "Space Grotesk", "Noto Sans KR", sans-serif';
+            compCtx.fillText(scene.canvasHeadline, cw / 2, ch * 0.52);
+
+            // Subtitle box at bottom
+            compCtx.shadowBlur = 0;
+            compCtx.fillStyle = 'rgba(5, 5, 14, 0.82)';
+            compCtx.fillRect(cw * 0.1, ch * 0.84, cw * 0.8, 54);
+            compCtx.fillStyle = '#e2e8f0';
+            compCtx.font = '600 22px "Noto Sans KR", sans-serif';
+            compCtx.fillText(scene.narration, cw / 2, ch * 0.84 + 34);
+            compCtx.restore();
+        }
+
+        function animateLoop(now) {
+            requestAnimationFrame(animateLoop);
+
+            const safeNow = typeof now === 'number' ? now : performance.now();
+            const rawDt = (safeNow - state.lastFrameTime) / 1000;
+            const dt = Math.max(0.001, Math.min(0.1, rawDt));
+            state.lastFrameTime = safeNow;
+
+            // FPS Counter calculation
+            state.frameCounter++;
+            if (safeNow - state.fpsTimer >= 500) {
+                state.fps = Math.min(60, (state.frameCounter * 1000) / (safeNow - state.fpsTimer));
+                document.getElementById('hud-fps').textContent = `${state.fps.toFixed(1)} FPS // WEBGL_2.0`;
+                state.frameCounter = 0;
+                state.fpsTimer = safeNow;
+            }
+
+            // Advance Timeline if playing
+            if (state.isPlaying) {
+                state.currentTime += dt;
+                if (state.currentTime >= TOTAL_DURATION) {
+                    state.currentTime = 0;
+                    state.activeSceneIndex = -1;
+                    if (state.isRecording) {
+                        stopVideoRecording();
+                    }
+                }
+                document.getElementById('timeline-scrubber').value = state.currentTime;
+            }
+
+            // Update Timecode & Scrubber Labels
+            const t = state.currentTime;
+            document.getElementById('time-current').textContent = `${t.toFixed(1)}s`;
+            const secs = Math.floor(t).toString().padStart(2, '0');
+            const frames = Math.floor((t % 1) * 60).toString().padStart(2, '0');
+            document.getElementById('hud-timecode').textContent = `TC 00:00:${secs}:${frames}`;
+
+            // Update Kinetic Typography & Scene Triggers
+            updateKineticScenes(t);
+
+            // Morph 3D Particles smoothly toward current scene's target formation
+            const targetIdx = Math.max(0, state.activeSceneIndex);
+            const targetArr = targetFormations[targetIdx];
+            const posAttr = pGeometry.attributes.position;
+            const posArr = posAttr.array;
+            const morphSpeed = 4.2 * dt;
+
+            for (let i = 0; i < PARTICLE_COUNT * 3; i += 3) {
+                posArr[i] += (targetArr[i] - posArr[i]) * morphSpeed;
+                posArr[i + 1] += (targetArr[i + 1] - posArr[i + 1]) * morphSpeed;
+                posArr[i + 2] += (targetArr[i + 2] - posArr[i + 2]) * morphSpeed;
+            }
+            posAttr.needsUpdate = true;
+
+            // Rotate 3D Core, Orbital Rings & Particle System
+            coreWireframe.rotation.y += dt * 0.55;
+            coreWireframe.rotation.x += dt * 0.35;
+            innerCore.rotation.y -= dt * 0.9;
+            innerCore.rotation.z += dt * 0.6;
+
+            orbitalRings.forEach((ring, idx) => {
+                ring.rotation.z += dt * (0.8 + idx * 0.35);
+                ring.rotation.x += dt * 0.25;
+            });
+
+            particleSystem.rotation.y = t * 0.18 + mouse.x * 0.35;
+            particleSystem.rotation.x = Math.sin(t * 0.3) * 0.15 + mouse.y * 0.25;
+
+            // Dynamic Camera Choreography & Bass Shake
+            const shakeX = (Math.random() - 0.5) * state.cameraShake;
+            const shakeY = (Math.random() - 0.5) * state.cameraShake;
+            state.cameraShake *= 0.88;
+
+            const targetZ = targetIdx === 1 ? 20 : (targetIdx === 5 ? 24 : 28);
+            camera.position.z += (targetZ - camera.position.z) * 3 * dt;
+            camera.position.x = mouse.x * 2.5 + shakeX;
+            camera.position.y = mouse.y * 1.8 + shakeY;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene3D, camera);
+            render2DHud(dt);
+            renderCompositeFrameForVideo();
+        }
+
+        /*************************************************************************
+         * 8. STUDIO CONTROLS, INTERACTIVE SCRUBBER & VIDEO RECORDING
+         *************************************************************************/
+        function togglePlay(forceState) {
+            audioEngine.init();
+            const nextState = typeof forceState === 'boolean' ? forceState : !state.isPlaying;
+            state.isPlaying = nextState;
+
+            const playBtn = document.getElementById('btn-play-pause');
+            if (state.isPlaying) {
+                playBtn.textContent = '⏸';
+                audioEngine.startBGM();
+                speakSceneNarration(Math.max(0, state.activeSceneIndex));
+            } else {
+                playBtn.textContent = '▶';
+                audioEngine.stopBGM();
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                if (state.activeVoiceSource) {
+                    try { state.activeVoiceSource.stop(); } catch (e) {}
+                }
+            }
+        }
+
+        function seekTo(newTime) {
+            state.currentTime = Math.max(0, Math.min(TOTAL_DURATION - 0.05, parseFloat(newTime)));
+            state.activeSceneIndex = -1; // Force scene re-sync
+            document.getElementById('timeline-scrubber').value = state.currentTime;
+            updateKineticScenes(state.currentTime);
+        }
+
+        function startVideoRecording() {
+            if (state.isRecording) {
+                stopVideoRecording();
+                return;
+            }
+            audioEngine.init();
+            resizeStage();
+
+            try {
+                const canvasStream = compositeCanvas.captureStream(60);
+                const audioTracks = audioEngine.streamDest.stream.getAudioTracks();
+                if (audioTracks.length > 0) {
+                    canvasStream.addTrack(audioTracks[0]);
+                }
+
+                const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                    ? 'video/webm;codecs=vp9,opus'
+                    : 'video/webm';
+
+                state.recordedChunks = [];
+                state.mediaRecorder = new MediaRecorder(canvasStream, {
+                    mimeType,
+                    videoBitsPerSecond: 8000000
+                });
+
+                state.mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) state.recordedChunks.push(e.data);
+                };
+
+                state.mediaRecorder.onstop = () => {
+                    const blob = new Blob(state.recordedChunks, { type: 'video/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `gemini-4-argon-showreel-${Date.now()}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                };
+
+                state.isRecording = true;
+                state.mediaRecorder.start(200);
+
+                document.getElementById('rec-label').textContent = "⏹ 녹화 중지 및 저장";
+                document.getElementById('rec-dot').className = "w-2 h-2 rounded-full bg-white animate-ping";
+
+                // Start from 00:00 for a clean full-reel capture
+                seekTo(0);
+                togglePlay(true);
+            } catch (err) {
+                document.getElementById('subtitle-text').textContent = "⚠️ 현재 브라우저 환경에서 MediaRecorder 스트림 캡처가 제한되어 실시간 프리뷰로 작동합니다.";
+            }
+        }
+
+        function stopVideoRecording() {
+            if (!state.isRecording || !state.mediaRecorder) return;
+            state.isRecording = false;
+            try { state.mediaRecorder.stop(); } catch (e) {}
+            document.getElementById('rec-label').textContent = "🎬 60FPS 영상 녹화";
+            document.getElementById('rec-dot').className = "w-2 h-2 rounded-full bg-rose-500";
+        }
+
+        // Event Listeners Setup
+        document.getElementById('btn-launch-showreel').addEventListener('click', () => {
+            const overlay = document.getElementById('start-overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.classList.add('hidden'), 450);
+            seekTo(0);
+            togglePlay(true);
+        });
+
+        document.getElementById('btn-play-pause').addEventListener('click', () => togglePlay());
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            seekTo(0);
+            togglePlay(true);
+        });
+        document.getElementById('btn-replay-finale').addEventListener('click', () => {
+            seekTo(0);
+            togglePlay(true);
+        });
+
+        document.getElementById('timeline-scrubber').addEventListener('input', (e) => {
+            seekTo(e.target.value);
+        });
+
+        document.querySelectorAll('.scene-jump-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.getAttribute('data-scene'), 10);
+                if (SCENES[idx]) {
+                    seekTo(SCENES[idx].start + 0.02);
+                    if (!state.isPlaying) togglePlay(true);
+                }
+            });
+        });
+
+        // Aspect Ratio Buttons
+        document.getElementById('btn-aspect-16-9').addEventListener('click', () => {
+            state.aspectRatio = '16:9';
+            const wrapper = document.getElementById('stage-wrapper');
+            wrapper.className = "relative aspect-16-9 overflow-hidden bg-[#05050c] flex items-center justify-center";
+            document.getElementById('btn-aspect-16-9').className = "px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-all";
+            document.getElementById('btn-aspect-9-16').className = "px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold text-slate-400 hover:text-white transition-all";
+            setTimeout(resizeStage, 460);
+        });
+
+        document.getElementById('btn-aspect-9-16').addEventListener('click', () => {
+            state.aspectRatio = '9:16';
+            const wrapper = document.getElementById('stage-wrapper');
+            wrapper.className = "relative aspect-9-16 overflow-hidden bg-[#05050c] flex items-center justify-center";
+            document.getElementById('btn-aspect-9-16').className = "px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 transition-all";
+            document.getElementById('btn-aspect-16-9').className = "px-2.5 py-1 rounded-md text-xs font-mono-tech font-bold text-slate-400 hover:text-white transition-all";
+            setTimeout(resizeStage, 460);
+        });
+
+        // Audio Mixer Buttons
+        document.getElementById('toggle-bgm').addEventListener('click', (e) => {
+            state.bgmEnabled = !state.bgmEnabled;
+            if (audioEngine.bgmGain) audioEngine.bgmGain.gain.value = state.bgmEnabled ? 0.42 : 0;
+            e.currentTarget.textContent = state.bgmEnabled ? "🎵 BGM ON" : "🔇 BGM OFF";
+            e.currentTarget.style.opacity = state.bgmEnabled ? "1" : "0.45";
+        });
+
+        document.getElementById('toggle-sfx').addEventListener('click', (e) => {
+            state.sfxEnabled = !state.sfxEnabled;
+            if (audioEngine.sfxGain) audioEngine.sfxGain.gain.value = state.sfxEnabled ? 0.65 : 0;
+            e.currentTarget.textContent = state.sfxEnabled ? "💥 SFX ON" : "🔇 SFX OFF";
+            e.currentTarget.style.opacity = state.sfxEnabled ? "1" : "0.45";
+        });
+
+        document.getElementById('toggle-voice').addEventListener('click', (e) => {
+            state.voiceEnabled = !state.voiceEnabled;
+            if (audioEngine.voiceGain) audioEngine.voiceGain.gain.value = state.voiceEnabled ? 1.0 : 0;
+            if (!state.voiceEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+            e.currentTarget.textContent = state.voiceEnabled ? "🗣️ VOICE ON" : "🔇 VOICE OFF";
+            e.currentTarget.style.opacity = state.voiceEnabled ? "1" : "0.45";
+        });
+
+        // Gemini Neural TTS & Video Record Buttons
+        document.getElementById('btn-gemini-tts').addEventListener('click', synthesizeGeminiNeuralVoice);
+        document.getElementById('btn-record').addEventListener('click', startVideoRecording);
+
+        // Keyboard Shortcuts (Space = Play/Pause, R = Restart)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlay();
+            } else if (e.code === 'KeyR') {
+                seekTo(0);
+                togglePlay(true);
+            }
+        });
+
+        // Initialize on Window Load
+        window.onload = function () {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.getVoices();
+            }
+            resizeStage();
+            state.lastFrameTime = performance.now();
+            requestAnimationFrame(animateLoop);
+        };
+    </script>
+</body>
+</html>

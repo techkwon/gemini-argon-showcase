@@ -1,0 +1,3077 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ARGON PHYSICS LAB | 손끝으로 움직이는 물리</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Pretendard / Noto Sans KR & JetBrains Mono for tabular numbers -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <!-- Three.js r128 CDN (with automatic 2D projection fallback if offline/blocked) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    :root {
+      --bg-deep: #040711;
+      --bg-panel: rgba(8, 13, 28, 0.80);
+      --border-cyan: rgba(0, 242, 254, 0.28);
+      --neon-cyan: #00f2fe;
+      --neon-purple: #a855f7;
+      --neon-gold: #fbbf24;
+      --neon-emerald: #10b981;
+      --neon-rose: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-deep);
+      font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #f8fafc;
+    }
+
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Glassmorphism panels */
+    .glass-panel {
+      background: linear-gradient(145deg, rgba(11, 18, 38, 0.86) 0%, rgba(6, 10, 24, 0.90) 100%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      box-shadow: 0 12px 40px -10px rgba(0, 0, 0, 0.75), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    }
+
+    .glass-pill {
+      background: rgba(9, 15, 32, 0.82);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Custom Cyber Sliders */
+    input[type="range"].cyber-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"].cyber-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #00f2fe;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.9);
+      cursor: grab;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    input[type="range"].cyber-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #38bdf8;
+    }
+
+    input[type="range"].cyber-slider::-webkit-slider-thumb:active {
+      cursor: grabbing;
+      transform: scale(1.05);
+    }
+
+    /* Launch Button Pulse */
+    .btn-launch {
+      background: linear-gradient(135deg, #00f2fe 0%, #0284c7 50%, #7c3aed 100%);
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-launch:hover {
+      transform: translateY(-1px) scale(1.01);
+      box-shadow: 0 0 35px rgba(0, 242, 254, 0.75), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+    }
+    .btn-launch:active {
+      transform: translateY(1px) scale(0.99);
+    }
+
+    /* Mode Tab Active Glow */
+    .mode-tab-active {
+      background: linear-gradient(135deg, rgba(0, 242, 254, 0.22) 0%, rgba(139, 92, 246, 0.22) 100%);
+      border-color: #00f2fe !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.3), inset 0 0 12px rgba(0, 242, 254, 0.15);
+    }
+
+    /* Custom Scrollbars for side panels */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.35);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 242, 254, 0.65);
+    }
+
+    /* Presentation Mode (Enlarged HUD, streamlined layout for classroom projector) */
+    body.presentation-mode .hide-in-presentation {
+      display: none !important;
+    }
+    body.presentation-mode .scale-in-presentation {
+      transform: scale(1.08);
+      transform-origin: top left;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden select-none bg-[#040711]">
+
+  <!-- =====================================================================
+       1. FULL-VIEWPORT INTERACTIVE 3D STAGE (OCCUPIES >70% OF VISUAL FIELD)
+       ===================================================================== -->
+  <div id="stage-container" class="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing">
+    <!-- Three.js WebGL Canvas mounts here -->
+    <canvas id="webgl-canvas" class="w-full h-full block"></canvas>
+    <!-- Fallback / Optional 2D Isometric Projection Canvas -->
+    <canvas id="fallback-2d-canvas" class="w-full h-full hidden"></canvas>
+  </div>
+
+  <!-- Subtle Radial Vignette & Holographic Scanline Overlay (Non-blocking) -->
+  <div class="pointer-events-none absolute inset-0 z-[1]"
+       style="background: radial-gradient(circle at 52% 48%, transparent 55%, rgba(3, 6, 17, 0.72) 100%);"></div>
+
+  <!-- Live Slow-Motion / Tour Banner Overlay -->
+  <div id="stage-alert-banner" class="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-30 hidden">
+    <div class="glass-pill px-5 py-2 rounded-full border border-amber-400/60 flex items-center gap-2.5 shadow-[0_0_30px_rgba(251,191,36,0.35)]">
+      <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+      <span id="stage-alert-text" class="text-sm md:text-base font-bold text-amber-300 tracking-wide">충돌 임팩트 슬로모션 작동 중 (0.15x)</span>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       2. TOP NAVIGATION BAR (BRAND, 3 EXPERIMENT MODES, TEACHER TOOLS)
+       ===================================================================== -->
+  <header class="fixed top-0 left-0 right-0 z-20 px-3 py-2.5 md:px-5 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <!-- Brand Identity -->
+    <div class="glass-panel px-3.5 py-2 rounded-2xl flex items-center gap-3 pointer-events-auto">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 via-sky-500 to-purple-600 flex items-center justify-center shadow-[0_0_16px_rgba(0,242,254,0.5)]">
+        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+          <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          <ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(30 12 12)"/>
+          <ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-30 12 12)"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-extrabold tracking-widest text-cyan-400 uppercase">ARGON PHYSICS LAB</span>
+          <span id="renderer-badge" class="text-[10px] font-mono-num px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">WebGL 3D</span>
+        </div>
+        <h1 class="text-sm md:text-base font-black text-white tracking-tight leading-tight">손끝으로 움직이는 물리 실험실</h1>
+      </div>
+    </div>
+
+    <!-- 3 Core Experiment Mode Selector Tabs -->
+    <nav class="glass-panel p-1.5 rounded-2xl flex items-center gap-1.5 pointer-events-auto" aria-label="실험 모드 선택">
+      <button id="tab-projectile" onclick="switchMode('projectile')"
+              class="mode-tab-active px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 border border-transparent transition-all flex items-center gap-2">
+        <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M3 20c4-10 10-14 18-14" stroke-dasharray="3 2"/>
+          <circle cx="19" cy="6" r="3" fill="currentColor"/>
+          <path d="M3 20h18"/>
+        </svg>
+        <span>1. 투사체 연구소</span>
+      </button>
+      <button id="tab-collision" onclick="switchMode('collision')"
+              class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 border border-transparent hover:text-white transition-all flex items-center gap-2">
+        <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="7" cy="12" r="4"/>
+          <circle cx="17" cy="12" r="4"/>
+          <path d="M12 7l-1 2 2 1-1 2M12 17l-1-2 2-1-1-2"/>
+        </svg>
+        <span>2. 충돌 아레나</span>
+      </button>
+      <button id="tab-pendulum" onclick="switchMode('pendulum')"
+              class="px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold text-slate-300 border border-transparent hover:text-white transition-all flex items-center gap-2">
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M6 3h12M12 3v11"/>
+          <circle cx="12" cy="17" r="3.5"/>
+          <path d="M5 16a9 9 0 0 0 14 0" stroke-dasharray="2 2"/>
+        </svg>
+        <span>3. 진자 스튜디오</span>
+      </button>
+    </nav>
+
+    <!-- Classroom Action & Verification Buttons -->
+    <div class="glass-panel p-1.5 rounded-2xl flex items-center gap-1.5 pointer-events-auto">
+      <button id="btn-demo-tour" onclick="toggleDemoTour()"
+              class="px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/35 text-purple-200 border border-purple-400/40 transition flex items-center gap-1.5"
+              title="3가지 물리 실험을 시네마틱 카메라와 함께 자동 시연합니다">
+        <svg class="w-4 h-4 text-purple-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        <span id="demo-tour-label">시네마틱 투어</span>
+      </button>
+
+      <button onclick="openModal('teacher-modal')"
+              class="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 text-cyan-200 border border-cyan-500/30 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+        </svg>
+        <span class="hidden sm:inline">교사용 5분 가이드</span>
+      </button>
+
+      <button onclick="runSelfVerificationSuite()"
+              class="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-400/40 transition flex items-center gap-1.5"
+              title="실제 물리 수식과 에너지 보존 오차를 코드로 즉시 검증합니다">
+        <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M9 12l2 2 4-4"/>
+          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+        </svg>
+        <span class="hidden sm:inline">자체 물리 검증</span>
+      </button>
+
+      <button id="btn-presentation" onclick="togglePresentationMode()"
+              class="px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/50 transition flex items-center gap-1"
+              title="교실 프로젝터용 발표 모드 전환">
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+        <span class="hidden md:inline">발표 모드</span>
+      </button>
+
+      <button onclick="openModal('info-modal')"
+              class="p-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600/50 transition"
+              title="런타임 엔진 및 개인정보 안내">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       3. LEFT FLOATING PANEL: LAUNCH CONTROLS & VARIABLE SLIDERS
+       ===================================================================== -->
+  <aside class="fixed top-20 left-3 md:left-5 bottom-16 z-20 w-[310px] sm:w-[340px] flex flex-col gap-2.5 pointer-events-none scale-in-presentation">
+    <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3.5 pointer-events-auto overflow-y-auto max-h-full">
+
+      <!-- Big One-Click Launch & Time Control Deck -->
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <button id="btn-main-action" onclick="handleMainLaunchOrStart()"
+                  class="btn-launch flex-1 py-3 px-4 rounded-xl font-black text-base text-slate-950 tracking-wide flex items-center justify-center gap-2">
+            <svg id="icon-main-action" class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 3l14 9-14 9V3z"/>
+            </svg>
+            <span id="label-main-action">발사 (LAUNCH)</span>
+          </button>
+
+          <button id="btn-pause" onclick="togglePauseSimulation()"
+                  class="px-3.5 py-3 rounded-xl font-bold text-xs bg-slate-800/90 hover:bg-slate-700 text-white border border-slate-600/70 transition flex items-center justify-center"
+                  title="일시정지 / 계속">
+            <svg id="icon-pause" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          </button>
+
+          <button onclick="resetCurrentExperiment(true)"
+                  class="px-3.5 py-3 rounded-xl font-bold text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600/70 transition flex items-center justify-center"
+                  title="초기화 (t = 0)">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Playback Speed & Impact Slow-Mo Bar -->
+        <div class="flex items-center justify-between gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-1">
+            <span class="text-[11px] font-bold text-slate-400 px-1.5">배속</span>
+            <button onclick="setTimeScale(0.25)" id="speed-025"
+                    class="px-2 py-1 rounded-lg text-xs font-mono-num font-bold text-slate-300 hover:bg-slate-800 transition">0.25x</button>
+            <button onclick="setTimeScale(1.0)" id="speed-100"
+                    class="px-2 py-1 rounded-lg text-xs font-mono-num font-bold bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 transition">1x</button>
+            <button onclick="setTimeScale(2.0)" id="speed-200"
+                    class="px-2 py-1 rounded-lg text-xs font-mono-num font-bold text-slate-300 hover:bg-slate-800 transition">2x</button>
+          </div>
+          <button id="btn-auto-slowmo" onclick="toggleAutoSlowMo()"
+                  class="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1 transition"
+                  title="충돌/착탄 순간 자동으로 극적인 슬로모션을 연출합니다">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400" id="dot-auto-slowmo"></span>
+            <span>임팩트 슬로모션</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           MODE 1 CONTROLS: 투사체 연구소 (PROJECTILE LAB)
+           =============================================================== -->
+      <div id="controls-projectile" class="flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div>
+            <h2 class="text-sm font-black text-cyan-300 flex items-center gap-1.5">
+              <span>투사체 변수 제어</span>
+            </h2>
+            <p class="text-[11px] text-slate-400">공기저항이 없는 이상 진공 포물선 모델 (발사 높이 h = 1.0m)</p>
+          </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="applyProjectilePreset('target30')"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 transition text-left flex items-center justify-between">
+            <span>🎯 30m 명중 해법</span>
+            <span class="font-mono-num text-[10px] opacity-80">45°·17m/s</span>
+          </button>
+          <button onclick="applyProjectilePreset('moonCompare')"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-500/15 hover:bg-purple-500/30 text-purple-200 border border-purple-400/30 transition text-left flex items-center justify-between">
+            <span>🌙 달 중력 체감</span>
+            <span class="font-mono-num text-[10px] opacity-80">g=1.62</span>
+          </button>
+        </div>
+
+        <!-- Angle Slider -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-proj-angle" class="font-bold text-slate-200">발사각 (θ)</label>
+            <span class="font-mono-num font-bold text-cyan-300"><span id="val-proj-angle">42</span>°</span>
+          </div>
+          <input id="slider-proj-angle" type="range" min="10" max="80" step="1" value="42"
+                 class="cyber-slider" oninput="updateProjectileParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>10° (저각)</span><span>45° (최대사거리 근방)</span><span>80° (고각)</span>
+          </div>
+        </div>
+
+        <!-- Initial Speed Slider -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-proj-speed" class="font-bold text-slate-200">초기속도 (v₀)</label>
+            <span class="font-mono-num font-bold text-cyan-300"><span id="val-proj-speed">17.0</span> m/s</span>
+          </div>
+          <input id="slider-proj-speed" type="range" min="5" max="25" step="0.5" value="17.0"
+                 class="cyber-slider" oninput="updateProjectileParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>5.0 m/s</span><span>15.0 m/s</span><span>25.0 m/s</span>
+          </div>
+        </div>
+
+        <!-- Mass Slider -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-proj-mass" class="font-bold text-slate-200">구체 질량 (m)</label>
+            <span class="font-mono-num font-bold text-cyan-300"><span id="val-proj-mass">2.0</span> kg</span>
+          </div>
+          <input id="slider-proj-mass" type="range" min="0.5" max="5.0" step="0.5" value="2.0"
+                 class="cyber-slider" oninput="updateProjectileParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>0.5 kg</span><span>진공에서 궤적 무관 (에너지 비례)</span><span>5.0 kg</span>
+          </div>
+        </div>
+
+        <!-- Planet Gravity Selector -->
+        <div class="flex flex-col gap-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="font-bold text-slate-200">천체 중력 가속도 (g)</span>
+            <span id="val-proj-gravity" class="font-mono-num font-bold text-amber-300">9.80 m/s²</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="grav-proj-earth" onclick="setProjectileGravity('earth', 9.8)"
+                    class="py-1.5 px-2 rounded-lg text-xs font-bold bg-cyan-500/25 text-white border border-cyan-400 transition">
+              지구 (9.8)
+            </button>
+            <button id="grav-proj-mars" onclick="setProjectileGravity('mars', 3.71)"
+                    class="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition">
+              화성 (3.71)
+            </button>
+            <button id="grav-proj-moon" onclick="setProjectileGravity('moon', 1.62)"
+                    class="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition">
+              달 (1.62)
+            </button>
+          </div>
+        </div>
+
+        <!-- Target Mission Box -->
+        <div class="p-2.5 rounded-xl bg-slate-900/90 border border-amber-400/30 flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-300 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+              </svg>
+              <span>목표 과녁 위치: 30.0 m</span>
+            </span>
+            <span id="proj-mission-badge" class="text-[11px] font-mono-num font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">대기 중</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-snug">
+            예상 착지 지점: <strong class="font-mono-num text-cyan-300" id="proj-predicted-range">30.39 m</strong> (목표 오차 <span class="font-mono-num text-amber-300" id="proj-predicted-err">0.39 m</span>)
+          </p>
+          <p id="proj-mission-feedback" class="text-[11px] text-slate-400 leading-snug">
+            발사 버튼을 눌러 30.0m 과녁 명중에 도전하세요.
+          </p>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           MODE 2 CONTROLS: 충돌 아레나 (COLLISION ARENA)
+           =============================================================== -->
+      <div id="controls-collision" class="hidden flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div>
+            <h2 class="text-sm font-black text-purple-300">1차원 정밀 충돌 트랙</h2>
+            <p class="text-[11px] text-slate-400">운동량은 언제나 보존되며, e &lt; 1이면 열·변형 에너지가 발생합니다.</p>
+          </div>
+        </div>
+
+        <!-- Preset Buttons for Restitution -->
+        <div class="grid grid-cols-3 gap-1.5">
+          <button onclick="applyCollisionPreset('elastic')"
+                  class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 border border-cyan-400/30 transition">
+            완전탄성 (e=1)
+          </button>
+          <button onclick="applyCollisionPreset('inelastic')"
+                  class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500/20 hover:bg-purple-500/35 text-purple-200 border border-purple-400/30 transition">
+            부분비탄성 (e=0.5)
+          </button>
+          <button onclick="applyCollisionPreset('perfectInelastic')"
+                  class="px-2 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500/20 hover:bg-rose-500/35 text-rose-200 border border-rose-400/30 transition">
+            완전비탄성 (e=0)
+          </button>
+        </div>
+
+        <!-- Coefficient of Restitution (e) -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-col-e" class="font-bold text-amber-300">반발계수 (e)</label>
+            <span class="font-mono-num font-bold text-amber-300" id="val-col-e">1.00 (탄성)</span>
+          </div>
+          <input id="slider-col-e" type="range" min="0" max="1" step="0.05" value="1.0"
+                 class="cyber-slider" oninput="updateCollisionParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>0.0 (한 덩어리 융합)</span><span>0.5</span><span>1.0 (운동에너지 보존)</span>
+          </div>
+        </div>
+
+        <!-- Sphere A (Left, Cyan) -->
+        <div class="p-2.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex flex-col gap-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-extrabold text-cyan-300">구체 A (좌측 · 시안)</span>
+            <span class="text-[11px] font-mono-num text-cyan-200" id="col-after-v1">충돌 후 v₁' = -2.00 m/s</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-300">질량 m₁</span>
+              <span class="font-mono-num font-bold text-white"><span id="val-col-m1">2.0</span> kg</span>
+            </div>
+            <input id="slider-col-m1" type="range" min="0.5" max="8.0" step="0.5" value="2.0"
+                   class="cyber-slider" oninput="updateCollisionParams()" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-300">초기속도 u₁ (우측 +)</span>
+              <span class="font-mono-num font-bold text-white">+<span id="val-col-u1">6.0</span> m/s</span>
+            </div>
+            <input id="slider-col-u1" type="range" min="1.0" max="12.0" step="0.5" value="6.0"
+                   class="cyber-slider" oninput="updateCollisionParams()" />
+          </div>
+        </div>
+
+        <!-- Sphere B (Right, Purple/Gold) -->
+        <div class="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 flex flex-col gap-2">
+          <div class="flex justify-between items-center">
+            <span class="text-xs font-extrabold text-purple-300">구체 B (우측 · 보라)</span>
+            <span class="text-[11px] font-mono-num text-purple-200" id="col-after-v2">충돌 후 v₂' = +6.00 m/s</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-300">질량 m₂</span>
+              <span class="font-mono-num font-bold text-white"><span id="val-col-m2">2.0</span> kg</span>
+            </div>
+            <input id="slider-col-m2" type="range" min="0.5" max="8.0" step="0.5" value="2.0"
+                   class="cyber-slider" oninput="updateCollisionParams()" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-300">초기속도 u₂</span>
+              <span class="font-mono-num font-bold text-white"><span id="val-col-u2">-2.0</span> m/s</span>
+            </div>
+            <input id="slider-col-u2" type="range" min="-8.0" max="0.0" step="0.5" value="-2.0"
+                   class="cyber-slider" oninput="updateCollisionParams()" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ===============================================================
+           MODE 3 CONTROLS: 진자 스튜디오 (PENDULUM STUDIO)
+           =============================================================== -->
+      <div id="controls-pendulum" class="hidden flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div>
+            <h2 class="text-sm font-black text-amber-300">비선형 진자 스튜디오 (RK4 적분)</h2>
+            <p class="text-[11px] text-slate-400">θ'' = -(g/L)sin(θ) 정밀 적분 · 질량과 주기의 무관성 탐구</p>
+          </div>
+        </div>
+
+        <!-- Comparison Activity Presets -->
+        <div class="grid grid-cols-2 gap-1.5">
+          <button onclick="applyPendulumPreset('massInvariance')"
+                  class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/30 transition text-left">
+            ⚖️ 질량 1kg vs 5kg 비교
+          </button>
+          <button onclick="applyPendulumPreset('lengthChange')"
+                  class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500/15 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 transition text-left">
+            📏 길이 L=1.5m vs 4.5m
+          </button>
+        </div>
+
+        <!-- Length L -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-pend-length" class="font-bold text-slate-200">줄 길이 (L)</label>
+            <span class="font-mono-num font-bold text-amber-300"><span id="val-pend-length">3.0</span> m</span>
+          </div>
+          <input id="slider-pend-length" type="range" min="1.0" max="5.5" step="0.25" value="3.0"
+                 class="cyber-slider" oninput="updatePendulumParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>1.0 m (단주기)</span><span>3.0 m</span><span>5.5 m (장주기)</span>
+          </div>
+        </div>
+
+        <!-- Initial Angle theta0 -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-pend-angle" class="font-bold text-slate-200">초기 진폭 각도 (θ₀)</label>
+            <span class="font-mono-num font-bold text-amber-300"><span id="val-pend-angle">35</span>°</span>
+          </div>
+          <input id="slider-pend-angle" type="range" min="5" max="80" step="1" value="35"
+                 class="cyber-slider" oninput="updatePendulumParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>5° (단진자 근사)</span><span>45°</span><span>80° (비선형 주기 증가)</span>
+          </div>
+        </div>
+
+        <!-- Bob Mass m -->
+        <div class="flex flex-col gap-1">
+          <div class="flex justify-between text-xs">
+            <label for="slider-pend-mass" class="font-bold text-slate-200">추 질량 (m)</label>
+            <span class="font-mono-num font-bold text-cyan-300"><span id="val-pend-mass">2.0</span> kg</span>
+          </div>
+          <input id="slider-pend-mass" type="range" min="0.5" max="5.0" step="0.5" value="2.0"
+                 class="cyber-slider" oninput="updatePendulumParams()" />
+          <div class="flex justify-between text-[10px] font-mono-num text-slate-400">
+            <span>0.5 kg</span><span>주기는 질량과 무관! (에너지만 비례)</span><span>5.0 kg</span>
+          </div>
+        </div>
+
+        <!-- Pendulum Gravity -->
+        <div class="grid grid-cols-3 gap-1.5">
+          <button id="grav-pend-earth" onclick="setPendulumGravity(9.8)"
+                  class="py-1.5 px-2 rounded-lg text-xs font-bold bg-cyan-500/25 text-white border border-cyan-400 transition">
+            지구 (9.8)
+          </button>
+          <button id="grav-pend-mars" onclick="setPendulumGravity(3.71)"
+                  class="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition">
+            화성 (3.71)
+          </button>
+          <button id="grav-pend-moon" onclick="setPendulumGravity(1.62)"
+                  class="py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition">
+            달 (1.62)
+          </button>
+        </div>
+
+        <!-- Ghost Comparison Toggle -->
+        <div class="p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 flex items-center justify-between">
+          <div>
+            <div class="text-xs font-bold text-cyan-200">비교용 기준 진자 동시 표시</div>
+            <div class="text-[10px] text-slate-400" id="ghost-pend-desc">기준: m=1.0kg, L=3.0m, θ₀=35°</div>
+          </div>
+          <button id="btn-ghost-pend" onclick="toggleGhostPendulum()"
+                  class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/25 text-cyan-200 border border-cyan-400/50">
+            켜짐 (ON)
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- =====================================================================
+       4. RIGHT FLOATING PANEL: LIVE TELEMETRY HUD, ENERGY GRAPH & MISSIONS
+       ===================================================================== -->
+  <aside class="fixed top-20 right-3 md:right-5 bottom-16 z-20 w-[320px] sm:w-[370px] flex flex-col gap-2.5 pointer-events-none">
+    <!-- Top Card: Live Physics Telemetry & Real-time Energy Conservation Graph -->
+    <div class="glass-panel rounded-2xl p-3.5 flex flex-col gap-2.5 pointer-events-auto">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+          <h2 class="text-xs sm:text-sm font-black text-white tracking-tight">실시간 물리 계측 HUD & 에너지 보존</h2>
+        </div>
+        <span id="hud-time-readout" class="font-mono-num text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-cyan-300 border border-cyan-500/30">
+          t = 0.00 s
+        </span>
+      </div>
+
+      <!-- 4 Key Live Metric Readouts -->
+      <div class="grid grid-cols-2 gap-1.5">
+        <div class="p-2 rounded-xl bg-slate-900/85 border border-slate-800">
+          <div class="text-[10px] font-bold text-slate-400" id="metric-1-label">현재 위치 (x, y)</div>
+          <div class="font-mono-num text-xs sm:text-sm font-extrabold text-white mt-0.5" id="metric-1-val">0.00m, 1.00m</div>
+        </div>
+        <div class="p-2 rounded-xl bg-slate-900/85 border border-slate-800">
+          <div class="text-[10px] font-bold text-slate-400" id="metric-2-label">현재 속력 (|v|)</div>
+          <div class="font-mono-num text-xs sm:text-sm font-extrabold text-cyan-300 mt-0.5" id="metric-2-val">17.00 m/s</div>
+        </div>
+        <div class="p-2 rounded-xl bg-slate-900/85 border border-slate-800">
+          <div class="text-[10px] font-bold text-slate-400" id="metric-3-label">최고 높이 / 사거리</div>
+          <div class="font-mono-num text-xs sm:text-sm font-extrabold text-purple-300 mt-0.5" id="metric-3-val">7.59m / 30.39m</div>
+        </div>
+        <div class="p-2 rounded-xl bg-slate-900/85 border border-slate-800">
+          <div class="text-[10px] font-bold text-slate-400" id="metric-4-label">비행 시간 / 상태</div>
+          <div class="font-mono-num text-xs sm:text-sm font-extrabold text-amber-300 mt-0.5" id="metric-4-val">2.40 s</div>
+        </div>
+      </div>
+
+      <!-- Stacked Live Energy Bar (Kinetic K + Potential U + Thermal Loss E_loss = Constant Total) -->
+      <div class="flex flex-col gap-1">
+        <div class="flex items-center justify-between text-[11px] font-mono-num">
+          <span class="text-cyan-300 font-bold">운동 K: <strong id="val-energy-k">289.0</strong>J</span>
+          <span class="text-purple-300 font-bold" id="wrap-energy-u">위치 U: <strong id="val-energy-u">19.6</strong>J</span>
+          <span class="text-rose-400 font-bold hidden" id="wrap-energy-loss">열·변형: <strong id="val-energy-loss">0.0</strong>J</span>
+          <span class="text-amber-300 font-bold">총합 E: <strong id="val-energy-total">308.6</strong>J</span>
+        </div>
+        <div class="w-full h-3 rounded-full bg-slate-900 overflow-hidden flex border border-slate-700/80 p-0.5">
+          <div id="bar-energy-k" class="h-full bg-cyan-400 transition-all duration-75 rounded-l-full" style="width: 75%"></div>
+          <div id="bar-energy-u" class="h-full bg-purple-500 transition-all duration-75" style="width: 25%"></div>
+          <div id="bar-energy-loss" class="h-full bg-rose-500 transition-all duration-75 rounded-r-full" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Real-Time Time-Series Energy & Velocity Graph Canvas -->
+      <div class="relative w-full h-28 rounded-xl bg-slate-950/90 border border-slate-800 overflow-hidden">
+        <canvas id="energy-chart-canvas" class="w-full h-full block"></canvas>
+        <div class="absolute top-1.5 left-2 flex items-center gap-2.5 text-[10px] font-bold pointer-events-none">
+          <span class="flex items-center gap-1 text-cyan-300"><i class="w-2 h-2 rounded-full bg-cyan-400 inline-block"></i>운동(K)</span>
+          <span id="legend-u" class="flex items-center gap-1 text-purple-300"><i class="w-2 h-2 rounded-full bg-purple-400 inline-block"></i>위치(U)</span>
+          <span id="legend-loss" class="hidden items-center gap-1 text-rose-300"><i class="w-2 h-2 rounded-full bg-rose-500 inline-block"></i>열손실</span>
+          <span class="flex items-center gap-1 text-amber-300"><i class="w-2 h-0.5 bg-amber-400 inline-block"></i>총에너지(E)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Card: 3 Structured Learning Missions & Experiment CSV Log (Hideable in Presentation Mode) -->
+    <div class="glass-panel rounded-2xl p-3.5 flex-1 flex flex-col gap-2.5 pointer-events-auto overflow-hidden hide-in-presentation">
+      <!-- Sub-tabs: Missions vs History Log -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+        <div class="flex items-center gap-1">
+          <button id="subtab-missions" onclick="switchRightPanelTab('missions')"
+                  class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+            수업 탐구 미션 (3)
+          </button>
+          <button id="subtab-history" onclick="switchRightPanelTab('history')"
+                  class="px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white">
+            실험 기록 (<span id="log-count">0</span>)
+          </button>
+        </div>
+        <button onclick="downloadExperimentCSV()"
+                class="px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 flex items-center gap-1"
+                title="실험 기록을 엑셀 호환 CSV 파일로 저장합니다">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>CSV 저장</span>
+        </button>
+      </div>
+
+      <!-- TAB CONTENT A: 3 Structured Learning Missions (Predict -> Experiment -> Observe) -->
+      <div id="panel-missions" class="flex-1 overflow-y-auto flex flex-col gap-2 pr-0.5">
+        <!-- Mission 1 -->
+        <div id="mission-card-1" onclick="activateMission(1)"
+             class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-cyan-400/60 transition cursor-pointer">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-cyan-300">미션 1. 목표 지점 30.0m 정밀 타격</span>
+            <span id="mission-status-1" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">도전 가능</span>
+          </div>
+          <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+            <strong class="text-amber-300">[예측→실험→관찰]</strong> 지구 중력에서 발사각과 초기속도를 조절하여 <span class="font-mono-num text-white">30.0m</span> 과녁에 오차 <span class="font-mono-num text-white">0.5m</span> 이내로 착탄시키세요.
+          </p>
+        </div>
+
+        <!-- Mission 2 -->
+        <div id="mission-card-2" onclick="activateMission(2)"
+             class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-purple-400/60 transition cursor-pointer">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-purple-300">미션 2. 탄성 vs 비탄성 에너지 비교</span>
+            <span id="mission-status-2" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">도전 가능</span>
+          </div>
+          <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+            <strong class="text-amber-300">[예측→실험→관찰]</strong> 충돌 아레나에서 <span class="font-mono-num text-white">e=1.0</span>과 <span class="font-mono-num text-white">e&lt;1.0</span>을 각각 실행하여 운동량 보존과 열·변형 손실 에너지를 관찰하세요.
+          </p>
+        </div>
+
+        <!-- Mission 3 -->
+        <div id="mission-card-3" onclick="activateMission(3)"
+             class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-amber-400/60 transition cursor-pointer">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-amber-300">미션 3. 진자 주기와 질량·길이의 관계</span>
+            <span id="mission-status-3" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">도전 가능</span>
+          </div>
+          <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+            <strong class="text-amber-300">[예측→실험→관찰]</strong> 진자 스튜디오에서 질량을 바꿔도 기준 진자와 주기가 같음을 확인한 뒤, 줄 길이를 바꿔 주기를 변화시키세요.
+          </p>
+        </div>
+      </div>
+
+      <!-- TAB CONTENT B: Experiment Log Table -->
+      <div id="panel-history" class="hidden flex-1 overflow-y-auto flex-col gap-1.5 pr-0.5">
+        <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+          <span>최근 실험 자동 기록 (최대 30건)</span>
+          <button onclick="recordCurrentSnapshotToLog()" class="text-cyan-400 hover:underline font-bold">+ 현재 상태 수동 기록</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-[11px] font-mono-num">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400">
+                <th class="py-1 px-1">#</th>
+                <th class="py-1 px-1">모드</th>
+                <th class="py-1 px-1">핵심 변수</th>
+                <th class="py-1 px-1">측정 결과</th>
+              </tr>
+            </thead>
+            <tbody id="experiment-log-tbody" class="divide-y divide-slate-800/60 text-slate-200">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- =====================================================================
+       5. BOTTOM FLOATING CAMERA & FORMULA BAR
+       ===================================================================== -->
+  <footer class="fixed bottom-3 left-3 right-3 md:left-5 md:right-5 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <!-- Active Physics Formula Pill -->
+    <div class="glass-pill px-3.5 py-2 rounded-xl flex items-center gap-2.5 pointer-events-auto">
+      <span class="text-[11px] font-extrabold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">핵심 법칙</span>
+      <span id="active-formula-text" class="text-xs font-mono-num text-slate-200">
+        y(t) = h + v₀sin(θ)t - ½gt² | E = K + U = 일정
+      </span>
+    </div>
+
+    <!-- Camera Orbit & Renderer Controls -->
+    <div class="glass-pill px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 pointer-events-auto">
+      <span class="text-[11px] text-slate-400 hidden lg:inline px-1.5">마우스 드래그: 3D 회전 · 휠: 줌</span>
+      <button onclick="setCameraPreset('home')"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition">
+        홈 시점
+      </button>
+      <button onclick="setCameraPreset('side')"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        측면 정밀 뷰
+      </button>
+      <button onclick="setCameraPreset('top')"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        상단 궤적 뷰
+      </button>
+      <button id="btn-toggle-renderer" onclick="toggleRendererMode()"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 transition"
+              title="WebGL 3D 무대와 2D 투영 캔버스 모드를 전환합니다">
+        2D 투영 전환
+      </button>
+      <button id="btn-reduced-motion" onclick="toggleReducedMotion()"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+        모션 절제: OFF
+      </button>
+    </div>
+  </footer>
+
+  <!-- =====================================================================
+       6. MODALS: TEACHER GUIDE, SELF-VERIFICATION SUITE, RUNTIME INFO
+       ===================================================================== -->
+  <!-- A. Teacher's 5-Minute Lesson Guide Modal -->
+  <div id="teacher-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel max-w-2xl w-full rounded-3xl p-6 border border-cyan-400/40 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-black">T</div>
+          <div>
+            <h3 class="text-lg font-black text-white">교사용 5분 수업 활용 가이드</h3>
+            <p class="text-xs text-slate-400">중학교 과학(운동과 에너지) · 기술·가정(기계와 에너지 시뮬레이션) 연계</p>
+          </div>
+        </div>
+        <button onclick="closeModal('teacher-modal')" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">✕</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs leading-relaxed">
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30">
+          <div class="font-black text-cyan-300 text-sm mb-1">1단계: 도입 및 예측 (1분)</div>
+          <p class="text-slate-300">
+            투사체 연구소에서 <strong>"질량을 1kg에서 5kg으로 늘리면 공이 더 가까이 떨어질까?"</strong> 질문을 던집니다. 학생들이 직접 예측한 뒤 발사 버튼을 눌러 진공에서 질량과 무관하게 같은 궤적을 그리는 것을 확인합니다.
+          </p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/30">
+          <div class="font-black text-purple-300 text-sm mb-1">2단계: 조작 및 탐구 (3분)</div>
+          <p class="text-slate-300">
+            우측 하단의 <strong>[수업 탐구 미션 3선]</strong>을 순서대로 클릭합니다.
+            <br/>• <strong>투사체:</strong> 30m 과녁 명중 조합 찾기
+            <br/>• <strong>충돌:</strong> e=1과 e=0에서 운동량은 항상 일정하지만 운동에너지는 열·변형으로 전환됨을 그래프에서 관찰
+          </p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/30">
+          <div class="font-black text-amber-300 text-sm mb-1">3단계: 정리 및 데이터 (1분)</div>
+          <p class="text-slate-300">
+            진자 스튜디오에서 <strong>[질량 1kg vs 5kg 비교]</strong>를 눌러 두 진자가 동시에 흔들리는 모습을 관찰하고, <strong>[CSV 저장]</strong>으로 모둠별 실험 데이터를 내려받아 보고서를 작성합니다.
+          </p>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 text-xs text-slate-300 flex flex-col gap-1.5">
+        <div class="font-bold text-white">💡 수업 프로젝터 팁</div>
+        <p>• 우측 상단의 <strong>[발표 모드]</strong>를 누르면 글자 크기가 커지고 부가 패널이 숨겨져 교실 뒤편에서도 숫자와 3D 무대가 선명하게 보입니다.</p>
+        <p>• 학생 로그인, 이름 입력, 카메라/마이크 권한이나 외부 서버 전송이 전혀 없어 학교 정보보안 규정 내에서 즉시 사용할 수 있습니다.</p>
+      </div>
+
+      <div class="flex justify-end">
+        <button onclick="closeModal('teacher-modal')" class="px-5 py-2.5 rounded-xl font-bold text-xs bg-cyan-500 text-slate-950 hover:bg-cyan-400">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B. Self-Verification Physics Test Suite Modal -->
+  <div id="verify-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel max-w-2xl w-full rounded-3xl p-6 border border-emerald-400/40 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-lg font-black text-emerald-300 flex items-center gap-2">
+            <span>실시간 물리 엔진 자체 검증 리포트</span>
+          </h3>
+          <p class="text-xs text-slate-400">고정된 텍스트가 아니라 현재 브라우저에서 물리 수식과 수치적분 오차를 즉시 계산한 결과입니다.</p>
+        </div>
+        <button onclick="closeModal('verify-modal')" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">✕</button>
+      </div>
+
+      <div id="verify-results-container" class="flex flex-col gap-2.5 text-xs font-mono-num">
+        <!-- Populated dynamically by runSelfVerificationSuite() -->
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+        <span id="verify-summary-status" class="text-xs font-bold text-emerald-400">검증 완료</span>
+        <div class="flex gap-2">
+          <button onclick="runSelfVerificationSuite()" class="px-4 py-2 rounded-xl font-bold text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 hover:bg-emerald-500/30">다시 검증 실행</button>
+          <button onclick="closeModal('verify-modal')" class="px-4 py-2 rounded-xl font-bold text-xs bg-slate-800 text-slate-200 hover:bg-slate-700">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C. Honest Runtime & Privacy Info Modal -->
+  <div id="info-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel max-w-lg w-full rounded-3xl p-6 border border-slate-700 flex flex-col gap-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-black text-white">앱 런타임 구조 및 개인정보 보호 안내</h3>
+        <button onclick="closeModal('info-modal')" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">✕</button>
+      </div>
+      <div class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+        <p>
+          <strong class="text-cyan-300">1. 순수 물리·수학 엔진 런타임:</strong><br/>
+          본 웹앱("ARGON PHYSICS LAB")의 모든 시뮬레이션은 브라우저 내부의 결정론적 물리 공식(포물선 해석해, 1차원 탄성·비탄성 충돌 보존식, 비선형 진자 4차 룬게-쿠타 RK4 수치적분)으로 실시간 계산됩니다. 외부 Argon API나 유료 클라우드 AI 서버를 호출하지 않으며, 벤치마크 점수를 앱 성능으로 가장하지 않습니다.
+        </p>
+        <p>
+          <strong class="text-purple-300">2. 무결성 및 2D 대체 렌더링 지원:</strong><br/>
+          Three.js WebGL 가속을 기본 사용하며, 학교 PC 환경에서 WebGL이 제한되거나 수동 전환 시 동일한 3D 좌표를 투영하는 내장 <strong>Canvas 2D 투영 렌더러</strong>가 빈 화면 없이 즉시 작동합니다.
+        </p>
+        <p>
+          <strong class="text-emerald-300">3. 학생 개인정보 보호:</strong><br/>
+          로그인, 이름, 카메라, 마이크 등을 요구하지 않으며 어떠한 데이터도 외부 서버로 전송하지 않습니다.
+        </p>
+      </div>
+      <div class="flex justify-end">
+        <button onclick="closeModal('info-modal')" class="px-4 py-2 rounded-xl font-bold text-xs bg-cyan-500 text-slate-950">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /*************************************************************************
+     * ARGON PHYSICS LAB - CORE ENGINE, 3D WEBGL STAGE & 2D FALLBACK RENDERER
+     * Every number, trajectory, collision, and energy bar is computed from
+     * exact physical laws with zero random/fake values.
+     *************************************************************************/
+
+    // =======================================================================
+    // 1. GLOBAL APPLICATION STATE
+    // =======================================================================
+    const APP = {
+      mode: 'projectile', // 'projectile' | 'collision' | 'pendulum'
+      isRunning: true,
+      isPaused: false,
+      timeScale: 1.0,
+      autoSlowMo: true,
+      slowMoActive: false,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      use2DFallback: false,
+      webglAvailable: false,
+      demoTourActive: false,
+      demoTourTimer: 0,
+      demoTourStep: 0,
+
+      // Simulation clock & fixed timestep accumulator
+      simTime: 0,
+      fixedDt: 1 / 240, // 240Hz physics integration for rock-solid accuracy
+      accumulator: 0,
+
+      // Energy time-series history for real-time chart (max 180 samples)
+      chartHistory: [],
+      chartSampleTimer: 0,
+
+      // Experiment Log & Mission completion state
+      experimentLogs: [],
+      missions: {
+        1: { completed: false },
+        2: { completed: false, testedElastic: false, testedInelastic: false },
+        3: { completed: false, testedMass: false, testedLength: false }
+      },
+
+      // Camera spherical coordinates (shared between WebGL and 2D Projection!)
+      camera: {
+        theta: 0.18,      // Horizontal azimuth (rad)
+        phi: 0.36,        // Vertical elevation (rad)
+        distance: 28,     // Distance from target
+        targetX: 14,
+        targetY: 3.5,
+        targetZ: 0,
+        isDragging: false,
+        lastMouseX: 0,
+        lastMouseY: 0
+      },
+
+      // ---------------------------------------------------------------------
+      // EXPERIMENT 1 STATE: PROJECTILE LAB (투사체 연구소)
+      // ---------------------------------------------------------------------
+      projectile: {
+        h0: 1.0,          // Launch height (m)
+        angleDeg: 42,     // Launch angle (10 ~ 80 deg)
+        v0: 17.0,         // Initial speed (5 ~ 25 m/s)
+        mass: 2.0,        // Mass (0.5 ~ 5.0 kg)
+        g: 9.8,           // Gravity (m/s^2)
+        planet: 'earth',
+        targetX: 30.0,    // Target bullseye at 30.0m
+        // Analytical derived metrics
+        vx0: 0,
+        vy0: 0,
+        tFlight: 0,
+        tPeak: 0,
+        maxHeight: 0,
+        range: 0,
+        totalEnergy: 0,
+        // Instantaneous state at t = simTime
+        x: 0,
+        y: 1.0,
+        vx: 0,
+        vy: 0,
+        K: 0,
+        U: 0,
+        landed: false,
+        trail: [],        // Array of {x, y}
+        strobePoints: []  // Strobe markers every 0.25s
+      },
+
+      // ---------------------------------------------------------------------
+      // EXPERIMENT 2 STATE: COLLISION ARENA (충돌 아레나)
+      // ---------------------------------------------------------------------
+      collision: {
+        x1_0: -7.5,       // Initial position of Sphere A (m)
+        x2_0: 3.5,        // Initial position of Sphere B (m)
+        r1: 0.85,         // Radius A (m)
+        r2: 0.85,         // Radius B (m)
+        m1: 2.0,          // Mass A (kg)
+        u1: 6.0,          // Initial velocity A (m/s)
+        m2: 2.0,          // Mass B (kg)
+        u2: -2.0,         // Initial velocity B (m/s)
+        e: 1.0,           // Coefficient of restitution (0 ~ 1)
+        // Analytical collision metrics
+        tImpact: 0,       // Exact impact time (s)
+        xImpact: 0,       // Impact center position (m)
+        v1After: 0,       // Post-collision velocity A (m/s)
+        v2After: 0,       // Post-collision velocity B (m/s)
+        pBefore: 0,
+        pAfter: 0,
+        KBefore: 0,
+        KAfter: 0,
+        ELossAfter: 0,
+        // Instantaneous state
+        x1: -7.5,
+        x2: 3.5,
+        v1: 6.0,
+        v2: -2.0,
+        K: 0,
+        ELoss: 0,
+        hasCollided: false,
+        impactFlash: 0
+      },
+
+      // ---------------------------------------------------------------------
+      // EXPERIMENT 3 STATE: PENDULUM STUDIO (진자 스튜디오)
+      // ---------------------------------------------------------------------
+      pendulum: {
+        L: 3.0,           // String length (m)
+        mass: 2.0,        // Bob mass (kg)
+        g: 9.8,           // Gravity (m/s^2)
+        theta0Deg: 35,    // Initial angle (5 ~ 80 deg)
+        theta0Rad: 35 * Math.PI / 180,
+        // Instantaneous RK4 state
+        theta: 35 * Math.PI / 180,
+        omega: 0,
+        alpha: 0,
+        K: 0,
+        U: 0,
+        E0: 0,
+        periodExact: 0,   // Nonlinear period via elliptic series
+        periodSmall: 0,   // Small-angle period 2*pi*sqrt(L/g)
+        // Ghost reference pendulum for side-by-side comparison
+        showGhost: true,
+        ghostL: 3.0,
+        ghostMass: 1.0,
+        ghostTheta0Rad: 35 * Math.PI / 180,
+        ghostTheta: 35 * Math.PI / 180,
+        ghostOmega: 0,
+        trail: []
+      },
+
+      // Impact / visual particles (strictly capped for smooth school PC performance)
+      particles: []
+    };
+
+    // =======================================================================
+    // 2. PURE PHYSICS CALCULATIONS (REUSABLE BY RUNTIME & SELF-TEST SUITE)
+    // =======================================================================
+
+    /**
+     * Computes exact analytical metrics for projectile motion from height h0.
+     * y(t) = h0 + vy0*t - 0.5*g*t^2
+     * x(t) = vx0*t
+     */
+    function computeProjectileAnalytical(h0, v0, angleDeg, g, mass) {
+      const theta = (angleDeg * Math.PI) / 180;
+      const vx0 = v0 * Math.cos(theta);
+      const vy0 = v0 * Math.sin(theta);
+      const tFlight = (vy0 + Math.sqrt(vy0 * vy0 + 2 * g * h0)) / g;
+      const tPeak = vy0 / g;
+      const maxHeight = h0 + (vy0 * vy0) / (2 * g);
+      const range = vx0 * tFlight;
+      const U0 = mass * g * h0;
+      const K0 = 0.5 * mass * v0 * v0;
+      const totalEnergy = U0 + K0;
+      return { theta, vx0, vy0, tFlight, tPeak, maxHeight, range, U0, K0, totalEnergy };
+    }
+
+    /**
+     * Evaluates projectile state at exact time t (0 <= t <= tFlight).
+     */
+    function evaluateProjectileAtTime(params, t) {
+      const clampedT = Math.min(Math.max(0, t), params.tFlight);
+      const x = params.vx0 * clampedT;
+      const y = Math.max(0, params.h0 + params.vy0 * clampedT - 0.5 * params.g * clampedT * clampedT);
+      const vx = params.vx0;
+      const vy = params.vy0 - params.g * clampedT;
+      const U = params.mass * params.g * y;
+      const K = 0.5 * params.mass * (vx * vx + vy * vy);
+      return { x, y, vx, vy, U, K, E: U + K, landed: t >= params.tFlight };
+    }
+
+    /**
+     * Computes exact 1D collision outcomes for two spheres with restitution e.
+     */
+    function computeCollisionAnalytical(m1, u1, m2, u2, e) {
+      const totalMass = m1 + m2;
+      const v1After = (m1 * u1 + m2 * u2 - m2 * e * (u1 - u2)) / totalMass;
+      const v2After = (m1 * u1 + m2 * u2 + m1 * e * (u1 - u2)) / totalMass;
+      const pBefore = m1 * u1 + m2 * u2;
+      const pAfter = m1 * v1After + m2 * v2After;
+      const KBefore = 0.5 * m1 * u1 * u1 + 0.5 * m2 * u2 * u2;
+      const KAfter = 0.5 * m1 * v1After * v1After + 0.5 * m2 * v2After * v2After;
+      const ELossAfter = Math.max(0, KBefore - KAfter);
+      return { v1After, v2After, pBefore, pAfter, KBefore, KAfter, ELossAfter };
+    }
+
+    /**
+     * Single 4th-Order Runge-Kutta (RK4) step for nonlinear pendulum:
+     * d(theta)/dt = omega
+     * d(omega)/dt = -(g / L) * sin(theta)
+     */
+    function stepPendulumRK4(theta, omega, g, L, dt) {
+      const fOmega = (th) => -(g / L) * Math.sin(th);
+
+      const k1_th = omega;
+      const k1_om = fOmega(theta);
+
+      const k2_th = omega + 0.5 * dt * k1_om;
+      const k2_om = fOmega(theta + 0.5 * dt * k1_th);
+
+      const k3_th = omega + 0.5 * dt * k2_om;
+      const k3_om = fOmega(theta + 0.5 * dt * k2_th);
+
+      const k4_th = omega + dt * k3_om;
+      const k4_om = fOmega(theta + dt * k3_th);
+
+      const nextTheta = theta + (dt / 6) * (k1_th + 2 * k2_th + 2 * k3_th + k4_th);
+      const nextOmega = omega + (dt / 6) * (k1_om + 2 * k2_om + 2 * k3_om + k4_om);
+      return { theta: nextTheta, omega: nextOmega };
+    }
+
+    /**
+     * Computes nonlinear pendulum period using elliptic integral series expansion.
+     */
+    function computePendulumPeriods(L, g, theta0Rad) {
+      const T0 = 2 * Math.PI * Math.sqrt(L / g);
+      const s2 = Math.sin(theta0Rad / 2) ** 2;
+      const factor = 1 + (1 / 4) * s2 + (9 / 64) * s2 * s2 + (25 / 256) * s2 * s2 * s2;
+      return { periodSmall: T0, periodExact: T0 * factor };
+    }
+
+    // =======================================================================
+    // 3. INITIALIZE & SYNCHRONIZE EXPERIMENT STATES
+    // =======================================================================
+
+    function recalculateProjectileSetup() {
+      const p = APP.projectile;
+      const res = computeProjectileAnalytical(p.h0, p.v0, p.angleDeg, p.g, p.mass);
+      p.vx0 = res.vx0;
+      p.vy0 = res.vy0;
+      p.tFlight = res.tFlight;
+      p.tPeak = res.tPeak;
+      p.maxHeight = res.maxHeight;
+      p.range = res.range;
+      p.totalEnergy = res.totalEnergy;
+
+      // Update predicted range feedback in UI safely
+      const err = Math.abs(p.range - p.targetX);
+      const rangeEl = document.getElementById('proj-predicted-range');
+      const errEl = document.getElementById('proj-predicted-err');
+      if (rangeEl) rangeEl.textContent = `${p.range.toFixed(2)} m`;
+      if (errEl) errEl.textContent = `${err.toFixed(2)} m`;
+
+      // Update 3D predicted trajectory line if ready
+      if (typeof update3DPredictedTrajectory === 'function') {
+        update3DPredictedTrajectory();
+      }
+    }
+
+    function recalculateCollisionSetup() {
+      const c = APP.collision;
+      c.r1 = 0.65 + 0.08 * Math.cbrt(c.m1);
+      c.r2 = 0.65 + 0.08 * Math.cbrt(c.m2);
+      const res = computeCollisionAnalytical(c.m1, c.u1, c.m2, c.u2, c.e);
+      c.v1After = res.v1After;
+      c.v2After = res.v2After;
+      c.pBefore = res.pBefore;
+      c.pAfter = res.pAfter;
+      c.KBefore = res.KBefore;
+      c.KAfter = res.KAfter;
+      c.ELossAfter = res.ELossAfter;
+
+      // Exact time of contact
+      const dist = (c.x2_0 - c.x1_0) - (c.r1 + c.r2);
+      const relV = c.u1 - c.u2;
+      c.tImpact = relV > 0.001 ? dist / relV : 999;
+      c.xImpact = c.x1_0 + c.u1 * c.tImpact + c.r1;
+
+      document.getElementById('col-after-v1').textContent =
+        `충돌 후 v₁' = ${c.v1After >= 0 ? '+' : ''}${c.v1After.toFixed(2)} m/s`;
+      document.getElementById('col-after-v2').textContent =
+        `충돌 후 v₂' = ${c.v2After >= 0 ? '+' : ''}${c.v2After.toFixed(2)} m/s`;
+    }
+
+    function recalculatePendulumSetup() {
+      const pd = APP.pendulum;
+      pd.theta0Rad = (pd.theta0Deg * Math.PI) / 180;
+      pd.ghostTheta0Rad = pd.theta0Rad;
+      const periods = computePendulumPeriods(pd.L, pd.g, pd.theta0Rad);
+      pd.periodSmall = periods.periodSmall;
+      pd.periodExact = periods.periodExact;
+      pd.E0 = pd.mass * pd.g * pd.L * (1 - Math.cos(pd.theta0Rad));
+      document.getElementById('ghost-pend-desc').textContent =
+        `기준: m=1.0kg, L=${pd.ghostL.toFixed(1)}m, θ₀=${pd.theta0Deg}°`;
+    }
+
+    /**
+     * Resets the active experiment to t = 0 and optionally starts running immediately.
+     */
+    function resetCurrentExperiment(startImmediately = false) {
+      APP.simTime = 0;
+      APP.accumulator = 0;
+      APP.chartHistory = [];
+      APP.chartSampleTimer = 0;
+      APP.slowMoActive = false;
+      APP.particles = [];
+      hideStageBanner();
+
+      if (APP.mode === 'projectile') {
+        recalculateProjectileSetup();
+        const p = APP.projectile;
+        p.x = 0;
+        p.y = p.h0;
+        p.vx = p.vx0;
+        p.vy = p.vy0;
+        p.U = p.mass * p.g * p.h0;
+        p.K = 0.5 * p.mass * p.v0 * p.v0;
+        p.landed = false;
+        p.trail = [{ x: 0, y: p.h0 }];
+        p.strobePoints = [{ x: 0, y: p.h0 }];
+      } else if (APP.mode === 'collision') {
+        recalculateCollisionSetup();
+        const c = APP.collision;
+        c.x1 = c.x1_0;
+        c.x2 = c.x2_0;
+        c.v1 = c.u1;
+        c.v2 = c.u2;
+        c.K = c.KBefore;
+        c.ELoss = 0;
+        c.hasCollided = false;
+        c.impactFlash = 0;
+      } else if (APP.mode === 'pendulum') {
+        recalculatePendulumSetup();
+        const pd = APP.pendulum;
+        pd.theta = pd.theta0Rad;
+        pd.omega = 0;
+        pd.U = pd.E0;
+        pd.K = 0;
+        pd.ghostTheta = pd.ghostTheta0Rad;
+        pd.ghostOmega = 0;
+        pd.trail = [];
+      }
+
+      APP.isRunning = startImmediately;
+      APP.isPaused = !startImmediately;
+      sampleEnergyChartPoint();
+      updateHUDAndControls();
+      sync3DSceneToPhysics();
+    }
+
+    // =======================================================================
+    // 4. STEP SIMULATION (FIXED TIMESTEP & ANALYTICAL PRECISION)
+    // =======================================================================
+
+    function stepPhysics(dt) {
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        if (p.landed) return;
+
+        const prevT = APP.simTime;
+        APP.simTime += dt;
+
+        // Trigger dramatic slow-motion right before target impact if enabled
+        if (APP.autoSlowMo && !APP.reducedMotion) {
+          const timeToLand = p.tFlight - APP.simTime;
+          if (timeToLand > 0 && timeToLand < 0.22 && Math.abs(p.range - p.targetX) < 3.0) {
+            APP.slowMoActive = true;
+            showStageBanner('과녁 착탄 슬로모션 분석 중 (0.2x)');
+          } else {
+            APP.slowMoActive = false;
+            hideStageBanner();
+          }
+        }
+
+        const state = evaluateProjectileAtTime(
+          { h0: p.h0, vx0: p.vx0, vy0: p.vy0, g: p.g, mass: p.mass, tFlight: p.tFlight },
+          APP.simTime
+        );
+
+        p.x = state.x;
+        p.y = state.y;
+        p.vx = state.vx;
+        p.vy = state.vy;
+        p.U = state.U;
+        p.K = state.K;
+
+        // Record trail and 0.2s strobe snapshots
+        p.trail.push({ x: p.x, y: p.y });
+        if (p.trail.length > 260) p.trail.shift();
+
+        if (Math.floor(APP.simTime / 0.2) > Math.floor(prevT / 0.2)) {
+          p.strobePoints.push({ x: p.x, y: p.y });
+        }
+
+        if (state.landed) {
+          p.landed = true;
+          APP.simTime = p.tFlight;
+          APP.isRunning = false;
+          APP.isPaused = true;
+          APP.slowMoActive = false;
+          hideStageBanner();
+          onProjectileLanded();
+        }
+      }
+
+      else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        APP.simTime += dt;
+
+        // Check slow-motion window around tImpact
+        if (APP.autoSlowMo && !APP.reducedMotion && Math.abs(APP.simTime - c.tImpact) < 0.14) {
+          APP.slowMoActive = true;
+          showStageBanner('충돌 임팩트 순간! 운동량·에너지 전이 슬로모션');
+        } else if (APP.slowMoActive) {
+          APP.slowMoActive = false;
+          hideStageBanner();
+        }
+
+        if (APP.simTime < c.tImpact) {
+          c.x1 = c.x1_0 + c.u1 * APP.simTime;
+          c.x2 = c.x2_0 + c.u2 * APP.simTime;
+          c.v1 = c.u1;
+          c.v2 = c.u2;
+          c.K = c.KBefore;
+          c.ELoss = 0;
+        } else {
+          if (!c.hasCollided) {
+            c.hasCollided = true;
+            c.impactFlash = 1.0;
+            spawnImpactParticles(c.xImpact, 0.85, 0, '#00f2fe', '#fbbf24');
+            onCollisionOccurred();
+          }
+          const postT = APP.simTime - c.tImpact;
+          c.x1 = c.xImpact - c.r1 + c.v1After * postT;
+          c.x2 = c.xImpact + c.r2 + c.v2After * postT;
+          c.v1 = c.v1After;
+          c.v2 = c.v2After;
+          c.K = c.KAfter;
+          c.ELoss = c.ELossAfter;
+
+          // Stop cleanly once spheres reach ends of the 15m arena track
+          if (Math.abs(c.x1) > 13.5 || Math.abs(c.x2) > 13.5 || postT > 3.2) {
+            APP.isRunning = false;
+            APP.isPaused = true;
+            APP.slowMoActive = false;
+            hideStageBanner();
+          }
+        }
+        c.impactFlash = Math.max(0, c.impactFlash - dt * 2.5);
+      }
+
+      else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        // Sub-step with RK4 for ultra-stable nonlinear integration
+        const subSteps = 4;
+        const h = dt / subSteps;
+        for (let i = 0; i < subSteps; i++) {
+          const nextMain = stepPendulumRK4(pd.theta, pd.omega, pd.g, pd.L, h);
+          pd.theta = nextMain.theta;
+          pd.omega = nextMain.omega;
+
+          const nextGhost = stepPendulumRK4(pd.ghostTheta, pd.ghostOmega, pd.g, pd.ghostL, h);
+          pd.ghostTheta = nextGhost.theta;
+          pd.ghostOmega = nextGhost.omega;
+        }
+        APP.simTime += dt;
+
+        pd.U = pd.mass * pd.g * pd.L * (1 - Math.cos(pd.theta));
+        pd.K = 0.5 * pd.mass * Math.pow(pd.L * pd.omega, 2);
+
+        const bobX = pd.L * Math.sin(pd.theta);
+        const bobY = 6.2 - pd.L * Math.cos(pd.theta);
+        pd.trail.push({ x: bobX, y: bobY });
+        if (pd.trail.length > 90) pd.trail.shift();
+      }
+
+      // Sample energy time-series for chart every ~0.03s
+      APP.chartSampleTimer += dt;
+      if (APP.chartSampleTimer >= 0.03) {
+        APP.chartSampleTimer = 0;
+        sampleEnergyChartPoint();
+      }
+    }
+
+    function sampleEnergyChartPoint() {
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        APP.chartHistory.push({
+          t: APP.simTime,
+          K: p.K,
+          U: p.U,
+          loss: 0,
+          E: p.K + p.U
+        });
+      } else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        APP.chartHistory.push({
+          t: APP.simTime,
+          K: c.K,
+          U: 0,
+          loss: c.ELoss,
+          E: c.K + c.ELoss
+        });
+      } else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        APP.chartHistory.push({
+          t: APP.simTime,
+          K: pd.K,
+          U: pd.U,
+          loss: 0,
+          E: pd.K + pd.U
+        });
+      }
+      if (APP.chartHistory.length > 160) {
+        APP.chartHistory.shift();
+      }
+    }
+
+    // =======================================================================
+    // 5. MISSION EVALUATION & EXPERIMENT LOGGING
+    // =======================================================================
+
+    function onProjectileLanded() {
+      const p = APP.projectile;
+      const err = Math.abs(p.range - p.targetX);
+      const badge = document.getElementById('proj-mission-badge');
+      const feedback = document.getElementById('proj-mission-feedback');
+
+      // Spawn landing particles
+      spawnImpactParticles(p.range, 0.1, 0, err <= 0.5 ? '#10b981' : '#00f2fe', '#fbbf24');
+
+      if (badge && feedback) {
+        if (err <= 0.5) {
+          badge.textContent = '명중 성공! (PASS)';
+          badge.className = 'text-[11px] font-mono-num font-bold px-2 py-0.5 rounded bg-emerald-500/25 text-emerald-300 border border-emerald-400/50';
+          feedback.innerHTML = `🎯 과녁 중심(30.0m)에 <strong class="font-mono-num text-emerald-300">오차 ${err.toFixed(2)}m</strong>로 정확히 명중했습니다!`;
+          if (p.planet === 'earth') {
+            completeMission(1);
+          }
+        } else if (err <= 2.0) {
+          badge.textContent = `근접 (${err.toFixed(2)}m 오차)`;
+          badge.className = 'text-[11px] font-mono-num font-bold px-2 py-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-400/50';
+          feedback.innerHTML = `착지 위치 <strong class="font-mono-num text-amber-300">${p.range.toFixed(2)}m</strong> · 목표까지 ${err.toFixed(2)}m 차이입니다. 속도를 미세 조절해보세요!`;
+        } else {
+          badge.textContent = `오차 ${err.toFixed(1)}m`;
+          badge.className = 'text-[11px] font-mono-num font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300';
+          feedback.innerHTML = `착지 위치 <strong class="font-mono-num text-cyan-300">${p.range.toFixed(2)}m</strong> (목표 30.0m 대비 ${p.range > p.targetX ? '+' : ''}${(p.range - p.targetX).toFixed(2)}m)`;
+        }
+      }
+
+      addExperimentLogEntry(
+        '투사체',
+        `θ=${p.angleDeg}°, v₀=${p.v0}m/s, m=${p.mass}kg, g=${p.g}`,
+        `사거리 ${p.range.toFixed(2)}m, 최고높이 ${p.maxHeight.toFixed(2)}m, 오차 ${err.toFixed(2)}m`
+      );
+    }
+
+    function onCollisionOccurred() {
+      const c = APP.collision;
+      if (Math.abs(c.e - 1.0) < 0.01) {
+        APP.missions[2].testedElastic = true;
+      }
+      if (c.e < 0.8) {
+        APP.missions[2].testedInelastic = true;
+      }
+      if (APP.missions[2].testedElastic && APP.missions[2].testedInelastic) {
+        completeMission(2);
+      }
+
+      addExperimentLogEntry(
+        '충돌',
+        `e=${c.e.toFixed(2)}, m₁=${c.m1}kg(${c.u1}m/s), m₂=${c.m2}kg(${c.u2}m/s)`,
+        `p=${c.pAfter.toFixed(1)}N·s 보존, 열손실 ${c.ELossAfter.toFixed(1)}J`
+      );
+    }
+
+    function completeMission(id) {
+      if (APP.missions[id].completed) return;
+      APP.missions[id].completed = true;
+      const statusEl = document.getElementById(`mission-status-${id}`);
+      const cardEl = document.getElementById(`mission-card-${id}`);
+      if (statusEl) {
+        statusEl.textContent = '달성 완료 ✓';
+        statusEl.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/50';
+      }
+      if (cardEl) {
+        cardEl.classList.add('border-emerald-400/70');
+      }
+    }
+
+    function activateMission(id) {
+      if (id === 1) {
+        switchMode('projectile');
+        setProjectileGravity('earth', 9.8);
+      } else if (id === 2) {
+        switchMode('collision');
+      } else if (id === 3) {
+        switchMode('pendulum');
+      }
+    }
+
+    function addExperimentLogEntry(modeName, paramsStr, resultStr) {
+      const idx = APP.experimentLogs.length + 1;
+      const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+      APP.experimentLogs.unshift({ idx, timeStr, modeName, paramsStr, resultStr });
+      if (APP.experimentLogs.length > 30) APP.experimentLogs.pop();
+
+      document.getElementById('log-count').textContent = APP.experimentLogs.length;
+      const tbody = document.getElementById('experiment-log-tbody');
+      tbody.innerHTML = APP.experimentLogs.map(item => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-1.5 px-1 text-cyan-400 font-bold">${item.idx}</td>
+          <td class="py-1.5 px-1 font-bold">${item.modeName}</td>
+          <td class="py-1.5 px-1 text-slate-300">${item.paramsStr}</td>
+          <td class="py-1.5 px-1 text-amber-300">${item.resultStr}</td>
+        </tr>
+      `).join('');
+    }
+
+    function recordCurrentSnapshotToLog() {
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        addExperimentLogEntry(
+          '투사체',
+          `θ=${p.angleDeg}°, v₀=${p.v0}m/s, g=${p.g}`,
+          `사거리 ${p.range.toFixed(2)}m, E=${p.totalEnergy.toFixed(1)}J`
+        );
+      } else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        addExperimentLogEntry(
+          '충돌',
+          `e=${c.e.toFixed(2)}, m₁=${c.m1}kg, m₂=${c.m2}kg`,
+          `v₁'=${c.v1After.toFixed(2)}, v₂'=${c.v2After.toFixed(2)}, 손실=${c.ELossAfter.toFixed(1)}J`
+        );
+      } else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        addExperimentLogEntry(
+          '진자',
+          `L=${pd.L}m, m=${pd.mass}kg, θ₀=${pd.theta0Deg}°, g=${pd.g}`,
+          `주기 T=${pd.periodExact.toFixed(3)}s, E=${pd.E0.toFixed(1)}J`
+        );
+      }
+    }
+
+    function downloadExperimentCSV() {
+      if (APP.experimentLogs.length === 0) {
+        recordCurrentSnapshotToLog();
+      }
+      const headers = ['번호', '시각', '실험모드', '입력변수', '측정결과'];
+      const rows = APP.experimentLogs.map(r => [
+        r.idx,
+        r.timeStr,
+        r.modeName,
+        `"${r.paramsStr.replace(/"/g, '""')}"`,
+        `"${r.resultStr.replace(/"/g, '""')}"`
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `argon_physics_lab_기록_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    // =======================================================================
+    // 6. THREE.JS 3D WEBGL SCENE SETUP & PROCEDURAL MESHES
+    // =======================================================================
+    let scene, camera, renderer;
+    let groupProjectile, groupCollision, groupPendulum;
+    // Projectile 3D objects
+    let meshLauncherBarrel, meshProjectileBall, meshProjectileShadow, linePredictedArc, lineLiveTrail;
+    let meshTargetGroup, meshPeakMarker;
+    let strobeInstancedMeshes = [];
+    // Collision 3D objects
+    let meshColSphereA, meshColSphereB, meshImpactRing, arrowVelA, arrowVelB;
+    // Pendulum 3D objects
+    let meshPendRod, meshPendBob, meshPendShadow, linePendTrail;
+    let meshGhostGroup, meshGhostRod, meshGhostBob;
+    // Shared 3D particle system
+    let particleMeshes = [];
+
+    function createTextSprite(text, colorHex = '#00f2fe', scale = 1.6) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'rgba(6, 12, 28, 0.78)';
+      ctx.strokeStyle = colorHex;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(6, 6, 244, 52, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = 'bold 26px "JetBrains Mono", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 128, 33);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(scale * 2.2, scale * 0.55, 1);
+      return sprite;
+    }
+
+    function initThreeJSStage() {
+      try {
+        if (typeof THREE === 'undefined') {
+          throw new Error('Three.js not loaded');
+        }
+        const canvas = document.getElementById('webgl-canvas');
+        renderer = new THREE.WebGLRenderer({
+          canvas,
+          antialias: true,
+          powerPreference: 'high-performance'
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x040711, 1);
+
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x040711, 0.012);
+
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 250);
+
+        // Museum Lighting
+        const ambientLight = new THREE.AmbientLight(0x94a3b8, 0.85);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 1.15);
+        dirLight1.position.set(18, 32, 24);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0xa855f7, 0.65);
+        dirLight2.position.set(-20, 15, -18);
+        scene.add(dirLight2);
+
+        // Reflective Museum Floor Plane + Holographic Coordinate Grid
+        const floorGeo = new THREE.PlaneGeometry(160, 100);
+        const floorMat = new THREE.MeshStandardMaterial({
+          color: 0x060b19,
+          roughness: 0.25,
+          metalness: 0.75
+        });
+        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.position.set(15, -0.02, 0);
+        scene.add(floorMesh);
+
+        const gridHelper = new THREE.GridHelper(120, 60, 0x00f2fe, 0x1e293b);
+        gridHelper.position.set(15, 0.0, 0);
+        gridHelper.material.opacity = 0.42;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+
+        // Build Mode Groups
+        groupProjectile = new THREE.Group();
+        groupCollision = new THREE.Group();
+        groupPendulum = new THREE.Group();
+        scene.add(groupProjectile);
+        scene.add(groupCollision);
+        scene.add(groupPendulum);
+
+        buildProjectile3DObjects();
+        buildCollision3DObjects();
+        buildPendulum3DObjects();
+        buildSharedParticles3D();
+
+        APP.webglAvailable = true;
+        APP.use2DFallback = false;
+      } catch (err) {
+        console.warn('WebGL/Three.js unavailable, activating 2D Projection Fallback:', err);
+        APP.webglAvailable = false;
+        APP.use2DFallback = true;
+        activate2DFallbackUI();
+      }
+    }
+
+    function buildProjectile3DObjects() {
+      // Distance markers along X axis (0m to 50m)
+      for (let x = 0; x <= 50; x += 10) {
+        const label = createTextSprite(`${x}m`, x === 30 ? '#fbbf24' : '#38bdf8', 1.3);
+        label.position.set(x, 0.45, 2.6);
+        groupProjectile.add(label);
+      }
+
+      // Launcher Pedestal at (0, 0, 0)
+      const baseGeo = new THREE.CylinderGeometry(0.9, 1.2, 0.8, 24);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.2 });
+      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+      baseMesh.position.set(0, 0.4, 0);
+      groupProjectile.add(baseMesh);
+
+      // Glowing Pivot Ring at h = 1.0m
+      const ringGeo = new THREE.TorusGeometry(0.65, 0.07, 16, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.set(0, 1.0, 0);
+      groupProjectile.add(ringMesh);
+
+      // Rotating Cannon Barrel Group pivoted at (0, 1.0, 0)
+      meshLauncherBarrel = new THREE.Group();
+      meshLauncherBarrel.position.set(0, 1.0, 0);
+      const barrelCyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.30, 1.8, 20),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.15, emissive: 0x0284c7, emissiveIntensity: 0.35 })
+      );
+      barrelCyl.rotation.z = -Math.PI / 2;
+      barrelCyl.position.x = 0.7;
+      meshLauncherBarrel.add(barrelCyl);
+      groupProjectile.add(meshLauncherBarrel);
+
+      // Projectile Sphere
+      meshProjectileBall = new THREE.Mesh(
+        new THREE.SphereGeometry(0.45, 32, 32),
+        new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x00f2fe, emissiveIntensity: 0.6, roughness: 0.1, metalness: 0.3 })
+      );
+      groupProjectile.add(meshProjectileBall);
+
+      // Floor Shadow under Projectile
+      meshProjectileShadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.5, 24),
+        new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.35 })
+      );
+      meshProjectileShadow.rotation.x = -Math.PI / 2;
+      meshProjectileShadow.position.y = 0.02;
+      groupProjectile.add(meshProjectileShadow);
+
+      // Predicted Trajectory Dashed Line
+      const predGeo = new THREE.BufferGeometry();
+      const predPositions = new Float32Array(120 * 3);
+      predGeo.setAttribute('position', new THREE.BufferAttribute(predPositions, 3));
+      linePredictedArc = new THREE.Line(
+        predGeo,
+        new THREE.LineDashedMaterial({ color: 0x38bdf8, dashSize: 0.6, gapSize: 0.35, transparent: true, opacity: 0.55 })
+      );
+      groupProjectile.add(linePredictedArc);
+
+      // Live Glowing Trail Line
+      const trailGeo = new THREE.BufferGeometry();
+      const trailPositions = new Float32Array(260 * 3);
+      trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+      lineLiveTrail = new THREE.Line(
+        trailGeo,
+        new THREE.LineBasicMaterial({ color: 0xfbbf24, linewidth: 2 })
+      );
+      groupProjectile.add(lineLiveTrail);
+
+      // Strobe Spheres Pool (up to 30 snapshots)
+      const strobeGeo = new THREE.SphereGeometry(0.16, 12, 12);
+      const strobeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.5 });
+      for (let i = 0; i < 30; i++) {
+        const sm = new THREE.Mesh(strobeGeo, strobeMat);
+        sm.visible = false;
+        groupProjectile.add(sm);
+        strobeInstancedMeshes.push(sm);
+      }
+
+      // Peak Height Laser Pillar
+      meshPeakMarker = new THREE.Group();
+      const peakLineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 1, 0)
+      ]);
+      const peakLine = new THREE.Line(
+        peakLineGeo,
+        new THREE.LineBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.55 })
+      );
+      peakLine.name = 'peakStem';
+      meshPeakMarker.add(peakLine);
+      groupProjectile.add(meshPeakMarker);
+
+      // Target Bullseye at x = 30.0m
+      meshTargetGroup = new THREE.Group();
+      meshTargetGroup.position.set(30.0, 0.03, 0);
+      const rings = [
+        { r: 2.0, col: 0xef4444, op: 0.25 },
+        { r: 1.2, col: 0xfbbf24, op: 0.45 },
+        { r: 0.5, col: 0x10b981, op: 0.85 }
+      ];
+      rings.forEach(rg => {
+        const m = new THREE.Mesh(
+          new THREE.RingGeometry(rg.r * 0.72, rg.r, 32),
+          new THREE.MeshBasicMaterial({ color: rg.col, side: THREE.DoubleSide, transparent: true, opacity: rg.op })
+        );
+        m.rotation.x = -Math.PI / 2;
+        meshTargetGroup.add(m);
+      });
+      groupProjectile.add(meshTargetGroup);
+    }
+
+    function update3DPredictedTrajectory() {
+      if (!APP.webglAvailable || !linePredictedArc) return;
+      const p = APP.projectile;
+      const posAttr = linePredictedArc.geometry.attributes.position;
+      const numPts = 120;
+      for (let i = 0; i < numPts; i++) {
+        const t = (i / (numPts - 1)) * p.tFlight;
+        const x = p.vx0 * t;
+        const y = Math.max(0, p.h0 + p.vy0 * t - 0.5 * p.g * t * t);
+        posAttr.setXYZ(i, x, y, 0);
+      }
+      posAttr.needsUpdate = true;
+      linePredictedArc.computeLineDistances();
+
+      if (meshPeakMarker) {
+        const xPeak = p.vx0 * p.tPeak;
+        meshPeakMarker.position.set(xPeak, 0, 0);
+        meshPeakMarker.scale.set(1, p.maxHeight, 1);
+      }
+    }
+
+    function buildCollision3DObjects() {
+      // Linear Magnetic Track Base (-14m to +14m)
+      const trackGeo = new THREE.BoxGeometry(28, 0.25, 2.2);
+      const trackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.85, roughness: 0.2 });
+      const trackMesh = new THREE.Mesh(trackGeo, trackMat);
+      trackMesh.position.set(0, -0.12, 0);
+      groupCollision.add(trackMesh);
+
+      // Glowing Neon Rails
+      const railGeo = new THREE.BoxGeometry(28, 0.06, 0.08);
+      const railMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const railFront = new THREE.Mesh(railGeo, railMat);
+      railFront.position.set(0, 0.03, 0.95);
+      const railBack = railFront.clone();
+      railBack.position.set(0, 0.03, -0.95);
+      groupCollision.add(railFront, railBack);
+
+      // Track Distance Labels (-10m, -5m, 0m, +5m, +10m)
+      [-10, -5, 0, 5, 10].forEach(x => {
+        const sp = createTextSprite(`${x > 0 ? '+' : ''}${x}m`, '#a855f7', 1.15);
+        sp.position.set(x, 0.45, 1.9);
+        groupCollision.add(sp);
+      });
+
+      // Sphere A (Cyan) & Sphere B (Purple)
+      meshColSphereA = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 32, 32),
+        new THREE.MeshStandardMaterial({ color: 0x00f2fe, emissive: 0x0284c7, emissiveIntensity: 0.45, roughness: 0.15, metalness: 0.5 })
+      );
+      meshColSphereB = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 32, 32),
+        new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0x7e22ce, emissiveIntensity: 0.45, roughness: 0.15, metalness: 0.5 })
+      );
+      groupCollision.add(meshColSphereA, meshColSphereB);
+
+      // Velocity Vector Arrows above spheres
+      arrowVelA = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 2, 0), 2, 0x00f2fe, 0.45, 0.3);
+      arrowVelB = new THREE.ArrowHelper(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 2, 0), 2, 0xc084fc, 0.45, 0.3);
+      groupCollision.add(arrowVelA, arrowVelB);
+
+      // Shockwave Ring at Collision Point
+      meshImpactRing = new THREE.Mesh(
+        new THREE.TorusGeometry(1.1, 0.08, 16, 32),
+        new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0 })
+      );
+      meshImpactRing.rotation.y = Math.PI / 2;
+      groupCollision.add(meshImpactRing);
+    }
+
+    function buildPendulum3DObjects() {
+      const pivotY = 6.2;
+
+      // Cybernetic Gantry Frame
+      const pillarGeo = new THREE.CylinderGeometry(0.14, 0.18, pivotY, 16);
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.25 });
+      const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+      leftPillar.position.set(-4.8, pivotY / 2, -1.2);
+      const rightPillar = leftPillar.clone();
+      rightPillar.position.set(4.8, pivotY / 2, -1.2);
+
+      const crossbarGeo = new THREE.CylinderGeometry(0.14, 0.14, 10.2, 16);
+      const crossbar = new THREE.Mesh(crossbarGeo, pillarMat);
+      crossbar.rotation.z = Math.PI / 2;
+      crossbar.position.set(0, pivotY, 0);
+
+      // Protractor Arc at Pivot
+      const arcGeo = new THREE.RingGeometry(1.4, 1.52, 32, 1, -Math.PI, Math.PI);
+      const arcMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+      const arcMesh = new THREE.Mesh(arcGeo, arcMat);
+      arcMesh.position.set(0, pivotY, 0);
+
+      groupPendulum.add(leftPillar, rightPillar, crossbar, arcMesh);
+
+      // Main Pendulum Rod & Bob
+      meshPendRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.04, 0.04, 1, 12),
+        new THREE.MeshBasicMaterial({ color: 0x00f2fe })
+      );
+      meshPendBob = new THREE.Mesh(
+        new THREE.SphereGeometry(0.45, 32, 32),
+        new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xd97706, emissiveIntensity: 0.5, roughness: 0.15, metalness: 0.4 })
+      );
+      meshPendShadow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.45, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.35 })
+      );
+      meshPendShadow.rotation.x = -Math.PI / 2;
+      meshPendShadow.position.y = 0.02;
+
+      // Glowing Swing Trail
+      const pTrailGeo = new THREE.BufferGeometry();
+      pTrailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(90 * 3), 3));
+      linePendTrail = new THREE.Line(
+        pTrailGeo,
+        new THREE.LineBasicMaterial({ color: 0x00f2fe })
+      );
+
+      groupPendulum.add(meshPendRod, meshPendBob, meshPendShadow, linePendTrail);
+
+      // Ghost Comparison Pendulum (offset back at z = -1.2m)
+      meshGhostGroup = new THREE.Group();
+      meshGhostRod = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 1, 10),
+        new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.45 })
+      );
+      meshGhostBob = new THREE.Mesh(
+        new THREE.SphereGeometry(0.36, 24, 24),
+        new THREE.MeshStandardMaterial({ color: 0xa855f7, transparent: true, opacity: 0.55 })
+      );
+      meshGhostGroup.add(meshGhostRod, meshGhostBob);
+      groupPendulum.add(meshGhostGroup);
+    }
+
+    function buildSharedParticles3D() {
+      const geo = new THREE.SphereGeometry(0.11, 8, 8);
+      for (let i = 0; i < 28; i++) {
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0 });
+        const m = new THREE.Mesh(geo, mat);
+        m.visible = false;
+        scene.add(m);
+        particleMeshes.push(m);
+      }
+    }
+
+    function spawnImpactParticles(x, y, z, col1 = '#00f2fe', col2 = '#fbbf24') {
+      if (APP.reducedMotion) return;
+      APP.particles = [];
+      for (let i = 0; i < 24; i++) {
+        const angle = (i / 24) * Math.PI * 2 + (i % 3) * 0.2;
+        const speed = 2.0 + (i % 5) * 1.1;
+        APP.particles.push({
+          x,
+          y,
+          z,
+          vx: Math.cos(angle) * speed,
+          vy: Math.abs(Math.sin(angle)) * speed * 0.8 + 1.5,
+          vz: Math.sin(angle * 1.7) * speed * 0.6,
+          life: 1.0,
+          color: i % 2 === 0 ? col1 : col2
+        });
+      }
+    }
+
+    // =======================================================================
+    // 7. SYNC 3D SCENE & 2D FALLBACK RENDERER TO PHYSICS STATE
+    // =======================================================================
+
+    function sync3DSceneToPhysics() {
+      if (!APP.webglAvailable || APP.use2DFallback) return;
+
+      groupProjectile.visible = APP.mode === 'projectile';
+      groupCollision.visible = APP.mode === 'collision';
+      groupPendulum.visible = APP.mode === 'pendulum';
+
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        meshLauncherBarrel.rotation.z = (p.angleDeg * Math.PI) / 180;
+        const scaleR = 0.85 + 0.08 * Math.cbrt(p.mass);
+        meshProjectileBall.scale.setScalar(scaleR);
+        meshProjectileBall.position.set(p.x, p.y, 0);
+        meshProjectileShadow.position.set(p.x, 0.02, 0);
+        const shadowScale = Math.max(0.3, 1.1 - p.y * 0.04);
+        meshProjectileShadow.scale.setScalar(shadowScale);
+
+        // Update live trail buffer
+        const posAttr = lineLiveTrail.geometry.attributes.position;
+        const pts = p.trail;
+        for (let i = 0; i < 260; i++) {
+          const pt = pts[Math.min(i, pts.length - 1)] || { x: 0, y: p.h0 };
+          posAttr.setXYZ(i, pt.x, pt.y, 0);
+        }
+        posAttr.needsUpdate = true;
+
+        // Update strobe spheres
+        for (let i = 0; i < strobeInstancedMeshes.length; i++) {
+          if (i < p.strobePoints.length) {
+            strobeInstancedMeshes[i].visible = true;
+            strobeInstancedMeshes[i].position.set(p.strobePoints[i].x, p.strobePoints[i].y, 0);
+          } else {
+            strobeInstancedMeshes[i].visible = false;
+          }
+        }
+      }
+
+      else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        meshColSphereA.scale.setScalar(c.r1);
+        meshColSphereA.position.set(c.x1, c.r1, 0);
+
+        meshColSphereB.scale.setScalar(c.r2);
+        meshColSphereB.position.set(c.x2, c.r2, 0);
+
+        // Update Velocity Arrows
+        const speedA = Math.abs(c.v1);
+        arrowVelA.visible = speedA > 0.05;
+        if (arrowVelA.visible) {
+          arrowVelA.position.set(c.x1, c.r1 * 2 + 0.45, 0);
+          arrowVelA.setDirection(new THREE.Vector3(c.v1 >= 0 ? 1 : -1, 0, 0));
+          arrowVelA.setLength(Math.max(0.6, speedA * 0.35), 0.35, 0.22);
+        }
+
+        const speedB = Math.abs(c.v2);
+        arrowVelB.visible = speedB > 0.05;
+        if (arrowVelB.visible) {
+          arrowVelB.position.set(c.x2, c.r2 * 2 + 0.45, 0);
+          arrowVelB.setDirection(new THREE.Vector3(c.v2 >= 0 ? 1 : -1, 0, 0));
+          arrowVelB.setLength(Math.max(0.6, speedB * 0.35), 0.35, 0.22);
+        }
+
+        // Shockwave Ring on impact
+        if (c.impactFlash > 0.01) {
+          meshImpactRing.position.set(c.xImpact, 0.9, 0);
+          const s = 1 + (1 - c.impactFlash) * 2.8;
+          meshImpactRing.scale.setScalar(s);
+          meshImpactRing.material.opacity = c.impactFlash * 0.85;
+        } else {
+          meshImpactRing.material.opacity = 0;
+        }
+      }
+
+      else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        const pivotY = 6.2;
+        const bobX = pd.L * Math.sin(pd.theta);
+        const bobY = pivotY - pd.L * Math.cos(pd.theta);
+
+        meshPendRod.scale.set(1, pd.L, 1);
+        meshPendRod.position.set(bobX / 2, (pivotY + bobY) / 2, 0);
+        meshPendRod.rotation.z = pd.theta;
+
+        const bobScale = 0.78 + 0.14 * Math.cbrt(pd.mass);
+        meshPendBob.scale.setScalar(bobScale);
+        meshPendBob.position.set(bobX, bobY, 0);
+        meshPendShadow.position.set(bobX, 0.02, 0);
+
+        // Update pendulum trail
+        const posAttr = linePendTrail.geometry.attributes.position;
+        const pts = pd.trail;
+        for (let i = 0; i < 90; i++) {
+          const pt = pts[Math.min(i, pts.length - 1)] || { x: bobX, y: bobY };
+          posAttr.setXYZ(i, pt.x, pt.y, 0);
+        }
+        posAttr.needsUpdate = true;
+
+        // Ghost Comparison Pendulum
+        meshGhostGroup.visible = pd.showGhost;
+        if (pd.showGhost) {
+          const gX = pd.ghostL * Math.sin(pd.ghostTheta);
+          const gY = pivotY - pd.ghostL * Math.cos(pd.ghostTheta);
+          const gZ = -1.2;
+          meshGhostRod.scale.set(1, pd.ghostL, 1);
+          meshGhostRod.position.set(gX / 2, (pivotY + gY) / 2, gZ);
+          meshGhostRod.rotation.z = pd.ghostTheta;
+          meshGhostBob.position.set(gX, gY, gZ);
+        }
+      }
+
+      // Sync shared particles
+      for (let i = 0; i < particleMeshes.length; i++) {
+        const pm = particleMeshes[i];
+        const pt = APP.particles[i];
+        if (pt && pt.life > 0.02) {
+          pm.visible = true;
+          pm.position.set(pt.x, pt.y, pt.z);
+          pm.material.color.set(pt.color);
+          pm.material.opacity = pt.life;
+        } else {
+          pm.visible = false;
+        }
+      }
+
+      // Update Orbit Camera Position from Spherical Angles
+      const cam = APP.camera;
+      const cx = cam.targetX + cam.distance * Math.sin(cam.theta) * Math.cos(cam.phi);
+      const cy = Math.max(0.8, cam.targetY + cam.distance * Math.sin(cam.phi));
+      const cz = cam.targetZ + cam.distance * Math.cos(cam.theta) * Math.cos(cam.phi);
+      camera.position.set(cx, cy, cz);
+      camera.lookAt(cam.targetX, cam.targetY, cam.targetZ);
+    }
+
+    // =======================================================================
+    // 8. BUILT-IN 2D ISOMETRIC/3D-PROJECTED FALLBACK RENDERER
+    //    Guarantees a rich interactive stage even if WebGL is disabled!
+    // =======================================================================
+
+    function project3DTo2D(x, y, z, width, height) {
+      const cam = APP.camera;
+      const dx = x - cam.targetX;
+      const dy = y - cam.targetY;
+      const dz = z - cam.targetZ;
+
+      // Rotate by camera azimuth theta and elevation phi
+      const cosT = Math.cos(-cam.theta);
+      const sinT = Math.sin(-cam.theta);
+      const rx = dx * cosT - dz * sinT;
+      const rz = dx * sinT + dz * cosT;
+
+      const cosP = Math.cos(cam.phi);
+      const sinP = Math.sin(cam.phi);
+      const ry = dy * cosP - rz * sinP;
+      const depth = dy * sinP + rz * cosP + cam.distance;
+
+      const fovScale = (Math.min(width, height) * 0.92) / Math.max(4, depth);
+      return {
+        sx: width * 0.52 + rx * fovScale,
+        sy: height * 0.54 - ry * fovScale,
+        scale: fovScale
+      };
+    }
+
+    function render2DFallbackStage() {
+      const canvas = document.getElementById('fallback-2d-canvas');
+      if (!canvas) return;
+      if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+
+      // Deep midnight museum background
+      const grad = ctx.createRadialGradient(W * 0.5, H * 0.45, 50, W * 0.5, H * 0.5, Math.max(W, H) * 0.75);
+      grad.addColorStop(0, '#0a132c');
+      grad.addColorStop(1, '#040711');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Draw 3D Projected Coordinate Floor Grid
+      ctx.lineWidth = 1;
+      for (let gx = -15; gx <= 55; gx += 5) {
+        const p1 = project3DTo2D(gx, 0, -12, W, H);
+        const p2 = project3DTo2D(gx, 0, 12, W, H);
+        ctx.strokeStyle = gx === 0 ? 'rgba(0, 242, 254, 0.45)' : 'rgba(56, 189, 248, 0.14)';
+        ctx.beginPath();
+        ctx.moveTo(p1.sx, p1.sy);
+        ctx.lineTo(p2.sx, p2.sy);
+        ctx.stroke();
+      }
+      for (let gz = -12; gz <= 12; gz += 4) {
+        const p1 = project3DTo2D(-15, 0, gz, W, H);
+        const p2 = project3DTo2D(55, 0, gz, W, H);
+        ctx.strokeStyle = gz === 0 ? 'rgba(0, 242, 254, 0.45)' : 'rgba(56, 189, 248, 0.14)';
+        ctx.beginPath();
+        ctx.moveTo(p1.sx, p1.sy);
+        ctx.lineTo(p2.sx, p2.sy);
+        ctx.stroke();
+      }
+
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        // Target rings at x = 30m
+        const tProj = project3DTo2D(p.targetX, 0, 0, W, H);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(tProj.sx, tProj.sy, tProj.scale * 1.5, tProj.scale * 0.55, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 12px "JetBrains Mono"';
+        ctx.fillText('TARGET 30.0m', tProj.sx - 40, tProj.sy + 22);
+
+        // Predicted Dashed Curve
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i <= 60; i++) {
+          const t = (i / 60) * p.tFlight;
+          const px = p.vx0 * t;
+          const py = Math.max(0, p.h0 + p.vy0 * t - 0.5 * p.g * t * t);
+          const pt = project3DTo2D(px, py, 0, W, H);
+          if (i === 0) ctx.moveTo(pt.sx, pt.sy);
+          else ctx.lineTo(pt.sx, pt.sy);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Live Trail
+        if (p.trail.length > 1) {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          p.trail.forEach((pt, idx) => {
+            const pr = project3DTo2D(pt.x, pt.y, 0, W, H);
+            if (idx === 0) ctx.moveTo(pr.sx, pr.sy);
+            else ctx.lineTo(pr.sx, pr.sy);
+          });
+          ctx.stroke();
+        }
+
+        // Projectile Ball
+        const ballP = project3DTo2D(p.x, p.y, 0, W, H);
+        ctx.fillStyle = '#00f2fe';
+        ctx.beginPath();
+        ctx.arc(ballP.sx, ballP.sy, Math.max(7, ballP.scale * 0.45), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        const pA = project3DTo2D(c.x1, c.r1, 0, W, H);
+        const pB = project3DTo2D(c.x2, c.r2, 0, W, H);
+
+        ctx.fillStyle = '#00f2fe';
+        ctx.beginPath();
+        ctx.arc(pA.sx, pA.sy, Math.max(12, pA.scale * c.r1), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#a855f7';
+        ctx.beginPath();
+        ctx.arc(pB.sx, pB.sy, Math.max(12, pB.scale * c.r2), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        const pivot = project3DTo2D(0, 6.2, 0, W, H);
+        const bobX = pd.L * Math.sin(pd.theta);
+        const bobY = 6.2 - pd.L * Math.cos(pd.theta);
+        const bob = project3DTo2D(bobX, bobY, 0, W, H);
+
+        ctx.strokeStyle = '#00f2fe';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(pivot.sx, pivot.sy);
+        ctx.lineTo(bob.sx, bob.sy);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(bob.sx, bob.sy, Math.max(10, bob.scale * 0.45), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // =======================================================================
+    // 9. REAL-TIME HUD & TIME-SERIES ENERGY CHART RENDERING
+    // =======================================================================
+
+    function updateHUDAndControls() {
+      // Update play/pause icon
+      const mainLabel = document.getElementById('label-main-action');
+      if (APP.mode === 'projectile') {
+        mainLabel.textContent = APP.projectile.landed ? '다시 발사 (RE-LAUNCH)' : '발사 (LAUNCH)';
+      } else if (APP.mode === 'collision') {
+        mainLabel.textContent = '충돌 실험 실행 (RUN)';
+      } else {
+        mainLabel.textContent = '진자 출발 (START)';
+      }
+
+      document.getElementById('hud-time-readout').textContent = `t = ${APP.simTime.toFixed(2)} s`;
+
+      const m1Label = document.getElementById('metric-1-label');
+      const m1Val = document.getElementById('metric-1-val');
+      const m2Label = document.getElementById('metric-2-label');
+      const m2Val = document.getElementById('metric-2-val');
+      const m3Label = document.getElementById('metric-3-label');
+      const m3Val = document.getElementById('metric-3-val');
+      const m4Label = document.getElementById('metric-4-label');
+      const m4Val = document.getElementById('metric-4-val');
+
+      let K = 0, U = 0, loss = 0, E = 0;
+
+      if (APP.mode === 'projectile') {
+        const p = APP.projectile;
+        const speed = Math.hypot(p.vx, p.vy);
+        m1Label.textContent = '현재 위치 (x, y)';
+        m1Val.textContent = `${p.x.toFixed(2)}m, ${p.y.toFixed(2)}m`;
+        m2Label.textContent = '순간 속력 (|v|)';
+        m2Val.textContent = `${speed.toFixed(2)} m/s`;
+        m3Label.textContent = '최고 높이 / 예상 사거리';
+        m3Val.textContent = `${p.maxHeight.toFixed(2)}m / ${p.range.toFixed(2)}m`;
+        m4Label.textContent = '총 체공 시간 (t_flight)';
+        m4Val.textContent = `${p.tFlight.toFixed(2)} s`;
+
+        K = p.K;
+        U = p.U;
+        loss = 0;
+        E = K + U;
+
+        document.getElementById('wrap-energy-u').classList.remove('hidden');
+        document.getElementById('wrap-energy-loss').classList.add('hidden');
+        document.getElementById('legend-u').classList.remove('hidden');
+        document.getElementById('legend-loss').classList.add('hidden');
+      }
+
+      else if (APP.mode === 'collision') {
+        const c = APP.collision;
+        const pCurr = c.m1 * c.v1 + c.m2 * c.v2;
+        m1Label.textContent = '구체 속도 (v₁, v₂)';
+        m1Val.textContent = `${c.v1.toFixed(2)}, ${c.v2.toFixed(2)} m/s`;
+        m2Label.textContent = '총 운동량 (p = m₁v₁+m₂v₂)';
+        m2Val.textContent = `${pCurr.toFixed(2)} N·s (보존)`;
+        m3Label.textContent = '충돌 전/후 운동에너지';
+        m3Val.textContent = `${c.KBefore.toFixed(1)}J → ${c.KAfter.toFixed(1)}J`;
+        m4Label.textContent = '열·변형 손실 에너지';
+        m4Val.textContent = `${c.ELoss.toFixed(2)} J`;
+
+        K = c.K;
+        U = 0;
+        loss = c.ELoss;
+        E = K + loss;
+
+        document.getElementById('wrap-energy-u').classList.add('hidden');
+        document.getElementById('wrap-energy-loss').classList.remove('hidden');
+        document.getElementById('legend-u').classList.add('hidden');
+        document.getElementById('legend-loss').classList.remove('hidden');
+      }
+
+      else if (APP.mode === 'pendulum') {
+        const pd = APP.pendulum;
+        const deg = (pd.theta * 180) / Math.PI;
+        const linSpeed = Math.abs(pd.L * pd.omega);
+        m1Label.textContent = '현재 각도 (θ)';
+        m1Val.textContent = `${deg >= 0 ? '+' : ''}${deg.toFixed(1)}°`;
+        m2Label.textContent = '접선 속력 (L·|ω|)';
+        m2Val.textContent = `${linSpeed.toFixed(2)} m/s`;
+        m3Label.textContent = '실제 주기 T (단진자 근사)';
+        m3Val.textContent = `${pd.periodExact.toFixed(3)}s (${pd.periodSmall.toFixed(3)}s)`;
+        m4Label.textContent = '기준 진자(1kg) 위상차';
+        const diffDeg = Math.abs(pd.theta - pd.ghostTheta) * (180 / Math.PI);
+        m4Val.textContent = `${diffDeg.toFixed(2)}°`;
+
+        K = pd.K;
+        U = pd.U;
+        loss = 0;
+        E = K + U;
+
+        document.getElementById('wrap-energy-u').classList.remove('hidden');
+        document.getElementById('wrap-energy-loss').classList.add('hidden');
+        document.getElementById('legend-u').classList.remove('hidden');
+        document.getElementById('legend-loss').classList.add('hidden');
+      }
+
+      // Update Energy Bar Readouts
+      document.getElementById('val-energy-k').textContent = K.toFixed(1);
+      document.getElementById('val-energy-u').textContent = U.toFixed(1);
+      document.getElementById('val-energy-loss').textContent = loss.toFixed(1);
+      document.getElementById('val-energy-total').textContent = E.toFixed(1);
+
+      const safeE = Math.max(E, 0.0001);
+      document.getElementById('bar-energy-k').style.width = `${(K / safeE) * 100}%`;
+      document.getElementById('bar-energy-u').style.width = `${(U / safeE) * 100}%`;
+      document.getElementById('bar-energy-loss').style.width = `${(loss / safeE) * 100}%`;
+
+      drawRealTimeEnergyChart();
+    }
+
+    function drawRealTimeEnergyChart() {
+      const canvas = document.getElementById('energy-chart-canvas');
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
+        canvas.width = Math.max(200, Math.floor(rect.width));
+        canvas.height = Math.max(80, Math.floor(rect.height));
+      }
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      // Subtle background grid lines
+      ctx.strokeStyle = 'rgba(51, 65, 85, 0.35)';
+      ctx.lineWidth = 1;
+      for (let y = 0.25; y < 1; y += 0.25) {
+        ctx.beginPath();
+        ctx.moveTo(0, H * y);
+        ctx.lineTo(W, H * y);
+        ctx.stroke();
+      }
+
+      const data = APP.chartHistory;
+      if (data.length < 2) return;
+
+      const maxE = Math.max(...data.map(d => d.E), 10) * 1.15;
+      const padTop = 20;
+      const padBottom = 8;
+      const plotH = H - padTop - padBottom;
+
+      const drawSeries = (key, color, dashed = false) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        if (dashed) ctx.setLineDash([4, 3]);
+        else ctx.setLineDash([]);
+        ctx.beginPath();
+        for (let i = 0; i < data.length; i++) {
+          const x = (i / (data.length - 1)) * (W - 12) + 6;
+          const y = H - padBottom - (data[i][key] / maxE) * plotH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      };
+
+      // Total Mechanical/System Energy E (Gold Horizontal Line)
+      drawSeries('E', '#fbbf24', true);
+      // Kinetic Energy K (Cyan)
+      drawSeries('K', '#00f2fe', false);
+      // Potential Energy U or Thermal Loss
+      if (APP.mode === 'collision') {
+        drawSeries('loss', '#f43f5e', false);
+      } else {
+        drawSeries('U', '#a855f7', false);
+      }
+    }
+
+    // =======================================================================
+    // 10. UI EVENT HANDLERS, MODE SWITCHING & PRESETS
+    // =======================================================================
+
+    function switchMode(newMode) {
+      APP.mode = newMode;
+      ['projectile', 'collision', 'pendulum'].forEach(m => {
+        const tab = document.getElementById(`tab-${m}`);
+        const ctrl = document.getElementById(`controls-${m}`);
+        if (m === newMode) {
+          tab.classList.add('mode-tab-active');
+          ctrl.classList.remove('hidden');
+          ctrl.classList.add('flex');
+        } else {
+          tab.classList.remove('mode-tab-active');
+          ctrl.classList.add('hidden');
+          ctrl.classList.remove('flex');
+        }
+      });
+
+      const formulaEl = document.getElementById('active-formula-text');
+      if (newMode === 'projectile') {
+        formulaEl.textContent = 'y(t) = h + v₀sin(θ)t - ½gt² | x(t) = v₀cos(θ)t | E = K + U = 일정';
+        setCameraPreset('home');
+      } else if (newMode === 'collision') {
+        formulaEl.textContent = 'm₁u₁ + m₂u₂ = m₁v₁\' + m₂v₂\' | e = -(v₁\' - v₂\') / (u₁ - u₂)';
+        setCameraPreset('home');
+      } else if (newMode === 'pendulum') {
+        formulaEl.textContent = 'θ\'\' = -(g/L)sin(θ) [RK4] | U = mgL(1-cosθ), K = ½m(Lω)²';
+        setCameraPreset('home');
+      }
+
+      resetCurrentExperiment(true);
+    }
+
+    function handleMainLaunchOrStart() {
+      resetCurrentExperiment(true);
+    }
+
+    function togglePauseSimulation() {
+      if (!APP.isRunning && APP.mode === 'projectile' && APP.projectile.landed) {
+        resetCurrentExperiment(true);
+        return;
+      }
+      APP.isPaused = !APP.isPaused;
+      APP.isRunning = !APP.isPaused;
+      updateHUDAndControls();
+    }
+
+    function setTimeScale(scale) {
+      APP.timeScale = scale;
+      const ids = { 0.25: 'speed-025', 1.0: 'speed-100', 2.0: 'speed-200' };
+      Object.entries(ids).forEach(([k, id]) => {
+        const btn = document.getElementById(id);
+        if (Math.abs(parseFloat(k) - scale) < 0.01) {
+          btn.className = 'px-2 py-1 rounded-lg text-xs font-mono-num font-bold bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 transition';
+        } else {
+          btn.className = 'px-2 py-1 rounded-lg text-xs font-mono-num font-bold text-slate-300 hover:bg-slate-800 transition';
+        }
+      });
+    }
+
+    function toggleAutoSlowMo() {
+      APP.autoSlowMo = !APP.autoSlowMo;
+      const btn = document.getElementById('btn-auto-slowmo');
+      const dot = document.getElementById('dot-auto-slowmo');
+      if (APP.autoSlowMo) {
+        btn.className = 'px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1 transition';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
+      } else {
+        btn.className = 'px-2 py-1 rounded-lg text-[11px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1 transition';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-500';
+        APP.slowMoActive = false;
+        hideStageBanner();
+      }
+    }
+
+    // --- Projectile Parameter Handlers ---
+    function updateProjectileParams() {
+      const p = APP.projectile;
+      p.angleDeg = parseFloat(document.getElementById('slider-proj-angle').value);
+      p.v0 = parseFloat(document.getElementById('slider-proj-speed').value);
+      p.mass = parseFloat(document.getElementById('slider-proj-mass').value);
+
+      document.getElementById('val-proj-angle').textContent = p.angleDeg.toFixed(0);
+      document.getElementById('val-proj-speed').textContent = p.v0.toFixed(1);
+      document.getElementById('val-proj-mass').textContent = p.mass.toFixed(1);
+
+      // Reset cleanly so physical state matches new parameters
+      resetCurrentExperiment(false);
+    }
+
+    function setProjectileGravity(planet, gVal) {
+      APP.projectile.planet = planet;
+      APP.projectile.g = gVal;
+      document.getElementById('val-proj-gravity').textContent = `${gVal.toFixed(2)} m/s²`;
+      ['earth', 'mars', 'moon'].forEach(pl => {
+        const btn = document.getElementById(`grav-proj-${pl}`);
+        if (pl === planet) {
+          btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold bg-cyan-500/25 text-white border border-cyan-400 transition';
+        } else {
+          btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition';
+        }
+      });
+      resetCurrentExperiment(true);
+    }
+
+    function applyProjectilePreset(type) {
+      if (type === 'target30') {
+        document.getElementById('slider-proj-angle').value = 45;
+        document.getElementById('slider-proj-speed').value = 16.9;
+        setProjectileGravity('earth', 9.8);
+        updateProjectileParams();
+        resetCurrentExperiment(true);
+      } else if (type === 'moonCompare') {
+        document.getElementById('slider-proj-angle').value = 35;
+        document.getElementById('slider-proj-speed').value = 9.0;
+        setProjectileGravity('moon', 1.62);
+        updateProjectileParams();
+        resetCurrentExperiment(true);
+      }
+    }
+
+    // --- Collision Parameter Handlers ---
+    function updateCollisionParams() {
+      const c = APP.collision;
+      c.e = parseFloat(document.getElementById('slider-col-e').value);
+      c.m1 = parseFloat(document.getElementById('slider-col-m1').value);
+      c.u1 = parseFloat(document.getElementById('slider-col-u1').value);
+      c.m2 = parseFloat(document.getElementById('slider-col-m2').value);
+      c.u2 = parseFloat(document.getElementById('slider-col-u2').value);
+
+      let eDesc = '부분비탄성';
+      if (c.e >= 0.99) eDesc = '탄성보존';
+      else if (c.e <= 0.01) eDesc = '완전비탄성';
+
+      document.getElementById('val-col-e').textContent = `${c.e.toFixed(2)} (${eDesc})`;
+      document.getElementById('val-col-m1').textContent = c.m1.toFixed(1);
+      document.getElementById('val-col-u1').textContent = c.u1.toFixed(1);
+      document.getElementById('val-col-m2').textContent = c.m2.toFixed(1);
+      document.getElementById('val-col-u2').textContent = c.u2.toFixed(1);
+
+      resetCurrentExperiment(false);
+    }
+
+    function applyCollisionPreset(type) {
+      if (type === 'elastic') {
+        document.getElementById('slider-col-e').value = 1.0;
+      } else if (type === 'inelastic') {
+        document.getElementById('slider-col-e').value = 0.5;
+      } else if (type === 'perfectInelastic') {
+        document.getElementById('slider-col-e').value = 0.0;
+      }
+      updateCollisionParams();
+      resetCurrentExperiment(true);
+    }
+
+    // --- Pendulum Parameter Handlers ---
+    function updatePendulumParams() {
+      const pd = APP.pendulum;
+      const newL = parseFloat(document.getElementById('slider-pend-length').value);
+      const newMass = parseFloat(document.getElementById('slider-pend-mass').value);
+      const newAngle = parseFloat(document.getElementById('slider-pend-angle').value);
+
+      if (Math.abs(newMass - pd.mass) > 0.1) APP.missions[3].testedMass = true;
+      if (Math.abs(newL - pd.L) > 0.1) APP.missions[3].testedLength = true;
+      if (APP.missions[3].testedMass && APP.missions[3].testedLength) {
+        completeMission(3);
+      }
+
+      pd.L = newL;
+      pd.mass = newMass;
+      pd.theta0Deg = newAngle;
+
+      document.getElementById('val-pend-length').textContent = pd.L.toFixed(2);
+      document.getElementById('val-pend-mass').textContent = pd.mass.toFixed(1);
+      document.getElementById('val-pend-angle').textContent = pd.theta0Deg.toFixed(0);
+
+      resetCurrentExperiment(true);
+    }
+
+    function setPendulumGravity(gVal) {
+      APP.pendulum.g = gVal;
+      const map = { 9.8: 'earth', 3.71: 'mars', 1.62: 'moon' };
+      const active = map[gVal] || 'earth';
+      ['earth', 'mars', 'moon'].forEach(pl => {
+        const btn = document.getElementById(`grav-pend-${pl}`);
+        if (pl === active) {
+          btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold bg-cyan-500/25 text-white border border-cyan-400 transition';
+        } else {
+          btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-300 border border-slate-700 hover:text-white transition';
+        }
+      });
+      resetCurrentExperiment(true);
+    }
+
+    function applyPendulumPreset(type) {
+      if (type === 'massInvariance') {
+        APP.pendulum.ghostL = 3.0;
+        APP.pendulum.showGhost = true;
+        document.getElementById('slider-pend-length').value = 3.0;
+        document.getElementById('slider-pend-mass').value = 5.0;
+        document.getElementById('slider-pend-angle').value = 40;
+        APP.missions[3].testedMass = true;
+        updatePendulumParams();
+      } else if (type === 'lengthChange') {
+        APP.pendulum.ghostL = 4.5;
+        APP.pendulum.showGhost = true;
+        document.getElementById('slider-pend-length').value = 1.5;
+        document.getElementById('slider-pend-mass').value = 2.0;
+        document.getElementById('slider-pend-angle').value = 35;
+        APP.missions[3].testedLength = true;
+        updatePendulumParams();
+      }
+    }
+
+    function toggleGhostPendulum() {
+      APP.pendulum.showGhost = !APP.pendulum.showGhost;
+      const btn = document.getElementById('btn-ghost-pend');
+      btn.textContent = APP.pendulum.showGhost ? '켜짐 (ON)' : '꺼짐 (OFF)';
+      btn.className = APP.pendulum.showGhost
+        ? 'px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-500/25 text-cyan-200 border border-cyan-400/50'
+        : 'px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700';
+      sync3DSceneToPhysics();
+    }
+
+    // --- Camera, Tour, and Presentation Controls ---
+    function setCameraPreset(preset) {
+      const cam = APP.camera;
+      if (APP.mode === 'projectile') {
+        cam.targetX = 14.5;
+        cam.targetY = 3.5;
+        cam.targetZ = 0;
+        if (preset === 'home') { cam.theta = 0.16; cam.phi = 0.32; cam.distance = 27; }
+        else if (preset === 'side') { cam.theta = 0.0; cam.phi = 0.08; cam.distance = 28; }
+        else if (preset === 'top') { cam.theta = 0.0; cam.phi = 1.38; cam.distance = 32; }
+      } else if (APP.mode === 'collision') {
+        cam.targetX = 0;
+        cam.targetY = 1.2;
+        cam.targetZ = 0;
+        if (preset === 'home') { cam.theta = 0.14; cam.phi = 0.35; cam.distance = 19; }
+        else if (preset === 'side') { cam.theta = 0.0; cam.phi = 0.08; cam.distance = 18; }
+        else if (preset === 'top') { cam.theta = 0.0; cam.phi = 1.42; cam.distance = 22; }
+      } else if (APP.mode === 'pendulum') {
+        cam.targetX = 0;
+        cam.targetY = 3.4;
+        cam.targetZ = -0.3;
+        if (preset === 'home') { cam.theta = 0.25; cam.phi = 0.22; cam.distance = 13.5; }
+        else if (preset === 'side') { cam.theta = 0.0; cam.phi = 0.05; cam.distance = 13.0; }
+        else if (preset === 'top') { cam.theta = 0.0; cam.phi = 1.35; cam.distance = 16.0; }
+      }
+      sync3DSceneToPhysics();
+    }
+
+    function toggleRendererMode() {
+      if (!APP.webglAvailable) return;
+      APP.use2DFallback = !APP.use2DFallback;
+      activate2DFallbackUI();
+    }
+
+    function activate2DFallbackUI() {
+      const webglCanvas = document.getElementById('webgl-canvas');
+      const fallbackCanvas = document.getElementById('fallback-2d-canvas');
+      const badge = document.getElementById('renderer-badge');
+      const btn = document.getElementById('btn-toggle-renderer');
+
+      if (APP.use2DFallback) {
+        webglCanvas.classList.add('hidden');
+        fallbackCanvas.classList.remove('hidden');
+        badge.textContent = 'Canvas 2D 투영';
+        badge.className = 'text-[10px] font-mono-num px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-400/30';
+        btn.textContent = APP.webglAvailable ? '3D WebGL 전환' : '2D 안전 모드 작동 중';
+      } else {
+        webglCanvas.classList.remove('hidden');
+        fallbackCanvas.classList.add('hidden');
+        badge.textContent = 'WebGL 3D';
+        badge.className = 'text-[10px] font-mono-num px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30';
+        btn.textContent = '2D 투영 전환';
+      }
+    }
+
+    function toggleReducedMotion() {
+      APP.reducedMotion = !APP.reducedMotion;
+      const btn = document.getElementById('btn-reduced-motion');
+      btn.textContent = `모션 절제: ${APP.reducedMotion ? 'ON' : 'OFF'}`;
+      if (APP.reducedMotion) {
+        APP.demoTourActive = false;
+        APP.slowMoActive = false;
+        APP.particles = [];
+        hideStageBanner();
+      }
+    }
+
+    function togglePresentationMode() {
+      document.body.classList.toggle('presentation-mode');
+      const isPres = document.body.classList.contains('presentation-mode');
+      const btn = document.getElementById('btn-presentation');
+      btn.className = isPres
+        ? 'px-2.5 py-2 rounded-xl text-xs font-bold bg-amber-500/30 text-amber-200 border border-amber-400 transition flex items-center gap-1'
+        : 'px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600/50 transition flex items-center gap-1';
+    }
+
+    function toggleDemoTour() {
+      APP.demoTourActive = !APP.demoTourActive;
+      const btn = document.getElementById('btn-demo-tour');
+      const label = document.getElementById('demo-tour-label');
+      if (APP.demoTourActive) {
+        APP.demoTourTimer = 0;
+        APP.demoTourStep = 0;
+        btn.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-amber-500/30 text-amber-200 border border-amber-400 transition flex items-center gap-1.5';
+        label.textContent = '투어 중지 (STOP)';
+        switchMode('projectile');
+        applyProjectilePreset('target30');
+        showStageBanner('시네마틱 데모 투어 진행 중 (클릭 시 언제든 조작 가능)');
+      } else {
+        btn.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/35 text-purple-200 border border-purple-400/40 transition flex items-center gap-1.5';
+        label.textContent = '시네마틱 투어';
+        hideStageBanner();
+      }
+    }
+
+    function switchRightPanelTab(tab) {
+      const mBtn = document.getElementById('subtab-missions');
+      const hBtn = document.getElementById('subtab-history');
+      const mPanel = document.getElementById('panel-missions');
+      const hPanel = document.getElementById('panel-history');
+
+      if (tab === 'missions') {
+        mBtn.className = 'px-2.5 py-1 rounded-lg text-xs font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        hBtn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white';
+        mPanel.classList.remove('hidden');
+        hPanel.classList.add('hidden');
+      } else {
+        hBtn.className = 'px-2.5 py-1 rounded-lg text-xs font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+        mBtn.className = 'px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-white';
+        hPanel.classList.remove('hidden');
+        hPanel.classList.add('flex');
+        mPanel.classList.add('hidden');
+      }
+    }
+
+    function showStageBanner(text) {
+      const b = document.getElementById('stage-alert-banner');
+      const t = document.getElementById('stage-alert-text');
+      t.textContent = text;
+      b.classList.remove('hidden');
+    }
+
+    function hideStageBanner() {
+      if (APP.demoTourActive) return;
+      document.getElementById('stage-alert-banner').classList.add('hidden');
+    }
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+      }
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+      }
+    }
+
+    // =======================================================================
+    // 11. LIVE SELF-VERIFICATION UNIT TEST SUITE (NO HARDCODED FAKE PASS!)
+    // =======================================================================
+
+    function runSelfVerificationSuite() {
+      const results = [];
+
+      // TEST 1: Projectile Analytical Landing Time, Range & Energy Conservation
+      const pTest = computeProjectileAnalytical(1.0, 18.0, 40, 9.8, 2.5);
+      const midState = evaluateProjectileAtTime(
+        { h0: 1.0, vx0: pTest.vx0, vy0: pTest.vy0, g: 9.8, mass: 2.5, tFlight: pTest.tFlight },
+        pTest.tFlight * 0.5
+      );
+      const endState = evaluateProjectileAtTime(
+        { h0: 1.0, vx0: pTest.vx0, vy0: pTest.vy0, g: 9.8, mass: 2.5, tFlight: pTest.tFlight },
+        pTest.tFlight
+      );
+      const energyDriftProj = Math.abs(midState.E - pTest.totalEnergy);
+      const pass1 = Math.abs(endState.y) < 1e-9 && energyDriftProj < 1e-9;
+      results.push({
+        title: '1. 투사체 착지 방정식 및 역학적 에너지 보존 검증',
+        formula: 'y(t_flight) = 0, |E(t_mid) - E(0)| < 10⁻⁹ J',
+        measured: `t_flight = ${pTest.tFlight.toFixed(4)}s, 사거리 = ${pTest.range.toFixed(4)}m, ΔE = ${energyDriftProj.toExponential(2)} J`,
+        pass: pass1
+      });
+
+      // TEST 2: Earth vs Moon Gravity Range Comparison
+      const earthProj = computeProjectileAnalytical(1.0, 15.0, 45, 9.8, 1.0);
+      const moonProj = computeProjectileAnalytical(1.0, 15.0, 45, 1.62, 1.0);
+      const ratio = moonProj.range / earthProj.range;
+      const pass2 = moonProj.range > earthProj.range * 5.2 && moonProj.tFlight > earthProj.tFlight * 5.2;
+      results.push({
+        title: '2. 천체 중력 변화 검증 (지구 g=9.8 vs 달 g=1.62)',
+        formula: 'R_moon / R_earth > 5.2 (v₀=15m/s, θ=45°, h=1m)',
+        measured: `지구 사거리 ${earthProj.range.toFixed(2)}m vs 달 사거리 ${moonProj.range.toFixed(2)}m (비율 ${ratio.toFixed(2)}배)`,
+        pass: pass2
+      });
+
+      // TEST 3: Elastic Collision (e = 1.0) Momentum & Kinetic Energy Conservation
+      const colElastic = computeCollisionAnalytical(3.0, 7.5, 2.0, -4.0, 1.0);
+      const dpElastic = Math.abs(colElastic.pAfter - colElastic.pBefore);
+      const dKElastic = Math.abs(colElastic.KAfter - colElastic.KBefore);
+      const pass3 = dpElastic < 1e-9 && dKElastic < 1e-9;
+      results.push({
+        title: '3. 완전탄성 충돌 (e=1.0) 운동량 및 운동에너지 보존',
+        formula: '|p_after - p_before| < 10⁻⁹, |K_after - K_before| < 10⁻⁹',
+        measured: `Δp = ${dpElastic.toExponential(2)} N·s, ΔK = ${dKElastic.toExponential(2)} J (K = ${colElastic.KBefore.toFixed(2)} J)`,
+        pass: pass3
+      });
+
+      // TEST 4: Inelastic Collision (e = 0.4) Momentum Conservation & Non-negative Thermal Loss
+      const colInelastic = computeCollisionAnalytical(4.0, 6.0, 2.0, -3.0, 0.4);
+      const dpInel = Math.abs(colInelastic.pAfter - colInelastic.pBefore);
+      const expectedLoss = 0.5 * ((4.0 * 2.0) / 6.0) * (1 - 0.4 * 0.4) * Math.pow(6.0 - (-3.0), 2);
+      const lossDiff = Math.abs(colInelastic.ELossAfter - expectedLoss);
+      const pass4 = dpInel < 1e-9 && colInelastic.ELossAfter > 0 && lossDiff < 1e-9;
+      results.push({
+        title: '4. 비탄성 충돌 (e=0.4) 운동량 보존 및 열·변형 손실 검증',
+        formula: 'ΔE_loss = ½ μ (1 - e²)(u₁ - u₂)² > 0',
+        measured: `손실 에너지 = ${colInelastic.ELossAfter.toFixed(4)} J, 이론식 오차 = ${lossDiff.toExponential(2)} J`,
+        pass: pass4
+      });
+
+      // TEST 5: Nonlinear Pendulum RK4 Integration Stability (1000 steps over 5.0 seconds)
+      const L = 2.5, g = 9.8, m = 2.0, th0 = (60 * Math.PI) / 180;
+      const E0 = m * g * L * (1 - Math.cos(th0));
+      let th = th0, om = 0;
+      const dtStep = 0.002;
+      for (let i = 0; i < 2500; i++) {
+        const st = stepPendulumRK4(th, om, g, L, dtStep);
+        th = st.theta;
+        om = st.omega;
+      }
+      const EFinal = m * g * L * (1 - Math.cos(th)) + 0.5 * m * Math.pow(L * om, 2);
+      const relErrPct = (Math.abs(EFinal - E0) / E0) * 100;
+      const pass5 = relErrPct < 0.005;
+      results.push({
+        title: '5. 비선형 진자(θ₀=60°) RK4 2,500스텝 적분 에너지 보존율',
+        formula: '|E(5.0s) - E(0)| / E(0) < 0.005%',
+        measured: `초기 E₀ = ${E0.toFixed(4)} J → 5초 후 E = ${EFinal.toFixed(4)} J (상대오차 ${relErrPct.toExponential(2)}%)`,
+        pass: pass5
+      });
+
+      // Render into Modal
+      const container = document.getElementById('verify-results-container');
+      container.innerHTML = results.map(r => `
+        <div class="p-3 rounded-2xl bg-slate-900/95 border ${r.pass ? 'border-emerald-500/40' : 'border-rose-500/60'} flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-white">${r.title}</span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-extrabold ${r.pass ? 'bg-emerald-500/25 text-emerald-300' : 'bg-rose-500/25 text-rose-300'}">
+              ${r.pass ? 'PASS (통과)' : 'FAIL (오류)'}
+            </span>
+          </div>
+          <div class="text-[11px] text-slate-400">검증 기준: ${r.formula}</div>
+          <div class="text-[11px] text-cyan-300">실측 결과: ${r.measured}</div>
+        </div>
+      `).join('');
+
+      const allPassed = results.every(r => r.pass);
+      const summary = document.getElementById('verify-summary-status');
+      summary.textContent = allPassed
+        ? `전체 ${results.length}개 물리 검증 항목 100% 통과 (${new Date().toLocaleTimeString('ko-KR')})`
+        : '일부 검증 항목 확인 필요';
+      summary.className = allPassed ? 'text-xs font-bold text-emerald-400' : 'text-xs font-bold text-rose-400';
+
+      openModal('verify-modal');
+    }
+
+    // =======================================================================
+    // 12. INTERACTIVE POINTER / TOUCH ORBIT CAMERA & MAIN ANIMATION LOOP
+    // =======================================================================
+
+    function initStagePointerControls() {
+      const container = document.getElementById('stage-container');
+
+      const onPointerDown = (clientX, clientY) => {
+        APP.camera.isDragging = true;
+        APP.camera.lastMouseX = clientX;
+        APP.camera.lastMouseY = clientY;
+        if (APP.demoTourActive) {
+          toggleDemoTour(); // Stop demo tour cleanly when user grabs the stage
+        }
+      };
+
+      const onPointerMove = (clientX, clientY) => {
+        if (!APP.camera.isDragging) return;
+        const dx = clientX - APP.camera.lastMouseX;
+        const dy = clientY - APP.camera.lastMouseY;
+        APP.camera.lastMouseX = clientX;
+        APP.camera.lastMouseY = clientY;
+
+        APP.camera.theta -= dx * 0.0065;
+        APP.camera.phi = Math.max(0.05, Math.min(1.45, APP.camera.phi + dy * 0.0065));
+      };
+
+      const onPointerUp = () => {
+        APP.camera.isDragging = false;
+      };
+
+      container.addEventListener('mousedown', e => onPointerDown(e.clientX, e.clientY));
+      window.addEventListener('mousemove', e => onPointerMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', onPointerUp);
+
+      container.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) {
+          onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchmove', e => {
+        if (e.touches.length === 1 && APP.camera.isDragging) {
+          onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
+
+      window.addEventListener('touchend', onPointerUp);
+
+      container.addEventListener('wheel', e => {
+        e.preventDefault();
+        APP.camera.distance = Math.max(7, Math.min(55, APP.camera.distance + e.deltaY * 0.018));
+      }, { passive: false });
+
+      window.addEventListener('resize', () => {
+        if (APP.webglAvailable && renderer && camera) {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        drawRealTimeEnergyChart();
+      });
+    }
+
+    let lastFrameTime = performance.now();
+
+    function mainAnimationLoop(now) {
+      requestAnimationFrame(mainAnimationLoop);
+
+      const rawDt = Math.min((now - lastFrameTime) / 1000, 0.05);
+      lastFrameTime = now;
+
+      // Handle Cinematic Demo Tour state machine
+      if (APP.demoTourActive) {
+        APP.demoTourTimer += rawDt;
+        APP.camera.theta = Math.sin(APP.demoTourTimer * 0.45) * 0.38;
+        APP.camera.phi = 0.25 + Math.cos(APP.demoTourTimer * 0.3) * 0.12;
+
+        if (APP.demoTourTimer > 5.0 && APP.demoTourStep === 0) {
+          APP.demoTourStep = 1;
+          switchMode('collision');
+          applyCollisionPreset('elastic');
+        } else if (APP.demoTourTimer > 9.5 && APP.demoTourStep === 1) {
+          APP.demoTourStep = 2;
+          switchMode('pendulum');
+          applyPendulumPreset('massInvariance');
+        } else if (APP.demoTourTimer > 15.0 && APP.demoTourStep === 2) {
+          APP.demoTourTimer = 0;
+          APP.demoTourStep = 0;
+          switchMode('projectile');
+          applyProjectilePreset('target30');
+        }
+      }
+
+      // Advance Physics with Fixed Timestep Accumulator
+      if (APP.isRunning && !APP.isPaused) {
+        const effectiveScale = APP.slowMoActive ? 0.16 : APP.timeScale;
+        APP.accumulator += rawDt * effectiveScale;
+        while (APP.accumulator >= APP.fixedDt) {
+          stepPhysics(APP.fixedDt);
+          APP.accumulator -= APP.fixedDt;
+        }
+        updateHUDAndControls();
+      }
+
+      // Update visual particles
+      for (let i = 0; i < APP.particles.length; i++) {
+        const pt = APP.particles[i];
+        if (pt.life > 0) {
+          pt.x += pt.vx * rawDt;
+          pt.y += pt.vy * rawDt;
+          pt.z += pt.vz * rawDt;
+          pt.vy -= 9.8 * rawDt;
+          pt.life -= rawDt * 1.4;
+        }
+      }
+
+      // Render active 3D WebGL or 2D Projection Stage
+      if (APP.webglAvailable && !APP.use2DFallback) {
+        sync3DSceneToPhysics();
+        renderer.render(scene, camera);
+      } else {
+        render2DFallbackStage();
+      }
+    }
+
+    // Start everything immediately on window load
+    window.onload = function () {
+      initThreeJSStage();
+      initStagePointerControls();
+      setCameraPreset('home');
+      // Start Projectile Lab immediately with a live initial shot so the stage is alive!
+      resetCurrentExperiment(true);
+      requestAnimationFrame(mainAnimationLoop);
+    };
+  </script>
+</body>
+</html>

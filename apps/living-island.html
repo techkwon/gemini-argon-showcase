@@ -1,0 +1,3039 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>LIVING ISLAND | 우리가 만드는 지속가능한 섬</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--font-sans);
+      background: #c8ecff;
+      color: #0f172a;
+    }
+    #viewport-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+      touch-action: none;
+    }
+    /* Custom Glassmorphism Panels */
+    .glass-bar {
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+    }
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(226, 232, 240, 0.95);
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+    .tool-btn {
+      transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .tool-btn:hover {
+      transform: translateY(-3px);
+    }
+    .tool-btn.active {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: #ffffff;
+      border-color: #0284c7;
+      box-shadow: 0 8px 20px -4px rgba(2, 132, 199, 0.45);
+      transform: translateY(-4px);
+    }
+    .tool-btn.active .tool-sub {
+      color: #e0f2fe;
+    }
+    .tool-btn.demolish-active {
+      background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+      color: #ffffff;
+      border-color: #e11d48;
+      box-shadow: 0 8px 20px -4px rgba(225, 29, 72, 0.45);
+      transform: translateY(-4px);
+    }
+    .tool-btn.demolish-active .tool-sub {
+      color: #ffe4e6;
+    }
+    /* Custom Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2.5px solid currentColor;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+      margin-top: -5px;
+      transition: transform 0.12s ease;
+    }
+    input[type="range"]:hover::-webkit-slider-thumb {
+      transform: scale(1.15);
+    }
+    /* Custom Scrollbar for Modals */
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.6);
+      border-radius: 8px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.7);
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body class="relative select-none">
+
+  <!-- Full-Viewport Interactive 3D Island Stage (85~90%+ unobscured screen area) -->
+  <div id="viewport-container" aria-label="3D 지속가능한 섬 시뮬레이션 화면">
+    <canvas id="island-canvas" tabindex="0"></canvas>
+  </div>
+
+  <!-- Floating 3D Cursor Cell Status Tooltip -->
+  <div id="cell-cursor-tooltip" class="fixed pointer-events-none z-20 hidden transition-opacity duration-75" style="left: 0; top: 0;">
+    <div id="cell-cursor-card" class="px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-lg border backdrop-blur-md flex items-center gap-1.5 whitespace-nowrap">
+      <span id="cell-cursor-dot" class="w-2 h-2 rounded-full"></span>
+      <span id="cell-cursor-text">건설 가능</span>
+      <span id="cell-cursor-elev" class="text-[11px] opacity-75 font-mono"></span>
+    </div>
+  </div>
+
+  <!-- Non-blocking Toast Banner -->
+  <div id="status-toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-none opacity-0 transition-all duration-300 transform -translate-y-2">
+    <div id="status-toast-inner" class="glass-pill px-4 py-2 rounded-full text-xs sm:text-sm font-semibold text-slate-800 flex items-center gap-2 shadow-lg">
+      <svg class="w-4 h-4 text-sky-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M12 8v4m0 4h.01" stroke-linecap="round"></path>
+      </svg>
+      <span id="status-toast-text">알림 메시지</span>
+    </div>
+  </div>
+
+  <!-- TOP THIN HUD BAR -->
+  <header class="fixed top-2.5 left-2.5 right-2.5 z-20 pointer-events-none flex flex-col gap-1.5">
+    <div class="max-w-[1440px] w-full mx-auto flex flex-wrap items-center justify-between gap-2">
+      
+      <!-- Left: Brand Title & 3 Core Numeric Metrics -->
+      <div class="glass-bar pointer-events-auto rounded-2xl px-3 py-1.5 flex flex-wrap items-center gap-2.5 sm:gap-4">
+        <div class="flex items-center gap-2 pr-1 border-r border-slate-200/80">
+          <div class="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-sm">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M3 17h18M5 17c1.5-4 4.5-6 7-6s5.5 2 7 6" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 11V4m0 0L9 7m3-3l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs sm:text-sm font-extrabold tracking-tight text-slate-900">LIVING ISLAND</span>
+              <span class="hidden md:inline-block text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200/70 px-1.5 py-0.5 rounded-md">우리가 만드는 지속가능한 섬</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 Key Metrics: 1. 예산 / 2. 전력 수지 / 3. 해수면·미션 상태 -->
+        <div class="flex items-center gap-3 sm:gap-4 text-xs">
+          <!-- Metric 1: Budget -->
+          <div class="flex items-center gap-1.5" title="총 예산 1,200 크레딧 중 잔여 예산">
+            <svg class="w-4 h-4 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="9"/>
+              <path d="M14.5 9.5c-.5-1-1.5-1.5-2.5-1.5-1.5 0-2.5 1-2.5 2s1 1.5 2.5 2 2.5 1 2.5 2-1 2-2.5 2c-1 0-2-.5-2.5-1.5M12 6.5v11" stroke-linecap="round"/>
+            </svg>
+            <div>
+              <div class="text-[10px] font-medium text-slate-500 leading-none">잔여 예산</div>
+              <div class="font-bold text-slate-900 tabular-nums leading-tight">
+                <span id="hud-budget">280</span> <span class="text-[11px] font-normal text-slate-500">/ 1200 C</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="h-6 w-px bg-slate-200/90"></div>
+
+          <!-- Metric 2: Power Balance -->
+          <div class="flex items-center gap-1.5" title="현재 전력 수지 = 발전량 - 소비량">
+            <svg id="hud-power-icon" class="w-4 h-4 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>
+              <div class="text-[10px] font-medium text-slate-500 leading-none flex items-center gap-1">
+                <span>전력 수지</span>
+                <span id="hud-power-badge" class="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700">정상</span>
+              </div>
+              <div class="font-bold tabular-nums leading-tight flex items-baseline gap-1">
+                <span id="hud-power-net" class="text-emerald-700">+14.7 kW</span>
+                <span class="text-[10px] font-medium text-slate-500">(발전 <span id="hud-power-gen">28.7</span> · 소비 <span id="hud-power-dem">14.0</span>)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="h-6 w-px bg-slate-200/90"></div>
+
+          <!-- Metric 3: Mission & Flood Status -->
+          <button id="btn-toggle-mission" type="button" class="flex items-center gap-1.5 text-left group hover:bg-slate-100/80 px-2 py-1 -my-1 rounded-xl transition" title="클릭하여 미션 조건 상세 보기">
+            <svg id="hud-mission-icon" class="w-4 h-4 text-sky-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>
+              <div class="text-[10px] font-medium text-slate-500 leading-none flex items-center gap-1">
+                <span>미션 진행</span>
+                <span id="hud-flood-badge" class="hidden px-1 rounded text-[9px] font-bold bg-rose-100 text-rose-700">침수 0</span>
+              </div>
+              <div class="font-bold text-slate-800 leading-tight flex items-center gap-1">
+                <span id="hud-mission-summary" class="text-sky-700">2 / 4 달성</span>
+                <svg class="w-3 h-3 text-slate-400 group-hover:translate-y-0.5 transition" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Time-of-Day, Wind, Sea-Level, Camera & Classroom Buttons -->
+      <div class="glass-bar pointer-events-auto rounded-2xl px-2.5 py-1.5 flex flex-wrap items-center gap-2 sm:gap-3">
+        
+        <!-- Time of Day Selector: 낮 / 노을 / 밤 -->
+        <div class="flex items-center bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/70" role="group" aria-label="시간대 전환">
+          <button type="button" data-time="day" class="time-btn px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition bg-white text-amber-600 shadow-sm">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke-linecap="round"/>
+            </svg>
+            <span>낮</span>
+          </button>
+          <button type="button" data-time="sunset" class="time-btn px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition text-slate-600 hover:text-slate-900">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M17 18a5 5 0 00-10 0M12 9V2m-7.07 7.93l1.41 1.41M1 18h2m18 0h2m-4.34-6.66l1.41-1.41M23 22H1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>노을</span>
+          </button>
+          <button type="button" data-time="night" class="time-btn px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition text-slate-600 hover:text-slate-900">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>밤</span>
+          </button>
+        </div>
+
+        <!-- Wind Slider (0.0 ~ 1.0) -->
+        <div class="flex items-center gap-1.5 px-1" title="바람 세기 조절 (풍력 발전량 = 정격 × 바람³)">
+          <svg class="w-4 h-4 text-sky-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="w-20 sm:w-24">
+            <div class="flex justify-between text-[10px] font-semibold text-slate-600 leading-none mb-1">
+              <span>바람</span>
+              <span id="label-wind" class="font-mono text-sky-700 font-bold">0.85</span>
+            </div>
+            <input id="slider-wind" type="range" min="0" max="1" step="0.05" value="0.85" class="w-full text-sky-600 bg-sky-100 rounded-lg" aria-label="바람 세기 슬라이더" />
+          </div>
+        </div>
+
+        <!-- Sea Level Slider (0.0 ~ 3.0) -->
+        <div class="flex items-center gap-1.5 px-1" title="해수면 상승 실험 슬라이더 (0.0m ~ 3.0m)">
+          <svg class="w-4 h-4 text-teal-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M2 12c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0M2 17c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="w-20 sm:w-24">
+            <div class="flex justify-between text-[10px] font-semibold text-slate-600 leading-none mb-1">
+              <span>해수면</span>
+              <span id="label-sealevel" class="font-mono text-teal-700 font-bold">+0.0m</span>
+            </div>
+            <input id="slider-sealevel" type="range" min="0" max="3" step="0.1" value="0" class="w-full text-teal-600 bg-teal-100 rounded-lg" aria-label="해수면 높이 슬라이더" />
+          </div>
+        </div>
+
+        <div class="h-5 w-px bg-slate-200/90 hidden sm:block"></div>
+
+        <!-- Camera Framing & Classroom Action Buttons -->
+        <div class="flex items-center gap-1">
+          <button id="btn-cam-home" type="button" class="p-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition" title="전체 섬 시점 (홈 시점)">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button id="btn-cam-hero" type="button" class="p-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition" title="마을 클로즈업 영웅 시점">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </button>
+
+          <button id="btn-open-lesson" type="button" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center gap-1 transition">
+            <svg class="w-3.5 h-3.5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>5분 수업</span>
+          </button>
+
+          <button id="btn-open-diagnostics" type="button" class="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 flex items-center gap-1 transition">
+            <svg class="w-3.5 h-3.5 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>정보·검사</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Collapsible Compact Mission Checklist Strip (Toggled via Mission Metric or shown concisely) -->
+    <div id="mission-strip" class="max-w-[1440px] w-full mx-auto pointer-events-none flex justify-start">
+      <div class="glass-pill pointer-events-auto rounded-2xl px-3 py-1.5 flex flex-wrap items-center gap-2 text-xs">
+        <span class="font-extrabold text-slate-700 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path d="M5 3v18M5 4h11l-2 4 2 4H5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>미션 목표:</span>
+        </span>
+        <span id="chk-buildings" class="px-2 py-0.5 rounded-lg font-semibold bg-slate-100 text-slate-600 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>학교 1+ · 집 3+
+        </span>
+        <span id="chk-day-power" class="px-2 py-0.5 rounded-lg font-semibold bg-slate-100 text-slate-600 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>낮 전력부족 0
+        </span>
+        <span id="chk-night-power" class="px-2 py-0.5 rounded-lg font-semibold bg-slate-100 text-slate-600 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>밤 전력부족 0
+        </span>
+        <span id="chk-sealevel1" class="px-2 py-0.5 rounded-lg font-semibold bg-slate-100 text-slate-600 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>해수면 1.0m 침수 0
+        </span>
+        <span id="mission-complete-banner" class="hidden px-2.5 py-0.5 rounded-lg font-extrabold bg-emerald-600 text-white shadow-sm">
+          미션 완료! 지속가능한 섬 달성
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- BOTTOM COMPACT CONSTRUCTION TOOLBAR -->
+  <footer class="fixed bottom-3 left-2.5 right-2.5 z-20 pointer-events-none flex justify-center">
+    <div class="glass-bar pointer-events-auto rounded-2xl p-1.5 sm:px-3 sm:py-2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-full">
+      
+      <!-- Build Tools -->
+      <div class="flex items-center gap-1 sm:gap-1.5" role="toolbar" aria-label="건설 도구 모음">
+        
+        <!-- Tool 1: House -->
+        <button type="button" data-tool="house" class="tool-btn active px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left">
+          <div class="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9.5z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">집</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">100C · -2kW</div>
+          </div>
+        </button>
+
+        <!-- Tool 2: School -->
+        <button type="button" data-tool="school" class="tool-btn px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 3L2 9l10 6 10-6-10-6zM4 11.5v6.5l8 4 8-4v-6.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">학교</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">300C · -8kW</div>
+          </div>
+        </button>
+
+        <!-- Tool 3: Solar -->
+        <button type="button" data-tool="solar" class="tool-btn px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left">
+          <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="3" y="6" width="18" height="11" rx="1.5"/>
+              <path d="M3 11.5h18M9 6v11M15 6v11M8 21h8m-4-4v4" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">태양광</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">200C · +10kW</div>
+          </div>
+        </button>
+
+        <!-- Tool 4: Wind -->
+        <button type="button" data-tool="wind" class="tool-btn px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left">
+          <div class="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="10" r="1.5"/>
+              <path d="M12 8.5V2m1.3 7.3L19 13m-8.3-.7L5 13m7-1.5V22m-4 0h8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">풍력</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">300C · +12kW</div>
+          </div>
+        </button>
+
+        <!-- Tool 5: Tree -->
+        <button type="button" data-tool="tree" class="tool-btn px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left">
+          <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 3L5 12h4l-3 6h12l-3-6h4L12 3zM12 18v4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">나무</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">20C · 숲조성</div>
+          </div>
+        </button>
+
+        <!-- Tool 6: Demolish -->
+        <button type="button" data-tool="demolish" class="tool-btn px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 text-slate-800 flex items-center gap-2 text-left" title="시설 철거 및 예산 100% 환급">
+          <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14zM10 11v6m4-6v6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-extrabold leading-none">철거</div>
+            <div class="tool-sub text-[10px] font-semibold text-slate-500 mt-0.5">크레딧 환급</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="h-6 w-px bg-slate-200/90 mx-0.5"></div>
+
+      <!-- Undo / Preset / Clear Actions -->
+      <div class="flex items-center gap-1">
+        <button id="btn-undo" type="button" class="px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1 transition disabled:opacity-40" title="마지막 작업 실행 취소 (단축키 Z)">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M3 10h10a5 5 0 015 5v2M3 10l5-5M3 10l5 5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>되돌리기</span>
+        </button>
+
+        <button id="btn-empty-island" type="button" class="px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white/90 hover:bg-rose-50 hover:text-rose-700 text-slate-700 text-xs font-bold flex items-center gap-1 transition" title="모든 건물을 지우고 빈 섬에서 처음부터 설계">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>빈 섬</span>
+        </button>
+
+        <button id="btn-preset-village" type="button" class="px-2.5 py-1.5 rounded-xl border border-teal-200 bg-teal-50/90 hover:bg-teal-100 text-teal-800 text-xs font-bold flex items-center gap-1 transition" title="처음 예시 마을 배치로 복원">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>예시 복원</span>
+        </button>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- 5-MINUTE LESSON MODAL (Hidden by default) -->
+  <div id="modal-lesson" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-bar bg-white/95 rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-white max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base sm:text-lg font-extrabold text-slate-900">5분 탐구 수업 가이드</h2>
+            <p class="text-xs text-slate-500">예측 → 건설 → 밤 전환 → 해수면 실험 → 관찰 및 재설계</p>
+          </div>
+        </div>
+        <button id="btn-close-lesson" type="button" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-3 overflow-y-auto custom-scroll text-xs sm:text-sm text-slate-700">
+        <div class="p-3 rounded-2xl bg-sky-50/80 border border-sky-100 flex gap-3">
+          <span class="w-6 h-6 rounded-full bg-sky-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+          <div>
+            <div class="font-bold text-slate-900">예측하기 (낮과 밤의 재생에너지 차이)</div>
+            <p class="text-xs text-slate-600 mt-0.5">처음 예시 마을은 낮에 전력 여유가 있습니다. 하지만 해가 지고 <strong>밤</strong>이 되면 태양광 발전소(정격 10kW)의 출력이 어떻게 변할지 예측해 보세요.</p>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100 flex gap-3">
+          <span class="w-6 h-6 rounded-full bg-indigo-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+          <div>
+            <div class="font-bold text-slate-900">밤으로 전환 & 바람 슬라이더 조작</div>
+            <p class="text-xs text-slate-600 mt-0.5">상단의 <strong>밤</strong> 버튼을 눌러보세요. 태양광 계수가 0이 되면서 전력 부족이 발생해 일부 집의 창문 불이 꺼집니다. 바람 슬라이더($P = 12 \times \text{wind}^3$)도 조절해 보세요.</p>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-teal-50/80 border border-teal-100 flex gap-3">
+          <span class="w-6 h-6 rounded-full bg-teal-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+          <div>
+            <div class="font-bold text-slate-900">해수면 상승 실험 (+1.0m ~ +3.0m)</div>
+            <p class="text-xs text-slate-600 mt-0.5">해수면 슬라이더를 <strong>+1.0m</strong>로 올려보세요. 해변 저지대(해발 1.0m 이하)에 지어진 집과 태양광 시설이 물에 잠기며 붉은 표식이 뜨고 전력망에서 제외됩니다.</p>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100 flex gap-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">4</span>
+          <div>
+            <div class="font-bold text-slate-900">건설 & 철거로 미션 해결하기</div>
+            <p class="text-xs text-slate-600 mt-0.5"><strong>철거</strong> 도구로 저지대 시설을 회수하거나 <strong>빈 섬</strong>에서 시작해 보세요. 예산 <strong>1,200C</strong> 안에서 해발 1.0m보다 높은 언덕에 <strong>학교 1개 + 집 3개</strong>를 유지하고, 밤에도 전력이 부족하지 않도록 풍력 발전기를 배치하면 미션이 달성됩니다!</p>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 space-y-1">
+          <div class="font-bold text-slate-800">교육용 모형 안내 및 개인정보 보호</div>
+          <p>• 본 웹앱의 발전 수식(태양광 계수: 낮 1.0 / 노을 0.3 / 밤 0.0, 풍력: 정격 $\times \text{wind}^3$)과 지형 고도 기반 침수 판정은 원리 이해를 돕기 위해 간략화된 <strong>교육용 시뮬레이션 모형</strong>이며, 실제 전력 엔지니어링 설계나 정밀 유체·기후 예측 모델이 아닙니다.</p>
+          <p>• 조작 팁: 마우스 드래그(회전), 휠/핀치(줌), 방향키+Enter(키보드 셀 이동 및 건설). 학생 이름·로그인·카메라·마이크·외부 서버 전송을 일절 사용하지 않습니다.</p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-200 flex justify-end">
+        <button id="btn-close-lesson-bottom" type="button" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition">
+          섬으로 돌아가기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SELF-DIAGNOSTICS & MODEL SPECS MODAL (Hidden by default) -->
+  <div id="modal-diagnostics" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-bar bg-white/95 rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-white max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base sm:text-lg font-extrabold text-slate-900">에너지·지형 자료표 및 실시간 자체검사</h2>
+            <p class="text-xs text-slate-500">고정 PASS 없이 실제 순수 함수(Pure Functions) 연산 결과를 검증합니다</p>
+          </div>
+        </div>
+        <button id="btn-close-diagnostics" type="button" class="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M6 18L18 6M6 6l12 12" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-4 overflow-y-auto custom-scroll text-xs">
+        <!-- Fixed Data Table -->
+        <div>
+          <h3 class="font-bold text-slate-800 mb-2">1. 시설별 고정 자료표 (초기 예산: 1,200 크레딧)</h3>
+          <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-100 text-slate-700 font-bold">
+                  <th class="py-2 px-3">시설명</th>
+                  <th class="py-2 px-3">건설 비용</th>
+                  <th class="py-2 px-3">전력 소비</th>
+                  <th class="py-2 px-3">정격 발전</th>
+                  <th class="py-2 px-3">특징 및 발전 공식</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 text-slate-600 bg-white">
+                <tr>
+                  <td class="py-1.5 px-3 font-bold text-slate-800">집 (주택)</td>
+                  <td class="py-1.5 px-3 font-mono">100 C</td>
+                  <td class="py-1.5 px-3 font-mono text-rose-600">2.0 kW</td>
+                  <td class="py-1.5 px-3 font-mono">-</td>
+                  <td class="py-1.5 px-3">핵심 주거 시설 (정전 시 창문 소등)</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-3 font-bold text-slate-800">학교</td>
+                  <td class="py-1.5 px-3 font-mono">300 C</td>
+                  <td class="py-1.5 px-3 font-mono text-rose-600">8.0 kW</td>
+                  <td class="py-1.5 px-3 font-mono">-</td>
+                  <td class="py-1.5 px-3">마을 교육 중심 시설 (미션 필수 1개+)</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-3 font-bold text-slate-800">태양광 발전</td>
+                  <td class="py-1.5 px-3 font-mono">200 C</td>
+                  <td class="py-1.5 px-3 font-mono">-</td>
+                  <td class="py-1.5 px-3 font-mono text-emerald-600">10.0 kW</td>
+                  <td class="py-1.5 px-3">출력 = $10 \times \text{일사계수}$ (낮 1.0, 노을 0.3, 밤 0.0)</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-3 font-bold text-slate-800">풍력 발전</td>
+                  <td class="py-1.5 px-3 font-mono">300 C</td>
+                  <td class="py-1.5 px-3 font-mono">-</td>
+                  <td class="py-1.5 px-3 font-mono text-emerald-600">12.0 kW</td>
+                  <td class="py-1.5 px-3">출력 = $12 \times \text{wind}^3$ (낮/밤 무관 바람에 비례)</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-3 font-bold text-slate-800">나무</td>
+                  <td class="py-1.5 px-3 font-mono">20 C</td>
+                  <td class="py-1.5 px-3 font-mono">0 kW</td>
+                  <td class="py-1.5 px-3 font-mono">0 kW</td>
+                  <td class="py-1.5 px-3">생태 경관림 조성</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Self-Inspection Results -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-slate-800">2. 시뮬레이션 엔진 자체검사 (Pure Function Verification)</h3>
+            <button id="btn-rerun-diagnostics" type="button" class="px-2.5 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border border-teal-200 transition">
+              다시 검사 실행
+            </button>
+          </div>
+          <div id="diagnostics-list" class="space-y-2"></div>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+        <span id="renderer-mode-label">렌더러 상태: WebGL 3D 정상 작동 중</span>
+        <button id="btn-close-diagnostics-bottom" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* =========================================================================
+       * 1. SIMULATION CONSTANTS & FIXED DATA SPECS
+       * ========================================================================= */
+      const INITIAL_BUDGET = 1200;
+      const GRID_SIZE = 13; // 13x13 grid (-6 to +6 in world grid coordinates)
+      const CELL_SIZE = 2.15;
+      const HEIGHT_SCALE = 1.15; // Visual vertical scale per 1.0 model elevation unit
+      const BASE_WATER_Y = 0.0;
+      const MAX_BUILDABLE_SLOPE = 0.72;
+
+      const FACILITY_SPECS = Object.freeze({
+        house: {
+          id: 'house',
+          name: '집',
+          cost: 100,
+          demand: 2.0,
+          rating: 0.0,
+          core: true
+        },
+        school: {
+          id: 'school',
+          name: '학교',
+          cost: 300,
+          demand: 8.0,
+          rating: 0.0,
+          core: true
+        },
+        solar: {
+          id: 'solar',
+          name: '태양광',
+          cost: 200,
+          demand: 0.0,
+          rating: 10.0,
+          core: true
+        },
+        wind: {
+          id: 'wind',
+          name: '풍력',
+          cost: 300,
+          demand: 0.0,
+          rating: 12.0,
+          core: true
+        },
+        tree: {
+          id: 'tree',
+          name: '나무',
+          cost: 20,
+          demand: 0.0,
+          rating: 0.0,
+          core: false
+        }
+      });
+
+      const SOLAR_FACTORS = Object.freeze({
+        day: 1.0,
+        sunset: 0.3,
+        night: 0.0
+      });
+
+      /* =========================================================================
+       * 2. DETERMINISTIC ISLAND TERRAIN MAP (13x13)
+       * Designed with gradual coastal beaches (0.45~0.85m), village terraces (1.25~1.85m),
+       * breezy upper hills (2.10~2.75m), and steep rocky cliffs.
+       * ========================================================================= */
+      function buildIslandCells() {
+        const cells = [];
+        const half = Math.floor(GRID_SIZE / 2);
+
+        // Hand-tuned radial + multi-ridge elevation map for natural diorama profile
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const gx = c - half;
+            const gz = r - half;
+            const dist = Math.hypot(gx * 0.95, gz * 1.02);
+
+            // Asymmetric island shape with a sheltered cove on the south-east and high ridge on north-west
+            const angle = Math.atan2(gz, gx);
+            const coastMod = 0.55 * Math.cos(angle * 2.0 - 0.6) + 0.35 * Math.sin(angle * 3.0 + 0.4);
+            const effectiveRadius = 5.45 + coastMod;
+
+            let elevation = 0;
+            let terrainType = 'ocean';
+            let rocky = false;
+
+            if (dist <= effectiveRadius) {
+              // Normalized inland factor (0 at coast, 1 at center/ridge)
+              const t = Math.max(0, (effectiveRadius - dist) / effectiveRadius);
+              // Ridge boost on the north-west & north-east hills
+              const hillNW = Math.exp(-((gx + 2.2) ** 2 + (gz + 2.0) ** 2) / 5.5) * 1.35;
+              const hillNE = Math.exp(-((gx - 2.3) ** 2 + (gz + 1.5) ** 2) / 6.0) * 0.95;
+              const valleySE = Math.exp(-((gx - 1.2) ** 2 + (gz - 2.3) ** 2) / 4.2) * 0.65;
+
+              let rawElev = 0.42 + Math.pow(t, 1.15) * 1.65 + hillNW + hillNE - valleySE;
+
+              // Quantize slightly into pleasant miniature diorama terraces while keeping smooth progression
+              elevation = Math.round(rawElev * 20) / 20;
+              elevation = Math.max(0.45, Math.min(2.95, elevation));
+
+              // Classify terrain aesthetics
+              if (elevation < 0.95) {
+                terrainType = 'beach';
+              } else if (elevation < 2.05) {
+                terrainType = 'grass';
+              } else {
+                terrainType = 'highland';
+              }
+
+              // Mark a few steep cliff/rocky cells on the far northern escarpment as non-buildable rocky outcrops
+              if ((gx === -3 && gz === -4) || (gx === -4 && gz === -2) || (gx === 4 && gz === -3) || (gx === -2 && gz === -5)) {
+                rocky = true;
+                terrainType = 'rock';
+              }
+            } else {
+              elevation = -0.6;
+              terrainType = 'ocean';
+            }
+
+            cells.push({
+              id: `${r}_${c}`,
+              row: r,
+              col: c,
+              gx,
+              gz,
+              x: gx * CELL_SIZE,
+              z: gz * CELL_SIZE,
+              elevation,
+              terrainType,
+              rocky,
+              slope: 0
+            });
+          }
+        }
+
+        // Compute local slope between orthogonal land neighbors
+        const cellMap = new Map(cells.map(cell => [cell.id, cell]));
+        for (const cell of cells) {
+          if (cell.terrainType === 'ocean') continue;
+          const neighbors = [
+            cellMap.get(`${cell.row - 1}_${cell.col}`),
+            cellMap.get(`${cell.row + 1}_${cell.col}`),
+            cellMap.get(`${cell.row}_${cell.col - 1}`),
+            cellMap.get(`${cell.row}_${cell.col + 1}`)
+          ].filter(n => n && n.terrainType !== 'ocean');
+
+          let maxDiff = 0;
+          for (const n of neighbors) {
+            maxDiff = Math.max(maxDiff, Math.abs(cell.elevation - n.elevation));
+          }
+          cell.slope = Math.round(maxDiff * 100) / 100;
+          if (cell.slope > MAX_BUILDABLE_SLOPE) {
+            cell.rocky = true;
+          }
+        }
+
+        return cells;
+      }
+
+      /* =========================================================================
+       * 3. PURE ACCOUNTING & SIMULATION ENGINE (Testable & Decoupled from 3D)
+       * ========================================================================= */
+      function calculateSolarOutput(rating, timeOfDay) {
+        const factor = SOLAR_FACTORS[timeOfDay] !== undefined ? SOLAR_FACTORS[timeOfDay] : 0;
+        return Math.round(rating * factor * 100) / 100;
+      }
+
+      function calculateWindOutput(rating, windSpeed) {
+        const w = Math.max(0, Math.min(1, Number(windSpeed) || 0));
+        return Math.round(rating * Math.pow(w, 3) * 100) / 100;
+      }
+
+      function isCellFlooded(cellElevation, seaLevel) {
+        if (cellElevation <= 0) return true; // Ocean cell
+        return seaLevel > 0 && cellElevation <= seaLevel + 1e-6;
+      }
+
+      /**
+       * Pure evaluation of any island state snapshot.
+       * Never mutates input state or global 3D scene.
+       */
+      function evaluateIslandState(snapshot) {
+        const {
+          cells,
+          placements, // Map or Object: cellId -> { type, id, treeVariant }
+          timeOfDay = 'day',
+          wind = 0.85,
+          seaLevel = 0.0,
+          initialBudget = INITIAL_BUDGET
+        } = snapshot;
+
+        const cellLookup = new Map(cells.map(c => [c.id, c]));
+        const entries = placements instanceof Map
+          ? Array.from(placements.entries())
+          : Object.entries(placements || {});
+
+        let spentBudget = 0;
+        let totalGeneration = 0;
+        let totalDemand = 0;
+        let dayGeneration = 0;
+        let nightGeneration = 0;
+
+        const activeCounts = { house: 0, school: 0, solar: 0, wind: 0, tree: 0 };
+        const totalCounts = { house: 0, school: 0, solar: 0, wind: 0, tree: 0 };
+        const floodedFacilities = [];
+        const floodedCoreAtSeaLevel1 = [];
+        const facilityStates = new Map();
+
+        // First pass: budget, flood status, generation, and demand
+        const consumingFacilities = [];
+
+        for (const [cellId, item] of entries) {
+          if (!item || !FACILITY_SPECS[item.type]) continue;
+          const spec = FACILITY_SPECS[item.type];
+          const cell = cellLookup.get(cellId);
+          if (!cell) continue;
+
+          spentBudget += spec.cost;
+          totalCounts[item.type] = (totalCounts[item.type] || 0) + 1;
+
+          const floodedNow = isCellFlooded(cell.elevation, seaLevel);
+          const floodedAtSL1 = isCellFlooded(cell.elevation, 1.0);
+
+          if (spec.core && floodedAtSL1) {
+            floodedCoreAtSeaLevel1.push({ cellId, type: item.type, elevation: cell.elevation });
+          }
+
+          if (floodedNow) {
+            floodedFacilities.push({ cellId, type: item.type, name: spec.name, elevation: cell.elevation });
+            facilityStates.set(cellId, {
+              cellId,
+              type: item.type,
+              flooded: true,
+              powered: false,
+              outputKw: 0,
+              demandKw: 0
+            });
+            continue;
+          }
+
+          // Active (non-flooded) facility
+          activeCounts[item.type] = (activeCounts[item.type] || 0) + 1;
+
+          let outputNow = 0;
+          let outputDay = 0;
+          let outputNight = 0;
+
+          if (item.type === 'solar') {
+            outputNow = calculateSolarOutput(spec.rating, timeOfDay);
+            outputDay = calculateSolarOutput(spec.rating, 'day');
+            outputNight = calculateSolarOutput(spec.rating, 'night');
+          } else if (item.type === 'wind') {
+            outputNow = calculateWindOutput(spec.rating, wind);
+            outputDay = outputNow;
+            outputNight = outputNow;
+          }
+
+          totalGeneration += outputNow;
+          dayGeneration += outputDay;
+          nightGeneration += outputNight;
+          totalDemand += spec.demand;
+
+          const fState = {
+            cellId,
+            type: item.type,
+            flooded: false,
+            powered: true,
+            outputKw: outputNow,
+            demandKw: spec.demand
+          };
+          facilityStates.set(cellId, fState);
+
+          if (spec.demand > 0) {
+            consumingFacilities.push(fState);
+          }
+        }
+
+        totalGeneration = Math.round(totalGeneration * 100) / 100;
+        dayGeneration = Math.round(dayGeneration * 100) / 100;
+        nightGeneration = Math.round(nightGeneration * 100) / 100;
+        totalDemand = Math.round(totalDemand * 100) / 100;
+
+        const netPower = Math.round((totalGeneration - totalDemand) * 100) / 100;
+        const dayNetPower = Math.round((dayGeneration - totalDemand) * 100) / 100;
+        const nightNetPower = Math.round((nightGeneration - totalDemand) * 100) / 100;
+        const remainingBudget = initialBudget - spentBudget;
+
+        // Allocate available power to consuming buildings so shortage turns off specific building lights
+        // Prioritize school first if enough power, then houses in deterministic order
+        consumingFacilities.sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'school' ? -1 : 1;
+          return a.cellId.localeCompare(b.cellId);
+        });
+
+        let availableKw = totalGeneration;
+        let unpoweredBuildingCount = 0;
+        for (const consumer of consumingFacilities) {
+          if (availableKw + 1e-4 >= consumer.demandKw) {
+            consumer.powered = true;
+            availableKw -= consumer.demandKw;
+          } else {
+            consumer.powered = false;
+            unpoweredBuildingCount++;
+          }
+        }
+
+        // Mission verification (4 core requirements within 1200 budget)
+        const condBudget = remainingBudget >= 0;
+        const condBuildings = activeCounts.school >= 1 && activeCounts.house >= 3;
+        const condDayPower = dayNetPower >= -1e-4 && totalDemand > 0;
+        const condNightPower = nightNetPower >= -1e-4 && totalDemand > 0;
+        const condSeaLevel1Safe = floodedCoreAtSeaLevel1.length === 0 && floodedFacilities.filter(f => FACILITY_SPECS[f.type].core).length === 0;
+
+        const missionCriteriaCount =
+          (condBuildings ? 1 : 0) +
+          (condDayPower ? 1 : 0) +
+          (condNightPower ? 1 : 0) +
+          (condSeaLevel1Safe ? 1 : 0);
+
+        const missionComplete = condBudget && condBuildings && condDayPower && condNightPower && condSeaLevel1Safe;
+
+        return {
+          initialBudget,
+          spentBudget,
+          remainingBudget,
+          totalGeneration,
+          totalDemand,
+          netPower,
+          dayGeneration,
+          nightGeneration,
+          dayNetPower,
+          nightNetPower,
+          activeCounts,
+          totalCounts,
+          floodedFacilities,
+          floodedCoreAtSeaLevel1,
+          unpoweredBuildingCount,
+          facilityStates,
+          mission: {
+            condBudget,
+            condBuildings,
+            condDayPower,
+            condNightPower,
+            condSeaLevel1Safe,
+            missionCriteriaCount,
+            missionComplete
+          }
+        };
+      }
+
+      /**
+       * Validates whether a tool action is legal on a target cell.
+       */
+      function validateToolAction(stateSnapshot, cellId, tool) {
+        const cell = stateSnapshot.cells.find(c => c.id === cellId);
+        if (!cell) return { valid: false, reason: '유효하지 않은 위치' };
+
+        const existing = stateSnapshot.placements.get(cellId);
+
+        if (tool === 'demolish') {
+          if (!existing) {
+            return { valid: false, reason: '철거할 시설 없음' };
+          }
+          const spec = FACILITY_SPECS[existing.type];
+          return { valid: true, reason: `${spec.name} 철거 (+${spec.cost}C 환급)` };
+        }
+
+        const spec = FACILITY_SPECS[tool];
+        if (!spec) return { valid: false, reason: '알 수 없는 도구' };
+
+        if (cell.terrainType === 'ocean') {
+          return { valid: false, reason: '바다 위 건설 불가' };
+        }
+        if (isCellFlooded(cell.elevation, stateSnapshot.seaLevel)) {
+          return { valid: false, reason: '현재 침수된 구역' };
+        }
+        if (cell.rocky || cell.slope > MAX_BUILDABLE_SLOPE) {
+          return { valid: false, reason: '경사 급함 / 바위 절벽' };
+        }
+        if (existing) {
+          return { valid: false, reason: '이미 시설이 있음' };
+        }
+
+        const evalNow = evaluateIslandState(stateSnapshot);
+        if (evalNow.remainingBudget < spec.cost) {
+          return { valid: false, reason: `예산 부족 (필요 ${spec.cost}C)` };
+        }
+
+        const elevWarn = (spec.core && cell.elevation <= 1.0)
+          ? ' (주의: 해발 1.0m 이하 저지대)'
+          : '';
+        return {
+          valid: true,
+          reason: `${spec.name} 건설 (-${spec.cost}C)${elevWarn}`
+        };
+      }
+
+      /* =========================================================================
+       * 4. INITIAL PRESET VILLAGE & STATE MANAGEMENT
+       * ========================================================================= */
+      const islandCells = buildIslandCells();
+      const cellById = new Map(islandCells.map(c => [c.id, c]));
+
+      function getInitialPresetPlacements() {
+        // Carefully designed picturesque village:
+        // - 1 School + 2 Houses on safe mid-plateau (elev > 1.3m)
+        // - 1 House + 1 Solar on scenic low sandy beach (elev <= 0.85m) so Sea Level +1.0m demonstrates flooding!
+        // - 1 Solar + 1 Wind turbine on upper hills so Day has surplus (+12.4kW), but Night has shortage (-6.6kW) until student adds wind power!
+        // - 6 varied trees around the hills
+        const presetCandidates = [
+          { r: 6, c: 6, type: 'school' },   // Central village plateau (elev ~1.75m)
+          { r: 6, c: 5, type: 'house' },    // Village plateau (elev ~1.80m)
+          { r: 5, c: 6, type: 'house' },    // Village plateau (elev ~1.90m)
+          { r: 8, c: 8, type: 'house' },    // Low coastal beach house (elev ~0.65m -> floods at seaLevel 1.0!)
+          { r: 7, c: 9, type: 'solar' },    // Low coastal solar array (elev ~0.70m -> floods at seaLevel 1.0!)
+          { r: 5, c: 8, type: 'solar' },    // Mid-hill solar array (elev ~1.45m)
+          { r: 4, c: 4, type: 'wind' },     // Breezy NW ridge wind turbine (elev ~2.60m)
+          { r: 3, c: 5, type: 'tree', treeVariant: 'pine' },
+          { r: 4, c: 6, type: 'tree', treeVariant: 'round' },
+          { r: 5, c: 4, type: 'tree', treeVariant: 'pine' },
+          { r: 7, c: 4, type: 'tree', treeVariant: 'round' },
+          { r: 4, c: 8, type: 'tree', treeVariant: 'pine' },
+          { r: 8, c: 5, type: 'tree', treeVariant: 'round' }
+        ];
+
+        const map = new Map();
+        for (const item of presetCandidates) {
+          const id = `${item.r}_${item.c}`;
+          const cell = cellById.get(id);
+          if (cell && cell.terrainType !== 'ocean' && !cell.rocky) {
+            map.set(id, {
+              type: item.type,
+              treeVariant: item.treeVariant || ((item.r + item.c) % 2 === 0 ? 'pine' : 'round'),
+              rotation: ((item.r * 7 + item.c * 13) % 4) * (Math.PI / 2)
+            });
+          }
+        }
+        return map;
+      }
+
+      // Single Source of Truth Application State
+      const appState = {
+        cells: islandCells,
+        placements: getInitialPresetPlacements(),
+        undoStack: [],
+        selectedTool: 'house',
+        timeOfDay: 'day', // 'day' | 'sunset' | 'night'
+        wind: 0.85,
+        seaLevel: 0.0,
+        hoveredCellId: '6_7',
+        keyboardCursorCellId: '6_7',
+        usingKeyboardCursor: false,
+        evaluation: null
+      };
+
+      appState.evaluation = evaluateIslandState(appState);
+
+      function applyToolAtCell(cellId, toolOverride) {
+        const tool = toolOverride || appState.selectedTool;
+        const check = validateToolAction(appState, cellId, tool);
+        if (!check.valid) {
+          showToast(`건설 불가: ${check.reason}`, 'warn');
+          return false;
+        }
+
+        const prevItem = appState.placements.get(cellId) || null;
+
+        if (tool === 'demolish') {
+          appState.placements.delete(cellId);
+          appState.undoStack.push({
+            action: 'demolish',
+            cellId,
+            prevItem,
+            newItem: null
+          });
+          const spec = FACILITY_SPECS[prevItem.type];
+          showToast(`${spec.name} 철거 완료 (+${spec.cost} 크레딧 환급)`, 'info');
+        } else {
+          const cell = cellById.get(cellId);
+          const newItem = {
+            type: tool,
+            treeVariant: (cell.row + cell.col) % 2 === 0 ? 'pine' : 'round',
+            rotation: ((cell.row * 3 + cell.col * 5) % 4) * (Math.PI / 2)
+          };
+          appState.placements.set(cellId, newItem);
+          appState.undoStack.push({
+            action: 'build',
+            cellId,
+            prevItem: null,
+            newItem
+          });
+          const spec = FACILITY_SPECS[tool];
+          showToast(`${spec.name} 건설 완료 (-${spec.cost} 크레딧)`, 'success');
+        }
+
+        refreshSimulationState();
+        return true;
+      }
+
+      function undoLastAction() {
+        if (appState.undoStack.length === 0) {
+          showToast('되돌릴 작업이 없습니다.', 'info');
+          return false;
+        }
+        const last = appState.undoStack.pop();
+        if (last.prevItem) {
+          appState.placements.set(last.cellId, last.prevItem);
+        } else {
+          appState.placements.delete(last.cellId);
+        }
+        refreshSimulationState();
+        showToast('마지막 작업을 되돌렸습니다.', 'info');
+        return true;
+      }
+
+      /* =========================================================================
+       * 5. AUTOMATED PURE-FUNCTION SELF-DIAGNOSTICS (No Hardcoded PASS)
+       * ========================================================================= */
+      function runSelfDiagnostics() {
+        const results = [];
+
+        // Test 1: Night Solar Output === 0 (and Day === 10, Sunset === 3)
+        const solarDay = calculateSolarOutput(10, 'day');
+        const solarSunset = calculateSolarOutput(10, 'sunset');
+        const solarNight = calculateSolarOutput(10, 'night');
+        const passT1 = (solarNight === 0 && solarDay === 10 && solarSunset === 3);
+        results.push({
+          title: '야간 태양광 발전 0kW 및 시간대 계수 검증',
+          expected: '낮 10.0kW / 노을 3.0kW / 밤 0.0kW',
+          actual: `낮 ${solarDay.toFixed(1)}kW / 노을 ${solarSunset.toFixed(1)}kW / 밤 ${solarNight.toFixed(1)}kW`,
+          passed: passT1
+        });
+
+        // Test 2: Wind = 0 Output === 0
+        const windZero = calculateWindOutput(12, 0);
+        const passT2 = (windZero === 0);
+        results.push({
+          title: '무풍(wind = 0.0) 시 풍력 발전량 0kW 검증',
+          expected: '0.00 kW',
+          actual: `${windZero.toFixed(2)} kW`,
+          passed: passT2
+        });
+
+        // Test 3: Wind = 1 Rated Output === 12
+        const windRated = calculateWindOutput(12, 1.0);
+        const windHalf = calculateWindOutput(12, 0.5);
+        const passT3 = (windRated === 12 && Math.abs(windHalf - 1.5) < 1e-6);
+        results.push({
+          title: '정격 바람(wind = 1.0) 및 삼제곱(0.5³) 풍력 수식 검증',
+          expected: 'wind 1.0 → 12.00kW / wind 0.5 → 1.50kW',
+          actual: `wind 1.0 → ${windRated.toFixed(2)}kW / wind 0.5 → ${windHalf.toFixed(2)}kW`,
+          passed: passT3
+        });
+
+        // Test 4: Build / Demolish / Undo Budget Consistency
+        const tempMap = new Map();
+        const evalEmpty = evaluateIslandState({ cells: islandCells, placements: tempMap });
+        tempMap.set('6_6', { type: 'school' }); // -300
+        tempMap.set('6_5', { type: 'house' });  // -100
+        const evalBuilt = evaluateIslandState({ cells: islandCells, placements: tempMap });
+        tempMap.delete('6_5'); // Demolish house (+100)
+        const evalDemolished = evaluateIslandState({ cells: islandCells, placements: tempMap });
+        tempMap.delete('6_6'); // Undo school (+300)
+        const evalRestored = evaluateIslandState({ cells: islandCells, placements: tempMap });
+        const passT4 = (
+          evalEmpty.remainingBudget === 1200 &&
+          evalBuilt.remainingBudget === 800 &&
+          evalDemolished.remainingBudget === 900 &&
+          evalRestored.remainingBudget === 1200
+        );
+        results.push({
+          title: '건설·철거·되돌리기(Undo) 예산 일관성 검증',
+          expected: '초기 1200C → 건설후 800C → 철거후 900C → 복원후 1200C',
+          actual: `초기 ${evalEmpty.remainingBudget}C → 건설후 ${evalBuilt.remainingBudget}C → 철거후 ${evalDemolished.remainingBudget}C → 복원후 ${evalRestored.remainingBudget}C`,
+          passed: passT4
+        });
+
+        // Test 5: Flooded Facility Excluded from Power Grid
+        const floodTestMap = new Map([
+          ['8_8', { type: 'solar' }], // Low beach cell (elev ~0.65m)
+          ['6_6', { type: 'house' }]  // High plateau cell (elev ~1.75m)
+        ]);
+        const evalDry = evaluateIslandState({ cells: islandCells, placements: floodTestMap, timeOfDay: 'day', seaLevel: 0.0 });
+        const evalFlood = evaluateIslandState({ cells: islandCells, placements: floodTestMap, timeOfDay: 'day', seaLevel: 1.0 });
+        const passT5 = (
+          evalDry.totalGeneration === 10 &&
+          evalDry.floodedFacilities.length === 0 &&
+          evalFlood.totalGeneration === 0 &&
+          evalFlood.floodedFacilities.length === 1
+        );
+        results.push({
+          title: '해수면 상승 시 침수 시설 전력망 제외 검증',
+          expected: '해수면 0m 발전 10.0kW(침수0) → 해수면 1.0m 발전 0.0kW(침수1)',
+          actual: `해수면 0m 발전 ${evalDry.totalGeneration.toFixed(1)}kW(침수${evalDry.floodedFacilities.length}) → 해수면 1.0m 발전 ${evalFlood.totalGeneration.toFixed(1)}kW(침수${evalFlood.floodedFacilities.length})`,
+          passed: passT5
+        });
+
+        // Test 6: Solvable Mission Fixture Verification (1 School + 3 Houses + 2 Wind on >1.0m cells, wind=0.85, budget<=1200)
+        const missionFixtureMap = new Map([
+          ['6_6', { type: 'school' }], // 300C, 8kW, elev > 1.5m
+          ['6_5', { type: 'house' }],  // 100C, 2kW, elev > 1.5m
+          ['5_6', { type: 'house' }],  // 100C, 2kW, elev > 1.5m
+          ['5_5', { type: 'house' }],  // 100C, 2kW, elev > 1.5m
+          ['4_4', { type: 'wind' }],   // 300C, 12kW rated, elev > 2.0m
+          ['4_5', { type: 'wind' }]    // 300C, 12kW rated, elev > 2.0m
+        ]);
+        const evalMission = evaluateIslandState({
+          cells: islandCells,
+          placements: missionFixtureMap,
+          timeOfDay: 'night',
+          wind: 0.85,
+          seaLevel: 1.0
+        });
+        const passT6 = (
+          evalMission.mission.missionComplete === true &&
+          evalMission.remainingBudget === 0 &&
+          evalMission.dayNetPower >= 0 &&
+          evalMission.nightNetPower >= 0 &&
+          evalMission.floodedFacilities.length === 0
+        );
+        results.push({
+          title: '미션 달성 가능성(Fixture) 수학적 검증 (예산 1200C 내)',
+          expected: '잔여 0C, 주/야 수지 +0.74kW, 해수면 1.0m 침수 0, 미션달성 true',
+          actual: `잔여 ${evalMission.remainingBudget}C, 주/야 수지 +${evalMission.nightNetPower.toFixed(2)}kW, 해수면 1.0m 침수 ${evalMission.floodedFacilities.length}, 미션달성 ${evalMission.mission.missionComplete}`,
+          passed: passT6
+        });
+
+        return results;
+      }
+
+      /* =========================================================================
+       * 6. 3D WEBGL DIORAMA ENGINE (Three.js + Isometric 2D Fallback)
+       * ========================================================================= */
+      const canvas = document.getElementById('island-canvas');
+      let webglAvailable = false;
+      let renderer = null;
+      let scene = null;
+      let camera = null;
+
+      // Camera spherical orbit state
+      const cameraRig = {
+        theta: 0.68,           // Horizontal orbit angle (radians)
+        phi: 0.88,             // Polar angle from vertical (radians)
+        distance: 33,          // Aspect-aware distance
+        baseDistance: 33,
+        target: { x: 0, y: 0.9, z: 0 },
+        desiredTheta: 0.68,
+        desiredPhi: 0.88,
+        desiredDistance: 33,
+        desiredTarget: { x: 0, y: 0.9, z: 0 }
+      };
+
+      // Scene dynamic handles
+      const sceneHandles = {
+        hemiLight: null,
+        dirLight: null,
+        ambientLight: null,
+        waterMesh: null,
+        waterSkirtMesh: null,
+        foamLinesGroup: null,
+        cloudsGroup: [],
+        starsMesh: null,
+        cellTopMeshes: new Map(), // cellId -> mesh for raycasting
+        facilityGroup: null,
+        roadGroup: null,
+        lampLights: [],
+        windowMaterials: [],
+        unpoweredMarkers: [],
+        floodMarkers: [],
+        windRotors: [],
+        swayingTrees: [],
+        cursorGroup: null,
+        cursorRingMat: null,
+        cursorPreviewGroup: null,
+        currentPreviewType: null
+      };
+
+      // Shared geometries & materials cache
+      const sharedGeo = {};
+      const sharedMat = {};
+
+      function initThreeScene() {
+        try {
+          if (typeof THREE === 'undefined') throw new Error('Three.js not loaded');
+          renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,
+            powerPreference: 'high-performance'
+          });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          renderer.outputEncoding = THREE.sRGBEncoding;
+
+          scene = new THREE.Scene();
+          scene.background = new THREE.Color(0xc8ecff);
+          scene.fog = new THREE.FogExp2(0xc8ecff, 0.0085);
+
+          camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 220);
+
+          setupLighting();
+          setupSharedAssets();
+          buildDioramaBaseAndTerrain();
+          buildWaterAndCoast();
+          buildCloudsAndStars();
+          buildCursorIndicator();
+
+          sceneHandles.facilityGroup = new THREE.Group();
+          sceneHandles.roadGroup = new THREE.Group();
+          scene.add(sceneHandles.roadGroup);
+          scene.add(sceneHandles.facilityGroup);
+
+          updateAspectAwareFraming('home', true);
+          webglAvailable = true;
+        } catch (err) {
+          console.warn('WebGL 초기화 실패, 2D 아이소메트릭 대체 모드로 전환합니다:', err);
+          webglAvailable = false;
+          const label = document.getElementById('renderer-mode-label');
+          if (label) {
+            label.textContent = '렌더러 상태: 2D Isometric Canvas 대체 모드 작동 중 (WebGL 미지원 환경)';
+          }
+        }
+      }
+
+      function setupLighting() {
+        const hemi = new THREE.HemisphereLight(0xf0f9ff, 0x86efac, 0.85);
+        hemi.position.set(0, 35, 0);
+        scene.add(hemi);
+        sceneHandles.hemiLight = hemi;
+
+        const dir = new THREE.DirectionalLight(0xfffbeb, 1.15);
+        dir.position.set(22, 34, 18);
+        dir.castShadow = true;
+        dir.shadow.mapSize.width = 2048;
+        dir.shadow.mapSize.height = 2048;
+        dir.shadow.camera.near = 5;
+        dir.shadow.camera.far = 85;
+        const d = 19;
+        dir.shadow.camera.left = -d;
+        dir.shadow.camera.right = d;
+        dir.shadow.camera.top = d;
+        dir.shadow.camera.bottom = -d;
+        dir.shadow.bias = -0.0005;
+        scene.add(dir);
+        sceneHandles.dirLight = dir;
+      }
+
+      function setupSharedAssets() {
+        sharedGeo.unitBox = new THREE.BoxGeometry(1, 1, 1);
+        sharedGeo.cylinder = new THREE.CylinderGeometry(1, 1, 1, 12);
+        sharedGeo.cone = new THREE.ConeGeometry(1, 1, 10);
+        sharedGeo.sphere = new THREE.IcosahedronGeometry(1, 1);
+
+        sharedMat.whiteWall = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65, metalness: 0.05 });
+        sharedMat.creamWall = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.65, metalness: 0.05 });
+        sharedMat.terracottaRoof = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.55, metalness: 0.08 });
+        sharedMat.slateRoof = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5, metalness: 0.15 });
+        sharedMat.wood = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 });
+        sharedMat.darkMetal = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.5 });
+        sharedMat.silverMetal = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.3, metalness: 0.6 });
+        sharedMat.solarPanel = new THREE.MeshStandardMaterial({
+          color: 0x1e3a8a,
+          emissive: 0x0f172a,
+          roughness: 0.2,
+          metalness: 0.75
+        });
+        sharedMat.foliagePine = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.75, flatShading: true });
+        sharedMat.foliagePineLight = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.75, flatShading: true });
+        sharedMat.foliageRound = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.7, flatShading: true });
+        sharedMat.stone = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85, flatShading: true });
+        sharedMat.pathStone = new THREE.MeshStandardMaterial({ color: 0xd6d3d1, roughness: 0.9 });
+        sharedMat.floodBeacon = new THREE.MeshBasicMaterial({ color: 0xf43f5e });
+        sharedMat.floodRing = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.82, side: THREE.DoubleSide });
+      }
+
+      function buildDioramaBaseAndTerrain() {
+        const terrainGroup = new THREE.Group();
+        const totalSpan = GRID_SIZE * CELL_SIZE + 5.0;
+
+        // 1. Miniature Diorama Tabletop Rim & Seabed Pedestal
+        const seabedGeo = new THREE.CylinderGeometry(totalSpan * 0.54, totalSpan * 0.49, 2.6, 48);
+        const seabedMat = new THREE.MeshStandardMaterial({
+          color: 0x0f766e,
+          roughness: 0.85,
+          metalness: 0.05
+        });
+        const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+        seabed.position.y = -1.75;
+        seabed.receiveShadow = true;
+        terrainGroup.add(seabed);
+
+        // Golden sandy sea floor just beneath shallow water
+        const shallowFloorGeo = new THREE.CylinderGeometry(totalSpan * 0.52, totalSpan * 0.50, 0.3, 48);
+        const shallowFloorMat = new THREE.MeshStandardMaterial({
+          color: 0xfde68a,
+          roughness: 0.9
+        });
+        const shallowFloor = new THREE.Mesh(shallowFloorGeo, shallowFloorMat);
+        shallowFloor.position.y = -0.45;
+        shallowFloor.receiveShadow = true;
+        terrainGroup.add(shallowFloor);
+
+        // 2. Build Each Grid Cell Column with Chamfered Top & Natural Strata
+        for (const cell of islandCells) {
+          if (cell.terrainType === 'ocean') {
+            // Invisible ocean raycast plane so hovering over ocean shows "바다 위 건설 불가"
+            const oceanHitGeo = new THREE.PlaneGeometry(CELL_SIZE * 0.96, CELL_SIZE * 0.96);
+            oceanHitGeo.rotateX(-Math.PI / 2);
+            const oceanHitMat = new THREE.MeshBasicMaterial({ visible: false });
+            const oceanHit = new THREE.Mesh(oceanHitGeo, oceanHitMat);
+            oceanHit.position.set(cell.x, BASE_WATER_Y, cell.z);
+            oceanHit.userData.cellId = cell.id;
+            terrainGroup.add(oceanHit);
+            sceneHandles.cellTopMeshes.set(cell.id, oceanHit);
+            continue;
+          }
+
+          const topY = cell.elevation * HEIGHT_SCALE;
+          const colHeight = topY + 0.6;
+
+          // Base earth/cliff column
+          const baseColor = cell.rocky
+            ? 0x64748b
+            : cell.terrainType === 'beach'
+              ? 0xfcd34d
+              : 0x78716c;
+
+          const colGeo = new THREE.BoxGeometry(CELL_SIZE * 0.98, colHeight, CELL_SIZE * 0.98);
+          const colMat = new THREE.MeshStandardMaterial({
+            color: baseColor,
+            roughness: 0.88
+          });
+          const colMesh = new THREE.Mesh(colGeo, colMat);
+          colMesh.position.set(cell.x, topY - colHeight / 2 - 0.12, cell.z);
+          colMesh.castShadow = true;
+          colMesh.receiveShadow = true;
+          terrainGroup.add(colMesh);
+
+          // Top turf / sand cap (slightly rounded bevel look)
+          let capColor = 0x4ade80;
+          if (cell.terrainType === 'beach') {
+            capColor = 0xfde047;
+          } else if (cell.rocky) {
+            capColor = 0x94a3b8;
+          } else if (cell.terrainType === 'highland') {
+            capColor = 0x22c55e;
+          } else {
+            // Subtle checkerboard variation for tactile miniature board feel
+            capColor = (cell.row + cell.col) % 2 === 0 ? 0x4ade80 : 0x34d399;
+          }
+
+          const capGeo = new THREE.BoxGeometry(CELL_SIZE * 0.95, 0.18, CELL_SIZE * 0.95);
+          const capMat = new THREE.MeshStandardMaterial({
+            color: capColor,
+            roughness: 0.78
+          });
+          const capMesh = new THREE.Mesh(capGeo, capMat);
+          capMesh.position.set(cell.x, topY - 0.06, cell.z);
+          capMesh.castShadow = true;
+          capMesh.receiveShadow = true;
+          capMesh.userData.cellId = cell.id;
+          capMesh.userData.baseColor = capColor;
+          terrainGroup.add(capMesh);
+          sceneHandles.cellTopMeshes.set(cell.id, capMesh);
+
+          // Add procedural cliff boulders on rocky cells
+          if (cell.rocky) {
+            const rockGroup = createProceduralRocks(cell.row * 17 + cell.col * 31);
+            rockGroup.position.set(cell.x, topY, cell.z);
+            terrainGroup.add(rockGroup);
+          } else if (cell.terrainType === 'beach' && (cell.row * 3 + cell.col) % 4 === 0) {
+            // Subtle coastal pebbles / shells
+            const pebble = new THREE.Mesh(sharedGeo.sphere, sharedMat.stone);
+            pebble.scale.set(0.16, 0.09, 0.14);
+            pebble.position.set(cell.x + 0.55, topY + 0.03, cell.z - 0.45);
+            terrainGroup.add(pebble);
+          }
+        }
+
+        scene.add(terrainGroup);
+      }
+
+      function createProceduralRocks(seed) {
+        const group = new THREE.Group();
+        const count = 3 + (seed % 3);
+        for (let i = 0; i < count; i++) {
+          const rock = new THREE.Mesh(sharedGeo.sphere, sharedMat.stone);
+          const s = 0.28 + ((seed + i * 13) % 5) * 0.08;
+          rock.scale.set(s * 1.2, s * 0.85, s);
+          const angle = (i / count) * Math.PI * 2 + seed;
+          const rad = 0.25 + (i % 2) * 0.22;
+          rock.position.set(Math.cos(angle) * rad, s * 0.4, Math.sin(angle) * rad);
+          rock.rotation.set(seed * 0.3, angle, i * 0.5);
+          rock.castShadow = true;
+          rock.receiveShadow = true;
+          group.add(rock);
+        }
+        return group;
+      }
+
+      function buildWaterAndCoast() {
+        const totalSpan = GRID_SIZE * CELL_SIZE + 5.0;
+
+        // Animated Emerald-Turquoise Ocean Surface
+        const waterGeo = new THREE.CylinderGeometry(totalSpan * 0.535, totalSpan * 0.535, 0.12, 64, 1, false);
+        // Subdivide top surface ring for vertex wave animation
+        const topWaterGeo = new THREE.RingGeometry(0.01, totalSpan * 0.534, 64, 18);
+        topWaterGeo.rotateX(-Math.PI / 2);
+
+        // Store original Y/positions for gentle wave ripples
+        const posAttr = topWaterGeo.attributes.position;
+        const origCoords = new Float32Array(posAttr.count * 2);
+        for (let i = 0; i < posAttr.count; i++) {
+          origCoords[i * 2] = posAttr.getX(i);
+          origCoords[i * 2 + 1] = posAttr.getZ(i);
+        }
+        topWaterGeo.userData.origCoords = origCoords;
+
+        const waterMat = new THREE.MeshStandardMaterial({
+          color: 0x06b6d4,
+          emissive: 0x0e7490,
+          emissiveIntensity: 0.18,
+          roughness: 0.18,
+          metalness: 0.15,
+          transparent: true,
+          opacity: 0.84
+        });
+
+        const waterMesh = new THREE.Mesh(topWaterGeo, waterMat);
+        waterMesh.position.y = BASE_WATER_Y + 0.05;
+        waterMesh.receiveShadow = true;
+        scene.add(waterMesh);
+        sceneHandles.waterMesh = waterMesh;
+
+        // Translucent Turquoise Diorama Water Skirt (shows water volume rising with seaLevel!)
+        const skirtGeo = new THREE.CylinderGeometry(totalSpan * 0.533, totalSpan * 0.525, 1.0, 64, 1, true);
+        const skirtMat = new THREE.MeshStandardMaterial({
+          color: 0x0891b2,
+          transparent: true,
+          opacity: 0.52,
+          roughness: 0.25,
+          side: THREE.DoubleSide
+        });
+        const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
+        skirtMesh.position.y = -0.2;
+        scene.add(skirtMesh);
+        sceneHandles.waterSkirtMesh = skirtMesh;
+
+        // Dynamic Coastline Foam Highlights Group
+        sceneHandles.foamLinesGroup = new THREE.Group();
+        scene.add(sceneHandles.foamLinesGroup);
+      }
+
+      function rebuildCoastlineFoam() {
+        if (!webglAvailable || !sceneHandles.foamLinesGroup) return;
+        const group = sceneHandles.foamLinesGroup;
+        while (group.children.length > 0) {
+          const child = group.children.pop();
+          if (child.geometry) child.geometry.dispose();
+        }
+
+        const waterY = BASE_WATER_Y + appState.seaLevel * HEIGHT_SCALE + 0.07;
+        const foamMat = new THREE.MeshBasicMaterial({
+          color: 0xe0f2fe,
+          transparent: true,
+          opacity: 0.78
+        });
+
+        // For each dry land cell, check orthogonal neighbors that are underwater (ocean or flooded)
+        for (const cell of islandCells) {
+          const cellDry = !isCellFlooded(cell.elevation, appState.seaLevel);
+          if (!cellDry) continue;
+
+          const dirs = [
+            { dr: -1, dc: 0, dx: 0, dz: -CELL_SIZE * 0.49, rotY: 0 },
+            { dr: 1, dc: 0, dx: 0, dz: CELL_SIZE * 0.49, rotY: 0 },
+            { dr: 0, dc: -1, dx: -CELL_SIZE * 0.49, dz: 0, rotY: Math.PI / 2 },
+            { dr: 0, dc: 1, dx: CELL_SIZE * 0.49, dz: 0, rotY: Math.PI / 2 }
+          ];
+
+          for (const d of dirs) {
+            const nCell = cellById.get(`${cell.row + d.dr}_${cell.col + d.dc}`);
+            const neighborWet = !nCell || isCellFlooded(nCell.elevation, appState.seaLevel);
+            if (neighborWet) {
+              const stripGeo = new THREE.BoxGeometry(CELL_SIZE * 0.98, 0.04, 0.14);
+              const strip = new THREE.Mesh(stripGeo, foamMat);
+              strip.position.set(cell.x + d.dx, waterY, cell.z + d.dz);
+              strip.rotation.y = d.rotY;
+              group.add(strip);
+            }
+          }
+        }
+      }
+
+      function buildCloudsAndStars() {
+        const cloudMat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.9,
+          flatShading: true,
+          transparent: true,
+          opacity: 0.92
+        });
+
+        const cloudConfigs = [
+          { x: -11, y: 9.5, z: -8, scale: 1.1, speed: 0.35 },
+          { x: 9, y: 10.2, z: -6, scale: 0.9, speed: 0.28 },
+          { x: -7, y: 8.8, z: 10, scale: 0.85, speed: 0.42 },
+          { x: 12, y: 9.6, z: 7, scale: 1.05, speed: 0.31 }
+        ];
+
+        for (const cfg of cloudConfigs) {
+          const cGroup = new THREE.Group();
+          const puffs = [
+            { dx: 0, dy: 0, dz: 0, s: 1.1 },
+            { dx: 0.9, dy: -0.15, dz: 0.2, s: 0.82 },
+            { dx: -0.85, dy: -0.18, dz: -0.15, s: 0.78 },
+            { dx: 0.2, dy: 0.35, dz: -0.3, s: 0.72 }
+          ];
+          for (const p of puffs) {
+            const mesh = new THREE.Mesh(sharedGeo.sphere, cloudMat);
+            mesh.position.set(p.dx, p.dy, p.dz);
+            mesh.scale.set(p.s * 1.25, p.s * 0.75, p.s);
+            cGroup.add(mesh);
+          }
+          cGroup.position.set(cfg.x, cfg.y, cfg.z);
+          cGroup.scale.setScalar(cfg.scale);
+          cGroup.userData = { baseX: cfg.x, speed: cfg.speed };
+          scene.add(cGroup);
+          sceneHandles.cloudsGroup.push(cGroup);
+        }
+
+        // Night Starfield Dome
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 220;
+        const starPos = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.random() * Math.PI * 0.44;
+          const r = 75 + Math.random() * 15;
+          starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          starPos[i * 3 + 1] = r * Math.cos(phi) + 8;
+          starPos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        const starMat = new THREE.PointsMaterial({
+          color: 0xfef9c3,
+          size: 0.55,
+          transparent: true,
+          opacity: 0.0
+        });
+        const stars = new THREE.Points(starGeo, starMat);
+        scene.add(stars);
+        sceneHandles.starsMesh = stars;
+      }
+
+      /* =========================================================================
+       * 7. PROCEDURAL 3D MINIATURE ARCHITECTURAL & NATURE MESH GENERATORS
+       * ========================================================================= */
+      function createWindowMaterial(powered, timeOfDay) {
+        const isLit = powered && (timeOfDay === 'night' || timeOfDay === 'sunset');
+        return new THREE.MeshStandardMaterial({
+          color: isLit ? 0xfef08a : (powered ? 0xbae6fd : 0x334155),
+          emissive: isLit ? 0xf59e0b : 0x000000,
+          emissiveIntensity: isLit ? (timeOfDay === 'night' ? 1.35 : 0.75) : 0.0,
+          roughness: 0.25
+        });
+      }
+
+      function createHouseMesh(powered, timeOfDay) {
+        const group = new THREE.Group();
+        const winMat = createWindowMaterial(powered, timeOfDay);
+        sceneHandles.windowMaterials.push({ mat: winMat, powered });
+
+        // Stone foundation plinth
+        const plinth = new THREE.Mesh(sharedGeo.unitBox, sharedMat.stone);
+        plinth.scale.set(1.26, 0.14, 1.06);
+        plinth.position.y = 0.07;
+        plinth.castShadow = true;
+        plinth.receiveShadow = true;
+        group.add(plinth);
+
+        // Main crisp white cottage body
+        const body = new THREE.Mesh(sharedGeo.unitBox, sharedMat.whiteWall);
+        body.scale.set(1.16, 0.72, 0.96);
+        body.position.y = 0.50;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        group.add(body);
+
+        // Pitched terracotta gable roof (2 angled roof slopes + ridge beam)
+        const roofGroup = new THREE.Group();
+        roofGroup.position.y = 0.86;
+
+        const leftSlope = new THREE.Mesh(sharedGeo.unitBox, sharedMat.terracottaRoof);
+        leftSlope.scale.set(1.32, 0.09, 0.68);
+        leftSlope.position.set(0, 0.18, -0.24);
+        leftSlope.rotation.x = Math.PI * 0.21;
+        leftSlope.castShadow = true;
+        roofGroup.add(leftSlope);
+
+        const rightSlope = new THREE.Mesh(sharedGeo.unitBox, sharedMat.terracottaRoof);
+        rightSlope.scale.set(1.32, 0.09, 0.68);
+        rightSlope.position.set(0, 0.18, 0.24);
+        rightSlope.rotation.x = -Math.PI * 0.21;
+        rightSlope.castShadow = true;
+        roofGroup.add(rightSlope);
+
+        // Brick chimney
+        const chimney = new THREE.Mesh(sharedGeo.unitBox, sharedMat.terracottaRoof);
+        chimney.scale.set(0.18, 0.42, 0.18);
+        chimney.position.set(0.36, 0.28, -0.22);
+        chimney.castShadow = true;
+        roofGroup.add(chimney);
+
+        group.add(roofGroup);
+
+        // Wooden front door
+        const door = new THREE.Mesh(sharedGeo.unitBox, sharedMat.wood);
+        door.scale.set(0.22, 0.42, 0.05);
+        door.position.set(-0.22, 0.35, 0.49);
+        group.add(door);
+
+        // Glowing front & side windows
+        const winPositions = [
+          { x: 0.24, y: 0.48, z: 0.49, sx: 0.28, sy: 0.24, sz: 0.04 },
+          { x: 0.24, y: 0.48, z: -0.49, sx: 0.28, sy: 0.24, sz: 0.04 },
+          { x: -0.24, y: 0.48, z: -0.49, sx: 0.28, sy: 0.24, sz: 0.04 },
+          { x: 0.59, y: 0.48, z: 0, sx: 0.04, sy: 0.24, sz: 0.32 },
+          { x: -0.59, y: 0.48, z: 0, sx: 0.04, sy: 0.24, sz: 0.32 }
+        ];
+        for (const wp of winPositions) {
+          const wMesh = new THREE.Mesh(sharedGeo.unitBox, winMat);
+          wMesh.scale.set(wp.sx, wp.sy, wp.sz);
+          wMesh.position.set(wp.x, wp.y, wp.z);
+          group.add(wMesh);
+        }
+
+        // Small garden hedge in front corner
+        const bush = new THREE.Mesh(sharedGeo.sphere, sharedMat.foliageRound);
+        bush.scale.set(0.22, 0.18, 0.22);
+        bush.position.set(0.45, 0.18, 0.55);
+        group.add(bush);
+
+        return group;
+      }
+
+      function createSchoolMesh(powered, timeOfDay) {
+        const group = new THREE.Group();
+        const winMat = createWindowMaterial(powered, timeOfDay);
+        sceneHandles.windowMaterials.push({ mat: winMat, powered });
+
+        // Wide stone courtyard base
+        const base = new THREE.Mesh(sharedGeo.unitBox, sharedMat.stone);
+        base.scale.set(1.75, 0.15, 1.45);
+        base.position.y = 0.075;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        group.add(base);
+
+        // Main two-story hall
+        const mainHall = new THREE.Mesh(sharedGeo.unitBox, sharedMat.creamWall);
+        mainHall.scale.set(1.56, 0.92, 1.05);
+        mainHall.position.set(0, 0.58, -0.08);
+        mainHall.castShadow = true;
+        mainHall.receiveShadow = true;
+        group.add(mainHall);
+
+        // Slate-blue pitched roof
+        const roofL = new THREE.Mesh(sharedGeo.unitBox, sharedMat.slateRoof);
+        roofL.scale.set(1.68, 0.10, 0.72);
+        roofL.position.set(0, 1.20, -0.34);
+        roofL.rotation.x = Math.PI * 0.20;
+        roofL.castShadow = true;
+        group.add(roofL);
+
+        const roofR = new THREE.Mesh(sharedGeo.unitBox, sharedMat.slateRoof);
+        roofR.scale.set(1.68, 0.10, 0.72);
+        roofR.position.set(0, 1.20, 0.18);
+        roofR.rotation.x = -Math.PI * 0.20;
+        roofR.castShadow = true;
+        group.add(roofR);
+
+        // Central Clock / Bell Tower
+        const tower = new THREE.Mesh(sharedGeo.unitBox, sharedMat.whiteWall);
+        tower.scale.set(0.48, 0.65, 0.48);
+        tower.position.set(0, 1.35, -0.05);
+        tower.castShadow = true;
+        group.add(tower);
+
+        const spire = new THREE.Mesh(sharedGeo.cone, sharedMat.slateRoof);
+        spire.scale.set(0.42, 0.52, 0.42);
+        spire.position.set(0, 1.93, -0.05);
+        spire.rotation.y = Math.PI / 4;
+        spire.castShadow = true;
+        group.add(spire);
+
+        // Glowing clock face
+        const clockFace = new THREE.Mesh(sharedGeo.cylinder, winMat);
+        clockFace.scale.set(0.14, 0.04, 0.14);
+        clockFace.rotation.x = Math.PI / 2;
+        clockFace.position.set(0, 1.45, 0.20);
+        group.add(clockFace);
+
+        // Classroom window rows (2 stories)
+        for (const rowY of [0.42, 0.78]) {
+          for (const colX of [-0.52, 0, 0.52]) {
+            if (rowY === 0.42 && colX === 0) continue; // Entrance door spot
+            const wFront = new THREE.Mesh(sharedGeo.unitBox, winMat);
+            wFront.scale.set(0.28, 0.20, 0.04);
+            wFront.position.set(colX, rowY, 0.45);
+            group.add(wFront);
+
+            const wBack = new THREE.Mesh(sharedGeo.unitBox, winMat);
+            wBack.scale.set(0.28, 0.20, 0.04);
+            wBack.position.set(colX, rowY, -0.61);
+            group.add(wBack);
+          }
+        }
+
+        // Front entrance canopy & double doors
+        const door = new THREE.Mesh(sharedGeo.unitBox, sharedMat.wood);
+        door.scale.set(0.32, 0.42, 0.06);
+        door.position.set(0, 0.36, 0.46);
+        group.add(door);
+
+        return group;
+      }
+
+      function createSolarMesh() {
+        const group = new THREE.Group();
+
+        // Gravel pad
+        const pad = new THREE.Mesh(sharedGeo.unitBox, sharedMat.stone);
+        pad.scale.set(1.55, 0.08, 1.55);
+        pad.position.y = 0.04;
+        pad.receiveShadow = true;
+        group.add(pad);
+
+        // Two rows of angled photovoltaic arrays with silver frames
+        for (const zOffset of [-0.36, 0.36]) {
+          const strutL = new THREE.Mesh(sharedGeo.cylinder, sharedMat.darkMetal);
+          strutL.scale.set(0.05, 0.42, 0.05);
+          strutL.position.set(-0.45, 0.25, zOffset);
+          group.add(strutL);
+
+          const strutR = new THREE.Mesh(sharedGeo.cylinder, sharedMat.darkMetal);
+          strutR.scale.set(0.05, 0.42, 0.05);
+          strutR.position.set(0.45, 0.25, zOffset);
+          group.add(strutR);
+
+          const frame = new THREE.Mesh(sharedGeo.unitBox, sharedMat.silverMetal);
+          frame.scale.set(1.36, 0.05, 0.62);
+          frame.position.set(0, 0.44, zOffset);
+          frame.rotation.x = Math.PI * 0.16;
+          frame.castShadow = true;
+          group.add(frame);
+
+          const pv = new THREE.Mesh(sharedGeo.unitBox, sharedMat.solarPanel);
+          pv.scale.set(1.28, 0.06, 0.56);
+          pv.position.set(0, 0.45, zOffset);
+          pv.rotation.x = Math.PI * 0.16;
+          group.add(pv);
+        }
+
+        // Inverter control box
+        const inverter = new THREE.Mesh(sharedGeo.unitBox, sharedMat.whiteWall);
+        inverter.scale.set(0.26, 0.34, 0.22);
+        inverter.position.set(0.62, 0.24, 0);
+        inverter.castShadow = true;
+        group.add(inverter);
+
+        return group;
+      }
+
+      function createWindTurbineMesh() {
+        const group = new THREE.Group();
+
+        // Circular concrete foundation pad
+        const base = new THREE.Mesh(sharedGeo.cylinder, sharedMat.stone);
+        base.scale.set(0.52, 0.16, 0.52);
+        base.position.y = 0.08;
+        base.castShadow = true;
+        base.receiveShadow = true;
+        group.add(base);
+
+        // Tapered white tubular tower
+        const towerGeo = new THREE.CylinderGeometry(0.11, 0.22, 2.55, 14);
+        const tower = new THREE.Mesh(towerGeo, sharedMat.whiteWall);
+        tower.position.y = 1.38;
+        tower.castShadow = true;
+        group.add(tower);
+
+        // Nacelle housing at top
+        const nacelle = new THREE.Mesh(sharedGeo.unitBox, sharedMat.whiteWall);
+        nacelle.scale.set(0.32, 0.28, 0.64);
+        nacelle.position.set(0, 2.68, 0.05);
+        nacelle.castShadow = true;
+        group.add(nacelle);
+
+        // Rotor hub + 3 aerodynamic blades
+        const rotorGroup = new THREE.Group();
+        rotorGroup.position.set(0, 2.68, 0.40);
+
+        const hub = new THREE.Mesh(sharedGeo.cone, sharedMat.silverMetal);
+        hub.scale.set(0.16, 0.28, 0.16);
+        hub.rotation.x = Math.PI / 2;
+        rotorGroup.add(hub);
+
+        for (let i = 0; i < 3; i++) {
+          const bladePivot = new THREE.Group();
+          bladePivot.rotation.z = (i * Math.PI * 2) / 3;
+
+          const blade = new THREE.Mesh(sharedGeo.unitBox, sharedMat.whiteWall);
+          blade.scale.set(0.13, 1.32, 0.03);
+          blade.position.set(0, 0.68, 0.02);
+          blade.rotation.y = 0.18;
+          blade.castShadow = true;
+          bladePivot.add(blade);
+
+          // Red safety tip stripe
+          const tip = new THREE.Mesh(sharedGeo.unitBox, sharedMat.terracottaRoof);
+          tip.scale.set(0.132, 0.22, 0.032);
+          tip.position.set(0, 1.22, 0.02);
+          tip.rotation.y = 0.18;
+          bladePivot.add(tip);
+
+          rotorGroup.add(bladePivot);
+        }
+
+        group.add(rotorGroup);
+        sceneHandles.windRotors.push(rotorGroup);
+
+        return group;
+      }
+
+      function createTreeMesh(variant, seed) {
+        const group = new THREE.Group();
+
+        if (variant === 'pine') {
+          // Multi-tiered coniferous pine/cypress clusters
+          for (let i = 0; i < 2; i++) {
+            const sub = new THREE.Group();
+            const ox = i === 0 ? -0.18 : 0.26;
+            const oz = i === 0 ? 0.12 : -0.22;
+            const scale = i === 0 ? 1.0 : 0.76;
+
+            const trunk = new THREE.Mesh(sharedGeo.cylinder, sharedMat.wood);
+            trunk.scale.set(0.10 * scale, 0.45 * scale, 0.10 * scale);
+            trunk.position.y = 0.22 * scale;
+            trunk.castShadow = true;
+            sub.add(trunk);
+
+            const mat = i === 0 ? sharedMat.foliagePine : sharedMat.foliagePineLight;
+            for (let layer = 0; layer < 3; layer++) {
+              const cone = new THREE.Mesh(sharedGeo.cone, mat);
+              const r = (0.52 - layer * 0.11) * scale;
+              const h = (0.62 - layer * 0.08) * scale;
+              cone.scale.set(r, h, r);
+              cone.position.y = (0.55 + layer * 0.34) * scale;
+              cone.castShadow = true;
+              sub.add(cone);
+            }
+            sub.position.set(ox, 0, oz);
+            group.add(sub);
+          }
+        } else {
+          // Lush broadleaf canopy tree with clustered foliage puffs
+          const trunk = new THREE.Mesh(sharedGeo.cylinder, sharedMat.wood);
+          trunk.scale.set(0.13, 0.62, 0.13);
+          trunk.position.y = 0.31;
+          trunk.castShadow = true;
+          group.add(trunk);
+
+          const puffs = [
+            { x: 0, y: 0.88, z: 0, s: 0.48 },
+            { x: 0.26, y: 0.76, z: 0.18, s: 0.36 },
+            { x: -0.24, y: 0.78, z: -0.16, s: 0.38 },
+            { x: -0.15, y: 0.72, z: 0.25, s: 0.33 },
+            { x: 0.18, y: 0.74, z: -0.24, s: 0.34 }
+          ];
+          for (let i = 0; i < puffs.length; i++) {
+            const p = puffs[i];
+            const mat = i % 2 === 0 ? sharedMat.foliageRound : sharedMat.foliagePineLight;
+            const puff = new THREE.Mesh(sharedGeo.sphere, mat);
+            puff.scale.setScalar(p.s);
+            puff.position.set(p.x, p.y, p.z);
+            puff.castShadow = true;
+            group.add(puff);
+          }
+        }
+
+        group.userData.seed = seed || 1;
+        sceneHandles.swayingTrees.push(group);
+        return group;
+      }
+
+      function createFloodMarkerMesh() {
+        const group = new THREE.Group();
+        // Floating red exclamation octahedron + ring
+        const ringGeo = new THREE.RingGeometry(0.45, 0.62, 24);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ring = new THREE.Mesh(ringGeo, sharedMat.floodRing);
+        ring.position.y = 0.08;
+        group.add(ring);
+
+        const beacon = new THREE.Mesh(sharedGeo.cone, sharedMat.floodBeacon);
+        beacon.scale.set(0.24, 0.45, 0.24);
+        beacon.rotation.x = Math.PI;
+        beacon.position.y = 1.65;
+        group.add(beacon);
+
+        sceneHandles.floodMarkers.push(group);
+        return group;
+      }
+
+      function createUnpoweredMarkerMesh() {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+        const bolt = new THREE.Mesh(sharedGeo.cone, mat);
+        bolt.scale.set(0.18, 0.36, 0.18);
+        bolt.rotation.x = Math.PI;
+        bolt.position.y = 1.65;
+        group.add(bolt);
+        sceneHandles.unpoweredMarkers.push(group);
+        return group;
+      }
+
+      function buildCursorIndicator() {
+        const group = new THREE.Group();
+
+        const ringGeo = new THREE.RingGeometry(CELL_SIZE * 0.36, CELL_SIZE * 0.46, 32);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0x10b981,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.9
+        });
+        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+        ringMesh.position.y = 0.05;
+        group.add(ringMesh);
+
+        const previewGroup = new THREE.Group();
+        group.add(previewGroup);
+
+        group.visible = false;
+        scene.add(group);
+
+        sceneHandles.cursorGroup = group;
+        sceneHandles.cursorRingMat = ringMat;
+        sceneHandles.cursorPreviewGroup = previewGroup;
+      }
+
+      function syncSceneWithState() {
+        if (!webglAvailable) return;
+
+        // Clear dynamic arrays & previous meshes
+        sceneHandles.windRotors.length = 0;
+        sceneHandles.swayingTrees.length = 0;
+        sceneHandles.windowMaterials.length = 0;
+        sceneHandles.floodMarkers.length = 0;
+        sceneHandles.unpoweredMarkers.length = 0;
+        sceneHandles.lampLights.length = 0;
+
+        while (sceneHandles.facilityGroup.children.length > 0) {
+          sceneHandles.facilityGroup.remove(sceneHandles.facilityGroup.children[0]);
+        }
+        while (sceneHandles.roadGroup.children.length > 0) {
+          sceneHandles.roadGroup.remove(sceneHandles.roadGroup.children[0]);
+        }
+
+        const evalState = appState.evaluation;
+        const waterY = BASE_WATER_Y + appState.seaLevel * HEIGHT_SCALE;
+
+        // 1. Update terrain cell cap colors for flooded cells
+        for (const cell of islandCells) {
+          if (cell.terrainType === 'ocean') continue;
+          const mesh = sceneHandles.cellTopMeshes.get(cell.id);
+          if (!mesh) continue;
+          const flooded = isCellFlooded(cell.elevation, appState.seaLevel);
+          if (flooded) {
+            mesh.material.color.setHex(0x38bdf8);
+          } else {
+            mesh.material.color.setHex(mesh.userData.baseColor);
+          }
+        }
+
+        // 2. Build village paths & streetlamps between adjacent dry buildings
+        const buildingCellIds = new Set();
+        for (const [cellId, item] of appState.placements.entries()) {
+          if (item.type !== 'tree') {
+            buildingCellIds.add(cellId);
+          }
+        }
+
+        const lampMat = new THREE.MeshBasicMaterial({
+          color: (appState.timeOfDay === 'night' || appState.timeOfDay === 'sunset') ? 0xfef08a : 0xe2e8f0
+        });
+
+        for (const cellId of buildingCellIds) {
+          const cell = cellById.get(cellId);
+          if (!cell || isCellFlooded(cell.elevation, appState.seaLevel)) continue;
+          const topY = cell.elevation * HEIGHT_SCALE;
+
+          // Stepping stone pad
+          const pad = new THREE.Mesh(sharedGeo.unitBox, sharedMat.pathStone);
+          pad.scale.set(0.32, 0.04, 0.32);
+          pad.position.set(cell.x, topY + 0.03, cell.z + 0.68);
+          sceneHandles.roadGroup.add(pad);
+
+          // Cute miniature village streetlamp on house/school cells
+          const item = appState.placements.get(cellId);
+          if (item && (item.type === 'house' || item.type === 'school')) {
+            const pole = new THREE.Mesh(sharedGeo.cylinder, sharedMat.darkMetal);
+            pole.scale.set(0.03, 0.52, 0.03);
+            pole.position.set(cell.x - 0.68, topY + 0.26, cell.z + 0.68);
+            sceneHandles.roadGroup.add(pole);
+
+            const bulb = new THREE.Mesh(sharedGeo.sphere, lampMat);
+            bulb.scale.setScalar(0.085);
+            bulb.position.set(cell.x - 0.68, topY + 0.54, cell.z + 0.68);
+            sceneHandles.roadGroup.add(bulb);
+          }
+        }
+
+        // 3. Instantiate all placed 3D structures
+        for (const [cellId, item] of appState.placements.entries()) {
+          const cell = cellById.get(cellId);
+          if (!cell) continue;
+
+          const fState = evalState.facilityStates.get(cellId);
+          const powered = fState ? fState.powered : false;
+          const flooded = fState ? fState.flooded : false;
+          const topY = cell.elevation * HEIGHT_SCALE;
+
+          let meshGroup = null;
+          if (item.type === 'house') {
+            meshGroup = createHouseMesh(powered, appState.timeOfDay);
+          } else if (item.type === 'school') {
+            meshGroup = createSchoolMesh(powered, appState.timeOfDay);
+          } else if (item.type === 'solar') {
+            meshGroup = createSolarMesh();
+          } else if (item.type === 'wind') {
+            meshGroup = createWindTurbineMesh();
+          } else if (item.type === 'tree') {
+            meshGroup = createTreeMesh(item.treeVariant, cell.row * 13 + cell.col);
+          }
+
+          if (meshGroup) {
+            meshGroup.position.set(cell.x, topY + 0.02, cell.z);
+            if (item.type === 'tree') {
+              meshGroup.rotation.y = item.rotation || 0;
+            }
+            sceneHandles.facilityGroup.add(meshGroup);
+          }
+
+          // Add red flood warning beacon if submerged
+          if (flooded) {
+            const marker = createFloodMarkerMesh();
+            marker.position.set(cell.x, Math.max(topY, waterY) + 0.04, cell.z);
+            sceneHandles.facilityGroup.add(marker);
+          } else if (!powered && (item.type === 'house' || item.type === 'school')) {
+            // Unpowered blackout warning badge
+            const marker = createUnpoweredMarkerMesh();
+            marker.position.set(cell.x, topY + 0.25, cell.z);
+            sceneHandles.facilityGroup.add(marker);
+          }
+        }
+
+        // 4. Update water height & coastline foam
+        if (sceneHandles.waterMesh) {
+          sceneHandles.waterMesh.position.y = waterY + 0.05;
+        }
+        if (sceneHandles.waterSkirtMesh) {
+          const skirtHeight = 1.6 + appState.seaLevel * HEIGHT_SCALE;
+          sceneHandles.waterSkirtMesh.scale.y = skirtHeight;
+          sceneHandles.waterSkirtMesh.position.y = waterY - skirtHeight * 0.5 + 0.04;
+        }
+        rebuildCoastlineFoam();
+        applyTimeOfDayVisuals();
+        updateCursor3D();
+      }
+
+      function applyTimeOfDayVisuals() {
+        if (!webglAvailable) return;
+        const t = appState.timeOfDay;
+
+        if (t === 'day') {
+          scene.background.setHex(0xc8ecff);
+          scene.fog.color.setHex(0xc8ecff);
+          sceneHandles.hemiLight.color.setHex(0xf0f9ff);
+          sceneHandles.hemiLight.groundColor.setHex(0x86efac);
+          sceneHandles.hemiLight.intensity = 0.88;
+
+          sceneHandles.dirLight.color.setHex(0xfffbeb);
+          sceneHandles.dirLight.intensity = 1.15;
+          sceneHandles.dirLight.position.set(22, 34, 18);
+
+          sceneHandles.waterMesh.material.color.setHex(0x06b6d4);
+          sceneHandles.waterMesh.material.emissive.setHex(0x0e7490);
+          sceneHandles.waterMesh.material.emissiveIntensity = 0.18;
+          sceneHandles.starsMesh.material.opacity = 0.0;
+        } else if (t === 'sunset') {
+          scene.background.setHex(0xfed7aa);
+          scene.fog.color.setHex(0xfdba74);
+          sceneHandles.hemiLight.color.setHex(0xffedd5);
+          sceneHandles.hemiLight.groundColor.setHex(0x7c2d12);
+          sceneHandles.hemiLight.intensity = 0.72;
+
+          sceneHandles.dirLight.color.setHex(0xf97316);
+          sceneHandles.dirLight.intensity = 1.25;
+          sceneHandles.dirLight.position.set(-28, 15, 20);
+
+          sceneHandles.waterMesh.material.color.setHex(0x0891b2);
+          sceneHandles.waterMesh.material.emissive.setHex(0x9a3412);
+          sceneHandles.waterMesh.material.emissiveIntensity = 0.25;
+          sceneHandles.starsMesh.material.opacity = 0.25;
+        } else {
+          // Cozy glowing night village (not just dark screen!)
+          scene.background.setHex(0x0f172a);
+          scene.fog.color.setHex(0x0f172a);
+          sceneHandles.hemiLight.color.setHex(0x38bdf8);
+          sceneHandles.hemiLight.groundColor.setHex(0x1e293b);
+          sceneHandles.hemiLight.intensity = 0.52;
+
+          sceneHandles.dirLight.color.setHex(0x93c5fd);
+          sceneHandles.dirLight.intensity = 0.68;
+          sceneHandles.dirLight.position.set(-18, 28, -16);
+
+          sceneHandles.waterMesh.material.color.setHex(0x0369a1);
+          sceneHandles.waterMesh.material.emissive.setHex(0x0c4a6e);
+          sceneHandles.waterMesh.material.emissiveIntensity = 0.35;
+          sceneHandles.starsMesh.material.opacity = 0.95;
+        }
+      }
+
+      /**
+       * Aspect-aware framing so the entire island fits within 70~85% of viewport width
+       * and is never clipped vertically or horizontally on any device orientation.
+       */
+      function updateAspectAwareFraming(preset, instant) {
+        const w = Math.max(320, window.innerWidth);
+        const h = Math.max(320, window.innerHeight);
+        const aspect = w / h;
+
+        const islandRadius = (GRID_SIZE * CELL_SIZE) * 0.64; // ~17.8 world units
+        const vFovRad = (38 * Math.PI) / 180;
+        const hFovRad = 2 * Math.atan(Math.tan(vFovRad / 2) * aspect);
+
+        // Compute distance so island occupies ~78% of the tighter axis
+        const distVertical = islandRadius / (Math.sin(vFovRad / 2) * 0.78);
+        const distHorizontal = islandRadius / (Math.sin(hFovRad / 2) * 0.78);
+        const optimalDistance = Math.max(distVertical, distHorizontal, 28);
+
+        cameraRig.baseDistance = optimalDistance;
+
+        if (preset === 'home') {
+          cameraRig.desiredTheta = 0.68;
+          cameraRig.desiredPhi = 0.92;
+          cameraRig.desiredDistance = optimalDistance;
+          cameraRig.desiredTarget = { x: 0, y: 0.85, z: 0 };
+        } else if (preset === 'hero') {
+          // Dramatic low-angle miniature diorama hero shot
+          cameraRig.desiredTheta = 0.42;
+          cameraRig.desiredPhi = 1.16;
+          cameraRig.desiredDistance = optimalDistance * 0.62;
+          cameraRig.desiredTarget = { x: 0, y: 1.65, z: 0 };
+        } else {
+          // Maintain relative zoom ratio on resize
+          cameraRig.desiredDistance = Math.min(Math.max(cameraRig.desiredDistance, optimalDistance * 0.45), optimalDistance * 1.45);
+        }
+
+        if (instant) {
+          cameraRig.theta = cameraRig.desiredTheta;
+          cameraRig.phi = cameraRig.desiredPhi;
+          cameraRig.distance = cameraRig.desiredDistance;
+          cameraRig.target.x = cameraRig.desiredTarget.x;
+          cameraRig.target.y = cameraRig.desiredTarget.y;
+          cameraRig.target.z = cameraRig.desiredTarget.z;
+        }
+      }
+
+      function updateCursor3D() {
+        const activeCellId = appState.usingKeyboardCursor
+          ? appState.keyboardCursorCellId
+          : appState.hoveredCellId;
+
+        const tooltipEl = document.getElementById('cell-cursor-tooltip');
+
+        if (!activeCellId) {
+          if (sceneHandles.cursorGroup) sceneHandles.cursorGroup.visible = false;
+          if (tooltipEl) tooltipEl.classList.add('hidden');
+          return;
+        }
+
+        const cell = cellById.get(activeCellId);
+        if (!cell) return;
+
+        const validation = validateToolAction(appState, activeCellId, appState.selectedTool);
+        const waterY = BASE_WATER_Y + appState.seaLevel * HEIGHT_SCALE;
+        const cellY = cell.terrainType === 'ocean' ? waterY : Math.max(cell.elevation * HEIGHT_SCALE, waterY);
+
+        if (webglAvailable && sceneHandles.cursorGroup) {
+          sceneHandles.cursorGroup.visible = true;
+          sceneHandles.cursorGroup.position.set(cell.x, cellY + 0.04, cell.z);
+          sceneHandles.cursorRingMat.color.setHex(validation.valid ? 0x10b981 : 0xf43f5e);
+
+          // Rebuild ghost preview mesh if tool changed
+          const previewType = validation.valid ? appState.selectedTool : 'none';
+          if (sceneHandles.currentPreviewType !== previewType) {
+            sceneHandles.currentPreviewType = previewType;
+            while (sceneHandles.cursorPreviewGroup.children.length > 0) {
+              sceneHandles.cursorPreviewGroup.remove(sceneHandles.cursorPreviewGroup.children[0]);
+            }
+
+            let ghost = null;
+            if (previewType === 'house') ghost = createHouseMesh(true, 'day');
+            else if (previewType === 'school') ghost = createSchoolMesh(true, 'day');
+            else if (previewType === 'solar') ghost = createSolarMesh();
+            else if (previewType === 'wind') ghost = createWindTurbineMesh();
+            else if (previewType === 'tree') ghost = createTreeMesh('pine', 1);
+
+            if (ghost) {
+              ghost.traverse(obj => {
+                if (obj.isMesh) {
+                  obj.material = obj.material.clone();
+                  obj.material.transparent = true;
+                  obj.material.opacity = 0.62;
+                  obj.castShadow = false;
+                }
+              });
+              sceneHandles.cursorPreviewGroup.add(ghost);
+            }
+          }
+        }
+
+        // Update floating 2D screen badge
+        if (tooltipEl) {
+          const cardEl = document.getElementById('cell-cursor-card');
+          const dotEl = document.getElementById('cell-cursor-dot');
+          const textEl = document.getElementById('cell-cursor-text');
+          const elevEl = document.getElementById('cell-cursor-elev');
+
+          textEl.textContent = validation.reason;
+          elevEl.textContent = cell.terrainType === 'ocean'
+            ? '(바다)'
+            : `(해발 ${cell.elevation.toFixed(2)}m)`;
+
+          if (validation.valid) {
+            cardEl.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-lg border backdrop-blur-md flex items-center gap-1.5 whitespace-nowrap bg-emerald-950/80 text-emerald-50 border-emerald-400/60';
+            dotEl.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          } else {
+            cardEl.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold shadow-lg border backdrop-blur-md flex items-center gap-1.5 whitespace-nowrap bg-rose-950/85 text-rose-50 border-rose-400/60';
+            dotEl.className = 'w-2 h-2 rounded-full bg-rose-400';
+          }
+        }
+      }
+
+      /* =========================================================================
+       * 8. HUD & UI SYNCHRONIZATION
+       * ========================================================================= */
+      function updateHUD() {
+        const ev = appState.evaluation;
+
+        // 1. Budget
+        const budgetEl = document.getElementById('hud-budget');
+        budgetEl.textContent = ev.remainingBudget.toLocaleString();
+        budgetEl.className = ev.remainingBudget < 100
+          ? 'text-amber-600 font-extrabold'
+          : 'text-slate-900 font-extrabold';
+
+        // 2. Power Balance
+        const netEl = document.getElementById('hud-power-net');
+        const genEl = document.getElementById('hud-power-gen');
+        const demEl = document.getElementById('hud-power-dem');
+        const badgeEl = document.getElementById('hud-power-badge');
+        const iconEl = document.getElementById('hud-power-icon');
+
+        const sign = ev.netPower >= 0 ? '+' : '';
+        netEl.textContent = `${sign}${ev.netPower.toFixed(1)} kW`;
+        genEl.textContent = ev.totalGeneration.toFixed(1);
+        demEl.textContent = ev.totalDemand.toFixed(1);
+
+        if (ev.netPower < -1e-4) {
+          netEl.className = 'text-rose-600 font-extrabold';
+          badgeEl.textContent = `정전 ${ev.unpoweredBuildingCount}동`;
+          badgeEl.className = 'px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-700 animate-pulse';
+          iconEl.setAttribute('class', 'w-4 h-4 text-rose-600 shrink-0');
+        } else {
+          netEl.className = 'text-emerald-700 font-extrabold';
+          badgeEl.textContent = '공급 정상';
+          badgeEl.className = 'px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700';
+          iconEl.setAttribute('class', 'w-4 h-4 text-emerald-600 shrink-0');
+        }
+
+        // 3. Flood & Mission Status
+        const floodBadge = document.getElementById('hud-flood-badge');
+        if (ev.floodedFacilities.length > 0) {
+          floodBadge.classList.remove('hidden');
+          floodBadge.textContent = `침수 ${ev.floodedFacilities.length}`;
+        } else {
+          floodBadge.classList.add('hidden');
+        }
+
+        const missionSummary = document.getElementById('hud-mission-summary');
+        const missionIcon = document.getElementById('hud-mission-icon');
+        if (ev.mission.missionComplete) {
+          missionSummary.textContent = '미션 완료!';
+          missionSummary.className = 'text-emerald-700 font-extrabold';
+          missionIcon.setAttribute('class', 'w-4 h-4 text-emerald-600 shrink-0');
+        } else {
+          missionSummary.textContent = `${ev.mission.missionCriteriaCount} / 4 달성`;
+          missionSummary.className = 'text-sky-700 font-bold';
+          missionIcon.setAttribute('class', 'w-4 h-4 text-sky-600 shrink-0');
+        }
+
+        // 4. Mission Strip Pills
+        setMissionPill('chk-buildings', ev.mission.condBuildings, `학교 ${ev.activeCounts.school}/1 · 집 ${ev.activeCounts.house}/3`);
+        setMissionPill('chk-day-power', ev.mission.condDayPower, `낮 수지 ${ev.dayNetPower >= 0 ? '+' : ''}${ev.dayNetPower.toFixed(1)}kW`);
+        setMissionPill('chk-night-power', ev.mission.condNightPower, `밤 수지 ${ev.nightNetPower >= 0 ? '+' : ''}${ev.nightNetPower.toFixed(1)}kW`);
+        setMissionPill(
+          'chk-sealevel1',
+          ev.mission.condSeaLevel1Safe,
+          ev.mission.condSeaLevel1Safe ? '해수면 1.0m 안전' : `저지대 위험 ${ev.floodedCoreAtSeaLevel1.length}동`
+        );
+
+        const completeBanner = document.getElementById('mission-complete-banner');
+        if (ev.mission.missionComplete) {
+          completeBanner.classList.remove('hidden');
+        } else {
+          completeBanner.classList.add('hidden');
+        }
+
+        // 5. Undo button state
+        const undoBtn = document.getElementById('btn-undo');
+        if (undoBtn) {
+          undoBtn.disabled = appState.undoStack.length === 0;
+        }
+      }
+
+      function setMissionPill(id, passed, label) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (passed) {
+          el.className = 'px-2 py-0.5 rounded-lg font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1';
+          el.innerHTML = `<svg class="w-3 h-3 text-emerald-600 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg><span>${label}</span>`;
+        } else {
+          el.className = 'px-2 py-0.5 rounded-lg font-semibold bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1';
+          el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span>${label}</span>`;
+        }
+      }
+
+      function refreshSimulationState() {
+        appState.evaluation = evaluateIslandState(appState);
+        updateHUD();
+        syncSceneWithState();
+      }
+
+      let toastTimer = null;
+      function showToast(message, type) {
+        const toast = document.getElementById('status-toast');
+        const text = document.getElementById('status-toast-text');
+        if (!toast || !text) return;
+
+        text.textContent = message;
+        toast.classList.remove('opacity-0', '-translate-y-2');
+        toast.classList.add('opacity-100', 'translate-y-0');
+
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toast.classList.add('opacity-0', '-translate-y-2');
+          toast.classList.remove('opacity-100', 'translate-y-0');
+        }, 2300);
+      }
+
+      /* =========================================================================
+       * 9. INTERACTION: ORBIT DRAG, ZOOM, RAYCAST CLICK & KEYBOARD ACCESSIBILITY
+       * ========================================================================= */
+      const raycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
+      const pointerNDC = typeof THREE !== 'undefined' ? new THREE.Vector2() : { x: 0, y: 0 };
+
+      const pointerState = {
+        isDown: false,
+        button: 0,
+        startX: 0,
+        startY: 0,
+        lastX: 0,
+        lastY: 0,
+        dragDistance: 0,
+        pinchDist: 0,
+        activeTouches: new Map()
+      };
+
+      function updatePointerRaycast(clientX, clientY) {
+        const tooltipEl = document.getElementById('cell-cursor-tooltip');
+        if (tooltipEl) {
+          tooltipEl.style.left = `${Math.min(window.innerWidth - 210, clientX + 16)}px`;
+          tooltipEl.style.top = `${Math.max(64, clientY - 36)}px`;
+        }
+
+        if (!webglAvailable) {
+          const hitId = pickIsometricCell(clientX, clientY);
+          if (hitId !== appState.hoveredCellId) {
+            appState.hoveredCellId = hitId;
+            appState.usingKeyboardCursor = false;
+            updateCursor3D();
+          }
+          if (tooltipEl) {
+            tooltipEl.classList.toggle('hidden', !hitId);
+          }
+          return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(pointerNDC, camera);
+        const targets = Array.from(sceneHandles.cellTopMeshes.values());
+        const intersects = raycaster.intersectObjects(targets, false);
+
+        const hitId = intersects.length > 0 ? intersects[0].object.userData.cellId : null;
+        if (hitId !== appState.hoveredCellId || appState.usingKeyboardCursor) {
+          appState.hoveredCellId = hitId;
+          appState.usingKeyboardCursor = false;
+          if (hitId) appState.keyboardCursorCellId = hitId;
+          updateCursor3D();
+        }
+        if (tooltipEl) {
+          tooltipEl.classList.toggle('hidden', !hitId);
+        }
+      }
+
+      canvas.addEventListener('pointerdown', (e) => {
+        canvas.focus();
+        pointerState.activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (pointerState.activeTouches.size === 2) {
+          const pts = Array.from(pointerState.activeTouches.values());
+          pointerState.pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          return;
+        }
+
+        pointerState.isDown = true;
+        pointerState.button = e.button;
+        pointerState.startX = e.clientX;
+        pointerState.startY = e.clientY;
+        pointerState.lastX = e.clientX;
+        pointerState.lastY = e.clientY;
+        pointerState.dragDistance = 0;
+        updatePointerRaycast(e.clientX, e.clientY);
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (pointerState.activeTouches.has(e.pointerId)) {
+          pointerState.activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        }
+
+        // Two-finger pinch zoom
+        if (pointerState.activeTouches.size === 2) {
+          const pts = Array.from(pointerState.activeTouches.values());
+          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          if (pointerState.pinchDist > 0) {
+            const delta = pointerState.pinchDist - dist;
+            cameraRig.desiredDistance = Math.min(
+              cameraRig.baseDistance * 1.45,
+              Math.max(cameraRig.baseDistance * 0.45, cameraRig.desiredDistance + delta * 0.06)
+            );
+          }
+          pointerState.pinchDist = dist;
+          return;
+        }
+
+        if (pointerState.isDown) {
+          const dx = e.clientX - pointerState.lastX;
+          const dy = e.clientY - pointerState.lastY;
+          pointerState.lastX = e.clientX;
+          pointerState.lastY = e.clientY;
+          pointerState.dragDistance += Math.hypot(dx, dy);
+
+          if (pointerState.dragDistance > 5) {
+            cameraRig.desiredTheta -= dx * 0.0075;
+            cameraRig.desiredPhi = Math.min(1.32, Math.max(0.38, cameraRig.desiredPhi - dy * 0.0065));
+          }
+        } else if (e.target === canvas) {
+          updatePointerRaycast(e.clientX, e.clientY);
+        }
+      });
+
+      window.addEventListener('pointerup', (e) => {
+        pointerState.activeTouches.delete(e.pointerId);
+        if (pointerState.activeTouches.size < 2) {
+          pointerState.pinchDist = 0;
+        }
+
+        if (!pointerState.isDown) return;
+        pointerState.isDown = false;
+
+        // If short click/tap (not orbit drag), execute tool on hovered cell
+        if (pointerState.dragDistance <= 6 && e.target === canvas && pointerState.button === 0) {
+          updatePointerRaycast(e.clientX, e.clientY);
+          if (appState.hoveredCellId) {
+            applyToolAtCell(appState.hoveredCellId);
+          }
+        }
+      });
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomStep = e.deltaY * 0.02;
+        cameraRig.desiredDistance = Math.min(
+          cameraRig.baseDistance * 1.45,
+          Math.max(cameraRig.baseDistance * 0.45, cameraRig.desiredDistance + zoomStep)
+        );
+      }, { passive: false });
+
+      // Keyboard navigation for classroom accessibility (Arrow keys + Enter/Space + Number shortcuts + Z undo)
+      window.addEventListener('keydown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+        const curCell = cellById.get(appState.keyboardCursorCellId || '6_6') || cellById.get('6_6');
+        let nr = curCell.row;
+        let nc = curCell.col;
+        let moved = false;
+
+        if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+          nr = Math.max(0, nr - 1);
+          moved = true;
+        } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+          nr = Math.min(GRID_SIZE - 1, nr + 1);
+          moved = true;
+        } else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          nc = Math.max(0, nc - 1);
+          moved = true;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          nc = Math.min(GRID_SIZE - 1, nc + 1);
+          moved = true;
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const targetId = appState.usingKeyboardCursor ? appState.keyboardCursorCellId : (appState.hoveredCellId || appState.keyboardCursorCellId);
+          if (targetId) applyToolAtCell(targetId);
+          return;
+        } else if ((e.key === 'z' || e.key === 'Z') && !e.metaKey && !e.ctrlKey) {
+          undoLastAction();
+          return;
+        } else if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+          const toolMap = { '1': 'house', '2': 'school', '3': 'solar', '4': 'wind', '5': 'tree', '6': 'demolish' };
+          selectTool(toolMap[e.key]);
+          return;
+        }
+
+        if (moved) {
+          e.preventDefault();
+          appState.usingKeyboardCursor = true;
+          appState.keyboardCursorCellId = `${nr}_${nc}`;
+          updateCursor3D();
+          const targetCell = cellById.get(appState.keyboardCursorCellId);
+          if (targetCell) {
+            showToast(`셀 선택 (${nr + 1}, ${nc + 1}) · 해발 ${targetCell.elevation > 0 ? targetCell.elevation.toFixed(2) + 'm' : '바다'}`, 'info');
+          }
+        }
+      });
+
+      /* =========================================================================
+       * 10. 2D ISOMETRIC FALLBACK (In Case WebGL Fails)
+       * ========================================================================= */
+      let ctx2D = null;
+      function pickIsometricCell(clientX, clientY) {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const cx = w / 2;
+        const cy = h * 0.54;
+        const tileW = Math.min(w, h) / 14;
+        const tileH = tileW * 0.52;
+
+        let bestId = null;
+        let bestDist = Infinity;
+
+        for (const cell of islandCells) {
+          const isoX = cx + (cell.gx - cell.gz) * tileW * 0.5;
+          const elevPx = Math.max(0, cell.elevation - appState.seaLevel) * 14;
+          const isoY = cy + (cell.gx + cell.gz) * tileH * 0.5 - elevPx;
+          const d = Math.hypot(clientX - isoX, clientY - isoY);
+          if (d < tileW * 0.55 && d < bestDist) {
+            bestDist = d;
+            bestId = cell.id;
+          }
+        }
+        return bestId;
+      }
+
+      function renderIsometricFallback(timeSec) {
+        if (!ctx2D) ctx2D = canvas.getContext('2d');
+        if (!ctx2D) return;
+
+        const w = canvas.width = window.innerWidth;
+        const h = canvas.height = window.innerHeight;
+
+        ctx2D.fillStyle = appState.timeOfDay === 'night' ? '#0f172a' : (appState.timeOfDay === 'sunset' ? '#fed7aa' : '#bae6fd');
+        ctx2D.fillRect(0, 0, w, h);
+
+        const cx = w / 2;
+        const cy = h * 0.54;
+        const tileW = Math.min(w, h) / 14;
+        const tileH = tileW * 0.52;
+
+        for (const cell of islandCells) {
+          if (cell.terrainType === 'ocean') continue;
+          const flooded = isCellFlooded(cell.elevation, appState.seaLevel);
+          const isoX = cx + (cell.gx - cell.gz) * tileW * 0.5;
+          const elevPx = flooded ? 0 : (cell.elevation - appState.seaLevel) * 14;
+          const isoY = cy + (cell.gx + cell.gz) * tileH * 0.5 - elevPx;
+
+          ctx2D.beginPath();
+          ctx2D.moveTo(isoX, isoY - tileH * 0.5);
+          ctx2D.lineTo(isoX + tileW * 0.5, isoY);
+          ctx2D.lineTo(isoX, isoY + tileH * 0.5);
+          ctx2D.lineTo(isoX - tileW * 0.5, isoY);
+          ctx2D.closePath();
+
+          ctx2D.fillStyle = flooded ? '#38bdf8' : (cell.rocky ? '#94a3b8' : (cell.terrainType === 'beach' ? '#fde047' : '#4ade80'));
+          ctx2D.fill();
+          ctx2D.strokeStyle = 'rgba(15,23,42,0.18)';
+          ctx2D.stroke();
+
+          const item = appState.placements.get(cell.id);
+          if (item) {
+            ctx2D.fillStyle = item.type === 'school' ? '#0284c7' : (item.type === 'house' ? '#ea580c' : (item.type === 'solar' ? '#1e3a8a' : (item.type === 'wind' ? '#f8fafc' : '#15803d')));
+            ctx2D.beginPath();
+            ctx2D.arc(isoX, isoY - 8, tileW * 0.22, 0, Math.PI * 2);
+            ctx2D.fill();
+          }
+        }
+      }
+
+      /* =========================================================================
+       * 11. ANIMATION LOOP (Waves, Rotating Wind Turbines, Clouds, Beacons)
+       * ========================================================================= */
+      let lastFrameTime = performance.now();
+
+      function animateLoop(now) {
+        requestAnimationFrame(animateLoop);
+
+        const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+        lastFrameTime = now;
+        const timeSec = now * 0.001;
+
+        if (!webglAvailable) {
+          renderIsometricFallback(timeSec);
+          return;
+        }
+
+        // 1. Smoothly damp camera orbit & zoom
+        const damp = 1 - Math.exp(-9 * dt);
+        cameraRig.theta += (cameraRig.desiredTheta - cameraRig.theta) * damp;
+        cameraRig.phi += (cameraRig.desiredPhi - cameraRig.phi) * damp;
+        cameraRig.distance += (cameraRig.desiredDistance - cameraRig.distance) * damp;
+        cameraRig.target.x += (cameraRig.desiredTarget.x - cameraRig.target.x) * damp;
+        cameraRig.target.y += (cameraRig.desiredTarget.y - cameraRig.target.y) * damp;
+        cameraRig.target.z += (cameraRig.desiredTarget.z - cameraRig.target.z) * damp;
+
+        const sinPhi = Math.sin(cameraRig.phi);
+        camera.position.set(
+          cameraRig.target.x + cameraRig.distance * sinPhi * Math.sin(cameraRig.theta),
+          cameraRig.target.y + cameraRig.distance * Math.cos(cameraRig.phi),
+          cameraRig.target.z + cameraRig.distance * sinPhi * Math.cos(cameraRig.theta)
+        );
+        camera.lookAt(cameraRig.target.x, cameraRig.target.y, cameraRig.target.z);
+
+        // 2. Rotate wind turbine rotors proportional to wind speed
+        const rotorSpeed = appState.wind * 5.8;
+        for (const rotor of sceneHandles.windRotors) {
+          rotor.rotation.z -= rotorSpeed * dt;
+        }
+
+        // 3. Gentle wind sway for trees
+        const swayAmp = 0.02 + appState.wind * 0.055;
+        for (const tree of sceneHandles.swayingTrees) {
+          const phase = timeSec * (1.8 + appState.wind * 2.2) + tree.userData.seed;
+          tree.rotation.z = Math.sin(phase) * swayAmp;
+          tree.rotation.x = Math.cos(phase * 0.8) * swayAmp * 0.6;
+        }
+
+        // 4. Gentle ocean surface vertex ripple waves
+        if (sceneHandles.waterMesh) {
+          const geo = sceneHandles.waterMesh.geometry;
+          const pos = geo.attributes.position;
+          const orig = geo.userData.origCoords;
+          if (orig) {
+            for (let i = 0; i < pos.count; i++) {
+              const ox = orig[i * 2];
+              const oz = orig[i * 2 + 1];
+              const wave = Math.sin(ox * 0.45 + timeSec * 1.9) * 0.045 + Math.cos(oz * 0.42 + timeSec * 1.5) * 0.045;
+              pos.setY(i, wave);
+            }
+            pos.needsUpdate = true;
+          }
+        }
+
+        // 5. Drift miniature clouds slowly across the sky
+        for (const cloud of sceneHandles.cloudsGroup) {
+          cloud.position.x = cloud.userData.baseX + Math.sin(timeSec * cloud.userData.speed) * 2.2;
+        }
+
+        // 6. Bobbing flood & blackout warning markers
+        for (const m of sceneHandles.floodMarkers) {
+          if (m.children[1]) {
+            m.children[1].position.y = 1.55 + Math.sin(timeSec * 4.5) * 0.14;
+            m.children[1].rotation.y = timeSec * 2.5;
+          }
+        }
+        for (const m of sceneHandles.unpoweredMarkers) {
+          if (m.children[0]) {
+            m.children[0].position.y = 1.55 + Math.sin(timeSec * 3.5) * 0.10;
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      /* =========================================================================
+       * 12. UI EVENT LISTENERS & INITIALIZATION
+       * ========================================================================= */
+      function selectTool(toolName) {
+        appState.selectedTool = toolName;
+        const buttons = document.querySelectorAll('[data-tool]');
+        buttons.forEach(btn => {
+          const t = btn.getAttribute('data-tool');
+          btn.classList.remove('active', 'demolish-active');
+          if (t === toolName) {
+            btn.classList.add(toolName === 'demolish' ? 'demolish-active' : 'active');
+          }
+        });
+        updateCursor3D();
+      }
+
+      function bindUIEvents() {
+        // Tool buttons
+        document.querySelectorAll('[data-tool]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            selectTool(btn.getAttribute('data-tool'));
+          });
+        });
+
+        // Time of Day buttons
+        document.querySelectorAll('.time-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const newTime = btn.getAttribute('data-time');
+            appState.timeOfDay = newTime;
+
+            document.querySelectorAll('.time-btn').forEach(b => {
+              const active = b.getAttribute('data-time') === newTime;
+              b.className = active
+                ? 'time-btn px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition bg-white text-sky-700 shadow-sm'
+                : 'time-btn px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition text-slate-600 hover:text-slate-900';
+            });
+
+            refreshSimulationState();
+            const labelMap = { day: '낮 (태양광 계수 1.0)', sunset: '노을 (태양광 계수 0.3)', night: '밤 (태양광 계수 0.0)' };
+            showToast(`시간대 전환: ${labelMap[newTime]}`, 'info');
+          });
+        });
+
+        // Wind Slider
+        const windSlider = document.getElementById('slider-wind');
+        const windLabel = document.getElementById('label-wind');
+        windSlider.addEventListener('input', (e) => {
+          appState.wind = parseFloat(e.target.value);
+          windLabel.textContent = appState.wind.toFixed(2);
+          appState.evaluation = evaluateIslandState(appState);
+          updateHUD();
+          // Update building window states if wind change restored/dropped power
+          syncSceneWithState();
+        });
+
+        // Sea Level Slider
+        const seaSlider = document.getElementById('slider-sealevel');
+        const seaLabel = document.getElementById('label-sealevel');
+        seaSlider.addEventListener('input', (e) => {
+          appState.seaLevel = parseFloat(e.target.value);
+          seaLabel.textContent = `+${appState.seaLevel.toFixed(1)}m`;
+          refreshSimulationState();
+        });
+
+        // Undo / Empty Island / Preset Village
+        document.getElementById('btn-undo').addEventListener('click', () => {
+          undoLastAction();
+        });
+
+        document.getElementById('btn-empty-island').addEventListener('click', () => {
+          if (appState.placements.size === 0) {
+            showToast('이미 빈 섬 상태입니다.', 'info');
+            return;
+          }
+          appState.placements.clear();
+          appState.undoStack.length = 0;
+          refreshSimulationState();
+          showToast('빈 섬으로 초기화되었습니다. 예산 1,200C로 자유롭게 설계해 보세요!', 'info');
+        });
+
+        document.getElementById('btn-preset-village').addEventListener('click', () => {
+          appState.placements = getInitialPresetPlacements();
+          appState.undoStack.length = 0;
+          appState.seaLevel = 0.0;
+          appState.wind = 0.85;
+          seaSlider.value = '0';
+          seaLabel.textContent = '+0.0m';
+          windSlider.value = '0.85';
+          windLabel.textContent = '0.85';
+          refreshSimulationState();
+          showToast('처음 예시 마을로 복원되었습니다.', 'info');
+        });
+
+        // Camera Presets
+        document.getElementById('btn-cam-home').addEventListener('click', () => {
+          updateAspectAwareFraming('home', false);
+          showToast('홈 시점: 섬 전체 조감도', 'info');
+        });
+
+        document.getElementById('btn-cam-hero').addEventListener('click', () => {
+          updateAspectAwareFraming('hero', false);
+          showToast('영웅 시점: 마을 클로즈업', 'info');
+        });
+
+        // Mission Strip Toggle
+        document.getElementById('btn-toggle-mission').addEventListener('click', () => {
+          const strip = document.getElementById('mission-strip');
+          strip.classList.toggle('hidden');
+        });
+
+        // 5-Minute Lesson Modal
+        const modalLesson = document.getElementById('modal-lesson');
+        document.getElementById('btn-open-lesson').addEventListener('click', () => {
+          modalLesson.classList.remove('hidden');
+        });
+        document.getElementById('btn-close-lesson').addEventListener('click', () => {
+          modalLesson.classList.add('hidden');
+        });
+        document.getElementById('btn-close-lesson-bottom').addEventListener('click', () => {
+          modalLesson.classList.add('hidden');
+        });
+
+        // Self-Diagnostics Modal
+        const modalDiag = document.getElementById('modal-diagnostics');
+        const renderDiagResults = () => {
+          const list = document.getElementById('diagnostics-list');
+          const checks = runSelfDiagnostics();
+          list.innerHTML = checks.map(c => `
+            <div class="p-2.5 rounded-2xl border ${c.passed ? 'bg-emerald-50/70 border-emerald-200' : 'bg-rose-50 border-rose-200'} flex items-start justify-between gap-3">
+              <div>
+                <div class="font-bold text-slate-900">${c.title}</div>
+                <div class="text-[11px] text-slate-600 mt-0.5 font-mono">기대값: ${c.expected}</div>
+                <div class="text-[11px] text-slate-800 font-mono font-semibold">실측값: ${c.actual}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg text-[11px] font-extrabold shrink-0 ${c.passed ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}">
+                ${c.passed ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+          `).join('');
+        };
+
+        document.getElementById('btn-open-diagnostics').addEventListener('click', () => {
+          renderDiagResults();
+          modalDiag.classList.remove('hidden');
+        });
+        document.getElementById('btn-rerun-diagnostics').addEventListener('click', () => {
+          renderDiagResults();
+          showToast('순수 함수 자체검사를 다시 실행했습니다.', 'info');
+        });
+        document.getElementById('btn-close-diagnostics').addEventListener('click', () => {
+          modalDiag.classList.add('hidden');
+        });
+        document.getElementById('btn-close-diagnostics-bottom').addEventListener('click', () => {
+          modalDiag.classList.add('hidden');
+        });
+
+        // Close modals on backdrop click
+        [modalLesson, modalDiag].forEach(modal => {
+          modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+          });
+        });
+
+        // Responsive Resize
+        window.addEventListener('resize', () => {
+          if (webglAvailable && renderer && camera) {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            updateAspectAwareFraming('resize', false);
+          }
+        });
+      }
+
+      window.onload = function () {
+        initThreeScene();
+        bindUIEvents();
+        refreshSimulationState();
+        animateLoop(performance.now());
+      };
+    })();
+  </script>
+</body>
+</html>
