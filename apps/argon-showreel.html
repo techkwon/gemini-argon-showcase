@@ -737,6 +737,11 @@
             geminiTtsReady: false,
             geminiTtsLoading: false,
             activeVoiceSource: null,
+            voiceToken: 0,        // Increments per narration so stale onend events are ignored
+            voiceBusy: false,     // True while the current scene's narration is still speaking
+            voiceStarted: false,
+            voiceStartedAt: 0,
+            voiceHoldUntil: 0,    // Short breath after narration ends before cutting to next scene
             isRecording: false,
             mediaRecorder: null,
             recordedChunks: []
@@ -1150,9 +1155,9 @@
             // Update subtitle bar immediately
             document.getElementById('subtitle-text').textContent = `🎙️ "${scene.narration}"`;
 
-            if (!state.voiceEnabled) return;
-
             // Stop previous voice
+            const token = ++state.voiceToken;
+            state.voiceBusy = false;
             if (state.activeVoiceSource) {
                 try { state.activeVoiceSource.stop(); } catch (e) {}
                 state.activeVoiceSource = null;
@@ -1161,12 +1166,23 @@
                 window.speechSynthesis.cancel();
             }
 
+            if (!state.voiceEnabled) return;
+
+            // Timeline waits at the end of a scene while voiceBusy is true
+            const markStart = () => { if (token === state.voiceToken) state.voiceStarted = true; };
+            const markEnd = () => { if (token === state.voiceToken) state.voiceBusy = false; };
+            state.voiceBusy = true;
+            state.voiceStarted = false;
+            state.voiceStartedAt = performance.now();
+
             // Priority 1: Play cached Gemini 2.5 Flash Neural TTS Buffer if synthesized
             if (state.geminiTtsReady && state.geminiTtsBuffers[sceneIndex] && audioEngine.ctx) {
                 const source = audioEngine.ctx.createBufferSource();
                 source.buffer = state.geminiTtsBuffers[sceneIndex];
                 source.connect(audioEngine.voiceGain);
+                source.onended = markEnd;
                 source.start(0);
+                markStart();
                 state.activeVoiceSource = source;
                 return;
             }
@@ -1181,8 +1197,24 @@
                 const korVoice = voices.find(v => v.lang.includes('ko') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Heami') || v.name.includes('Yuna')))
                               || voices.find(v => v.lang.includes('ko'));
                 if (korVoice) utter.voice = korVoice;
+                utter.onstart = markStart;
+                utter.onend = markEnd;
+                utter.onerror = markEnd;
                 window.speechSynthesis.speak(utter);
+            } else {
+                state.voiceBusy = false;
             }
+        }
+
+        // Hold the timeline at the end of the current scene until its narration finishes
+        function shouldHoldForVoice(now) {
+            if (!state.voiceEnabled) return false;
+            const elapsed = now - state.voiceStartedAt;
+            const speaking = state.voiceBusy
+                && (state.voiceStarted || elapsed < 1500)  // voice never started → don't stall
+                && elapsed < 25000;                         // safety cap if onend never fires
+            if (speaking) { state.voiceHoldUntil = now + 450; return true; }
+            return now < state.voiceHoldUntil;
         }
 
         /*************************************************************************
@@ -1619,7 +1651,13 @@
 
             // Advance Timeline if playing
             if (state.isPlaying) {
-                state.currentTime += dt;
+                const playingScene = SCENES[state.activeSceneIndex];
+                const sceneHoldPoint = playingScene ? playingScene.end - 0.05 : Infinity;
+                if (playingScene && state.currentTime + dt >= sceneHoldPoint && shouldHoldForVoice(safeNow)) {
+                    state.currentTime = Math.max(state.currentTime, Math.min(state.currentTime + dt, sceneHoldPoint));
+                } else {
+                    state.currentTime += dt;
+                }
                 if (state.currentTime >= TOTAL_DURATION) {
                     state.currentTime = 0;
                     state.activeSceneIndex = -1;
@@ -1710,6 +1748,7 @@
         function seekTo(newTime) {
             state.currentTime = Math.max(0, Math.min(TOTAL_DURATION - 0.05, parseFloat(newTime)));
             state.activeSceneIndex = -1; // Force scene re-sync
+            state.voiceHoldUntil = 0;
             document.getElementById('timeline-scrubber').value = state.currentTime;
             updateKineticScenes(state.currentTime);
         }
